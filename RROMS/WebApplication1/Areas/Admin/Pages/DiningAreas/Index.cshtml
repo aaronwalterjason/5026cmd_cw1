@@ -1,0 +1,42 @@
+@page
+@model RROMS.Areas.Admin.Pages.DiningAreas.IndexModel
+@{
+    ViewData["Title"] = "Dining Areas";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Dining Areas</h1>
+    <a class="btn btn-primary" asp-page="./Create">+ New dining area</a>
+</div>
+
+@if (TempData["StatusMessage"] is string status)
+{
+    <div class="alert alert-success">@status</div>
+}
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Zone</th>
+            <th>Tables</th>
+            <th>Active</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var area in Model.DiningAreas)
+    {
+        <tr>
+            <td>@area.Name</td>
+            <td>@area.Zone</td>
+            <td>@area.Tables.Count</td>
+            <td>@(area.IsActive ? "Yes" : "No")</td>
+            <td>
+                <a class="btn btn-sm btn-outline-secondary" asp-page="./Edit" asp-route-id="@area.Id">Edit</a>
+                <a class="btn btn-sm btn-outline-danger" asp-page="./Delete" asp-route-id="@area.Id">Delete</a>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

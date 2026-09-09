@@ -1,0 +1,17 @@
+@page "{id:int}"
+@model RROMS.Areas.Admin.Pages.MenuItems.DeleteModel
+@{
+    ViewData["Title"] = "Delete Menu Item";
+}
+
+<h1>Delete Menu Item</h1>
+
+<div class="alert alert-warning">
+    Are you sure you want to delete <strong>@Model.Item.Name</strong>? This cannot be undone.
+</div>
+
+<form method="post">
+    <input type="hidden" asp-for="Item.Id" />
+    <button type="submit" class="btn btn-danger">Delete</button>
+    <a asp-page="./Index" class="btn btn-link">Cancel</a>
+</form>
