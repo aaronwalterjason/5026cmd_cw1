@@ -1,0 +1,49 @@
+@page "{id:int}"
+@model KOMA.Pages.Admin.MenuItems.EditModel
+@{
+    ViewData["Title"] = "Edit Menu Item";
+}
+
+<h1>Edit Menu Item</h1>
+
+<form method="post" class="col-md-6">
+    <input type="hidden" asp-for="Item.Id" />
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="mb-3">
+        <label asp-for="Item.Name" class="form-label"></label>
+        <input asp-for="Item.Name" class="form-control" />
+        <span asp-validation-for="Item.Name" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Item.MenuCategoryId" class="form-label">Category</label>
+        <select asp-for="Item.MenuCategoryId" asp-items="Model.CategoryOptions" class="form-select">
+        </select>
+        <span asp-validation-for="Item.MenuCategoryId" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Item.Description" class="form-label"></label>
+        <textarea asp-for="Item.Description" class="form-control" rows="3"></textarea>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Item.Price" class="form-label"></label>
+        <input asp-for="Item.Price" class="form-control" />
+        <span asp-validation-for="Item.Price" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Item.ImageUrl" class="form-label"></label>
+        <input asp-for="Item.ImageUrl" class="form-control" />
+    </div>
+
+    <div class="form-check mb-3">
+        <input asp-for="Item.IsAvailable" class="form-check-input" />
+        <label asp-for="Item.IsAvailable" class="form-check-label"></label>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save changes</button>
+    <a asp-page="./Index" class="btn btn-link">Cancel</a>
+</form>

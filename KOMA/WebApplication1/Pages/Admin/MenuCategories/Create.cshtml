@@ -1,0 +1,30 @@
+@page
+@model KOMA.Pages.Admin.MenuCategories.CreateModel
+@{
+    ViewData["Title"] = "New Menu Category";
+}
+
+<h1>New Menu Category</h1>
+
+<form method="post" class="col-md-6">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="mb-3">
+        <label asp-for="Category.Name" class="form-label"></label>
+        <input asp-for="Category.Name" class="form-control" />
+        <span asp-validation-for="Category.Name" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Category.DisplayOrder" class="form-label"></label>
+        <input asp-for="Category.DisplayOrder" class="form-control" />
+    </div>
+
+    <div class="form-check mb-3">
+        <input asp-for="Category.IsActive" class="form-check-input" />
+        <label asp-for="Category.IsActive" class="form-check-label"></label>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-page="./Index" class="btn btn-link">Cancel</a>
+</form>

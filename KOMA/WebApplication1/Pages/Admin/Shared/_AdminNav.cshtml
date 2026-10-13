@@ -1,0 +1,14 @@
+@* Admin side-nav partial, rendered inside the shared site layout whenever the current path
+   starts with /Admin (see Pages/Shared/_Layout.cshtml). *@
+<nav class="admin-nav">
+    <ul class="nav flex-column">
+        <li class="nav-item"><a class="nav-link" asp-area="" asp-page="/Admin/Dashboard">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" asp-area="" asp-page="/Admin/DiningAreas/Index">Dining Areas</a></li>
+        <li class="nav-item"><a class="nav-link" asp-area="" asp-page="/Admin/Tables/Index">Tables</a></li>
+        <li class="nav-item"><a class="nav-link" asp-area="" asp-page="/Admin/MenuCategories/Index">Menu Categories</a></li>
+        <li class="nav-item"><a class="nav-link" asp-area="" asp-page="/Admin/MenuItems/Index">Menu Items</a></li>
+        <li class="nav-item"><a class="nav-link" asp-area="" asp-page="/Admin/Accounts/Index">Accounts &amp; Roles</a></li>
+        <li class="nav-item"><a class="nav-link" asp-area="" asp-page="/Admin/Reports/Index">Reports</a></li>
+        <li class="nav-item"><a class="nav-link" asp-area="" asp-page="/Admin/Settings/Index">Settings</a></li>
+    </ul>
+</nav>

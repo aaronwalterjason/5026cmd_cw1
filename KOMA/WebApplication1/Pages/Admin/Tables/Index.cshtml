@@ -1,0 +1,34 @@
+@page
+@model KOMA.Pages.Admin.Tables.IndexModel
+@{
+    ViewData["Title"] = "Tables";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Tables</h1>
+    <a class="btn btn-primary" asp-page="./Create">+ New table</a>
+</div>
+
+@if (TempData["StatusMessage"] is string status)
+{
+    <div class="alert alert-success">@status</div>
+}
+
+<table class="table table-striped">
+    <thead><tr><th>Table #</th><th>Dining Area</th><th>Capacity</th><th>Active</th><th></th></tr></thead>
+    <tbody>
+    @foreach (var t in Model.Tables)
+    {
+        <tr>
+            <td>@t.TableNumber</td>
+            <td>@t.DiningArea?.Name</td>
+            <td>@t.Capacity</td>
+            <td>@(t.IsActive ? "Yes" : "No")</td>
+            <td>
+                <a class="btn btn-sm btn-outline-secondary" asp-page="./Edit" asp-route-id="@t.Id">Edit</a>
+                <a class="btn btn-sm btn-outline-danger" asp-page="./Delete" asp-route-id="@t.Id">Delete</a>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

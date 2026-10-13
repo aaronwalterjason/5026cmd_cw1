@@ -1,0 +1,17 @@
+@page "{id:int}"
+@model KOMA.Pages.Admin.Tables.DeleteModel
+@{
+    ViewData["Title"] = "Delete Table";
+}
+
+<h1>Delete Table</h1>
+
+<div class="alert alert-warning">
+    Are you sure you want to delete table <strong>@Model.Table.TableNumber</strong>? This cannot be undone.
+</div>
+
+<form method="post">
+    <input type="hidden" asp-for="Table.Id" />
+    <button type="submit" class="btn btn-danger">Delete</button>
+    <a asp-page="./Index" class="btn btn-link">Cancel</a>
+</form>

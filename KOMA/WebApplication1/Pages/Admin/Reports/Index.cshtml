@@ -1,0 +1,27 @@
+@page
+@model KOMA.Pages.Admin.Reports.IndexModel
+@{
+    ViewData["Title"] = "Reports";
+}
+
+<h1>Reports</h1>
+
+<form method="get" class="row g-2 align-items-end mb-4">
+    <div class="col-auto">
+        <label class="form-label">From</label>
+        <input type="date" name="from" class="form-control" value="@Model.FromDate.ToString("yyyy-MM-dd")" />
+    </div>
+    <div class="col-auto">
+        <label class="form-label">To</label>
+        <input type="date" name="to" class="form-control" value="@Model.ToDate.ToString("yyyy-MM-dd")" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </div>
+</form>
+
+<div class="alert alert-info">
+    TODO (Intermediate, Week 7-8): reservation stats, sales totals, popular items for this range -
+    wire this up once the Reservations/Orders tables exist on <code>ApplicationDbContext</code>.<br />
+    TODO (Advanced, Week 9): charts + CSV/PDF/Excel export buttons.
+</div>

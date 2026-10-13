@@ -1,0 +1,38 @@
+@page
+@model KOMA.Pages.Admin.DashboardModel
+@{
+    ViewData["Title"] = "Admin Dashboard";
+}
+
+<h1>Admin Dashboard</h1>
+<p class="text-muted">Overview of restaurant setup.</p>
+
+<div class="row g-3">
+    <div class="col-md-3">
+        <div class="card p-3">
+            <div class="fs-2">@Model.DiningAreaCount</div>
+            <div>Dining Areas</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3">
+            <div class="fs-2">@Model.TableCount</div>
+            <div>Tables</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3">
+            <div class="fs-2">@Model.MenuItemCount</div>
+            <div>Menu Items</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3">
+            <div class="fs-2">@Model.ActivePromotionCount</div>
+            <div>Active Promotions</div>
+        </div>
+    </div>
+</div>
+
+@* Advanced tier (Week 9): replace/extend this grid with the analytics dashboard
+   (peak hours, reservation trends, table utilisation, sales chart). *@
