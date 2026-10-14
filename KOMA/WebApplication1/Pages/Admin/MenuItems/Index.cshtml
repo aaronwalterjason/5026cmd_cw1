@@ -15,7 +15,7 @@
 }
 
 <table class="table table-striped">
-    <thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Available</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Available</th><th>Homepage</th><th></th></tr></thead>
     <tbody>
     @foreach (var i in Model.Items)
     {
@@ -24,6 +24,7 @@
             <td>@i.MenuCategory?.Name</td>
             <td>@i.Price.ToString("C")</td>
             <td>@(i.IsAvailable ? "Yes" : "No")</td>
+            <td>@(i.IsRecommended ? "Recommended" : "") @(i.IsSeasonal ? "Seasonal" : "")</td>
             <td>
                 <a class="btn btn-sm btn-outline-secondary" asp-page="./Edit" asp-route-id="@i.Id">Edit</a>
                 <a class="btn btn-sm btn-outline-danger" asp-page="./Delete" asp-route-id="@i.Id">Delete</a>
@@ -32,3 +33,4 @@
     }
     </tbody>
 </table>
+

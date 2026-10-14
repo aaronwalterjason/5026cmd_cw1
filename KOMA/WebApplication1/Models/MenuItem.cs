@@ -20,6 +20,8 @@ namespace KOMA.Models
         public decimal Price { get; set; }
 
         public bool IsAvailable { get; set; } = true;
+        public bool IsRecommended { get; set; }
+        public bool IsSeasonal { get; set; }
 
         [ForeignKey(nameof(MenuCategory))]
         public int MenuCategoryId { get; set; }
@@ -32,3 +34,4 @@ namespace KOMA.Models
         public string? ImageUrl { get; set; }
     }
 }
+

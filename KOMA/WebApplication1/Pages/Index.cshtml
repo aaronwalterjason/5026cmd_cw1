@@ -1,10 +1,63 @@
-﻿@page
+@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    Layout = "_PublicLayout";
+    ViewData["Title"] = "Good food. Good company.";
 }
+<section class="hero hero-wide" aria-labelledby="hero-title">
+    <img class="hero-background" src="~/images/koma/japanese-table.jpg" alt="" fetchpriority="high" />
+    <div class="hero-copy">
+        <p class="eyebrow">A LITTLE TASTE OF JAPAN</p>
+        <h1 id="hero-title">Good food.<br /><em>Better together.</em></h1>
+        <p class="intro">Bring your appetite. Bring your favourite people.<br />There is always a little more to enjoy at KOMA.</p>
+        <a class="button light" href="#food">Find your favourite <span aria-hidden="true">↓</span></a>
+    </div>
+    <div class="hero-bottom"><span>JAPANESE-INSPIRED DINING</span><span>SCROLL TO SAVOUR ↓</span></div>
+</section>
+<section class="food-section wave-pattern" id="food" aria-labelledby="food-title">
+    <div class="food-heading reveal"><p class="eyebrow">SOMETHING GOOD IS ON THE TABLE</p><h2 id="food-title">What are you craving?</h2><p>A familiar favourite or something a little different.<br />Take a look around. Find your next good bite.</p></div>
+    <div class="food-toolbar" hidden="@(Model.Dishes.Count == 0)">
+        <div class="food-filters" aria-label="Food selection">
+            <button type="button" data-filter="all" aria-pressed="true">All favourites</button>
+            <button type="button" data-filter="recommended" aria-pressed="false">Recommended</button>
+            <button type="button" data-filter="seasonal" aria-pressed="false">Seasonal specials</button>
+        </div>
+        <div class="carousel-controls" aria-label="Food carousel controls"><button type="button" data-direction="-1" aria-label="Previous dishes">←</button><button type="button" data-direction="1" aria-label="Next dishes">→</button></div>
+    </div>
+    <p class="food-empty" role="status" hidden="@(Model.Dishes.Count > 0)">Our next favourites are on the way. Check back soon.</p>
+    <div class="food-track" aria-label="Featured dishes" tabindex="0">
+        @foreach (var dish in Model.Dishes)
+        {
+            <article class="food-card" data-category="@((dish.IsRecommended ? "recommended " : "") + (dish.IsSeasonal ? "seasonal" : ""))">
+                <div class="dish-photo">
+                    @if (!string.IsNullOrWhiteSpace(dish.ImageUrl))
+                    {
+                        <img src="@dish.ImageUrl" alt="@dish.Name" loading="lazy" />
+                    }
+                    else
+                    {
+                        <span class="photo-placeholder">Photo coming soon</span>
+                    }
+                </div>
+                <div class="food-card-body"><p class="eyebrow">@(dish.IsRecommended && dish.IsSeasonal ? "KOMA PICKS / SEASONAL" : dish.IsRecommended ? "KOMA PICKS" : "SEASONAL SPOTLIGHT")</p><h3>@dish.Name</h3><p>@dish.Description</p>
+                    @if (User.Identity?.IsAuthenticated != true)
+                    {
+                        <a class="button order-button" asp-area="Identity" asp-page="/Account/Login" asp-route-returnUrl="@Url.Page("/Index", new { dish = dish.Id })" aria-label="Order @dish.Name now">Order Now <span aria-hidden="true">↗</span></a>
+                    }
+                    else
+                    {
+                        <button class="button order-button" type="button" data-order-message="@(User.IsInRole("Customer") ? "Online ordering is not available yet. Please check back soon." : "Ordering is available to customer accounts. Please sign in with a customer account.")" aria-label="Order @dish.Name now">Order Now <span aria-hidden="true">↗</span></button>
+                    }
+                </div>
+            </article>
+        }
+    </div>
+    <p class="order-status" role="status" aria-live="polite">@if (Request.Query.ContainsKey("dish") && User.Identity?.IsAuthenticated == true) { <text>@(User.IsInRole("Customer") ? "You are signed in. Online ordering is not available yet. Please check back soon." : "Ordering is available to customer accounts. Please sign in with a customer account.")</text> }</p>
+</section>
+<section class="story reveal" id="story"><p class="eyebrow">THE KOMA WAY</p><h2>A full table.<br /><em>A happy heart.</em></h2><p>A good meal is about more than what is on the plate. It is the conversation, the company, and a little time together. Come as you are. Stay for another bite.</p></section>
+<section class="experience" id="experience"><div class="reveal"><p class="eyebrow">MAKE YOURSELF AT HOME</p><h2>Little reasons to linger.</h2></div><div class="cards"><article class="reveal"><span class="eyebrow">01 / THE FOOD</span><h3>Find a new favourite.</h3><p>Japanese-inspired flavours, from a delicate bite to a satisfying crunch.</p></article><article class="reveal"><span class="eyebrow">02 / THE COMPANY</span><h3>Share a little joy.</h3><p>Catch up, celebrate, or simply spend a little time around the table.</p></article><article class="reveal"><span class="eyebrow">03 / THE MOMENT</span><h3>Make it your own.</h3><p>A quick catch-up or a long conversation. Good moments start here.</p></article></div></section>
+<section class="invitation reveal"><p class="eyebrow">YOUR NEXT GOOD MOMENT</p><h2>Come for the food.<br /><em>Stay for the company.</em></h2>
+    @if (User.Identity?.IsAuthenticated == true) { <a class="button light" asp-area="Identity" asp-page="/Account/Manage/Index">Your account <span aria-hidden="true">↗</span></a> }
+    else { <a class="button light" asp-area="Identity" asp-page="/Account/Register">Join KOMA <span aria-hidden="true">↗</span></a> }
+</section>
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>

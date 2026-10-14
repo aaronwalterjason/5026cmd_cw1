@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="KOMA — Japanese-inspired dining and moments worth sharing." />
+    <meta name="theme-color" content="#263b49" />
+    <title>@ViewData["Title"] — KOMA</title>
+    <link rel="stylesheet" href="~/css/koma-home.css" asp-append-version="true" />
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="header">
+        <a class="brand" asp-area="" asp-page="/Index" aria-label="KOMA home"><span aria-hidden="true">こま</span>KOMA</a>
+        <nav class="main-nav" aria-label="Main navigation"><a href="#food">Our favourites</a><a href="#story">Our story</a><a href="#experience">The experience</a></nav>
+        <nav class="account-nav" aria-label="Account">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                @if (User.IsInRole("Administrator"))
+                {
+                    <a asp-area="" asp-page="/Admin/Dashboard">Dashboard</a>
+                }
+                <a class="account-name" asp-area="Identity" asp-page="/Account/Manage/Index">@User.Identity.Name</a>
+                <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Page("/Index", new { area = "" })" method="post"><button class="button small" type="submit">Logout</button></form>
+            }
+            else
+            {
+                <a asp-area="Identity" asp-page="/Account/Login">Login</a>
+                <a class="button small" asp-area="Identity" asp-page="/Account/Register">Register <span aria-hidden="true">↗</span></a>
+            }
+        </nav>
+    </header>
+    <main id="main" tabindex="-1">@RenderBody()</main>
+    <footer class="footer"><a class="brand" asp-area="" asp-page="/Index">KOMA</a><p>A moment, beautifully made.</p><div>© @DateTime.Now.Year KOMA · <a asp-area="" asp-page="/Privacy">Privacy</a></div></footer>
+    <script src="~/js/koma-home.js" asp-append-version="true" defer></script>
+</body>
+</html>

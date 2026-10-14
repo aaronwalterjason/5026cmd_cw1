@@ -6,7 +6,7 @@
 
 <h1>New Menu Item</h1>
 
-<form method="post" class="col-md-6">
+<form method="post" enctype="multipart/form-data" class="col-md-6">
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
     <div class="mb-3">
@@ -35,8 +35,14 @@
     </div>
 
     <div class="mb-3">
-        <label asp-for="Item.ImageUrl" class="form-label"></label>
-        <input asp-for="Item.ImageUrl" class="form-control" />
+        <label asp-for="Photo" class="form-label">Food photo</label>
+        <input asp-for="Photo" type="file" accept="image/jpeg,image/png,image/webp" class="form-control" />
+        <span asp-validation-for="Photo" class="text-danger"></span>
+        <p class="form-text">JPG, PNG or WebP, up to 5 MB. Leave blank to keep the current photo.</p>
+        @if (!string.IsNullOrEmpty(Model.Item.ImageUrl))
+        {
+            <img src="@Model.Item.ImageUrl" alt="@Model.Item.Name" style="width:180px;height:120px;object-fit:cover" />
+        }
     </div>
 
     <div class="form-check mb-3">
@@ -44,6 +50,19 @@
         <label asp-for="Item.IsAvailable" class="form-check-label"></label>
     </div>
 
+    <fieldset class="mb-3">
+        <legend class="fs-6">Show on the homepage</legend>
+        <div class="form-check">
+            <input asp-for="Item.IsRecommended" class="form-check-input" />
+            <label asp-for="Item.IsRecommended" class="form-check-label">Recommended</label>
+        </div>
+        <div class="form-check">
+            <input asp-for="Item.IsSeasonal" class="form-check-input" />
+            <label asp-for="Item.IsSeasonal" class="form-check-label">Seasonal special</label>
+        </div>
+        <p class="form-text">Select either or both. Only available items in active categories appear. Prices are not shown on the homepage.</p>
+    </fieldset>
     <button type="submit" class="btn btn-primary">Save</button>
     <a asp-page="./Index" class="btn btn-link">Cancel</a>
 </form>
+

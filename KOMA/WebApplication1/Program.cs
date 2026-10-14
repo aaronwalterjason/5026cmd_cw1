@@ -22,6 +22,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 
 builder.Services.AddRazorPages();
 builder.Services.AddScoped<AccountService>();
+builder.Services.AddScoped<MenuImageService>();
 // Check role changes on the next request, rather than retaining old role claims.
 builder.Services.Configure<SecurityStampValidatorOptions>(options =>
     options.ValidationInterval = TimeSpan.Zero);
@@ -36,6 +37,8 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+// Serve photos uploaded after the application was built.
+app.UseStaticFiles();
 
 app.UseRouting();
 
@@ -53,3 +56,4 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
