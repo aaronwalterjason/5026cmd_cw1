@@ -10,7 +10,8 @@ namespace KOMA.Models
         [Required, StringLength(60)]
         public string Name { get; set; } = string.Empty;
 
-        public int DisplayOrder { get; set; }
+        [StringLength(200)]
+        public string? Description { get; set; }
 
         public bool IsActive { get; set; } = true;
 

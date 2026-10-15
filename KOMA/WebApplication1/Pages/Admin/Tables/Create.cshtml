@@ -29,6 +29,11 @@
         <span asp-validation-for="Table.Capacity" class="text-danger"></span>
     </div>
 
+    <div class="mb-3">
+        <label asp-for="Table.Shape" class="form-label"></label>
+        <select asp-for="Table.Shape" asp-items="Html.GetEnumSelectList<TableShape>()" class="form-select"></select>
+    </div>
+
     <div class="form-check mb-3">
         <input asp-for="Table.IsActive" class="form-check-input" />
         <label asp-for="Table.IsActive" class="form-check-label"></label>

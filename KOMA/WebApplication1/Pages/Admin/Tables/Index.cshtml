@@ -15,7 +15,7 @@
 }
 
 <table class="table table-striped">
-    <thead><tr><th>Table #</th><th>Dining Area</th><th>Capacity</th><th>Active</th><th></th></tr></thead>
+    <thead><tr><th>Table #</th><th>Dining Area</th><th>Capacity</th><th>Shape</th><th>Active</th><th></th></tr></thead>
     <tbody>
     @foreach (var t in Model.Tables)
     {
@@ -23,6 +23,7 @@
             <td>@t.TableNumber</td>
             <td>@t.DiningArea?.Name</td>
             <td>@t.Capacity</td>
+            <td>@t.Shape</td>
             <td>@(t.IsActive ? "Yes" : "No")</td>
             <td>
                 <a class="btn btn-sm btn-outline-secondary" asp-page="./Edit" asp-route-id="@t.Id">Edit</a>

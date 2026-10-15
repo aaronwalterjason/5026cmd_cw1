@@ -15,6 +15,10 @@ namespace KOMA.Models
         [Range(1, 20)]
         public int Capacity { get; set; }
 
+        // Stored as an int in the database (Square = 0, the default for existing rows).
+        [Display(Name = "Table Shape")]
+        public TableShape Shape { get; set; } = TableShape.Square;
+
         public bool IsActive { get; set; } = true;
 
         [ForeignKey(nameof(DiningArea))]
@@ -23,5 +27,14 @@ namespace KOMA.Models
 
         // TODO (Engineer B, Intermediate tier): availability is computed from Reservations,
         // not stored here - don't add an "IsAvailable" flag, it will go stale.
+    }
+
+    public enum TableShape
+    {
+        Square = 0,
+        Round = 1,
+        Rectangle = 2,
+        Booth = 3,
+        Counter = 4
     }
 }
