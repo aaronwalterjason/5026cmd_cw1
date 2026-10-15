@@ -1,0 +1,107 @@
+﻿.floor-room {
+    border: 3px solid #c8c1b4;
+    border-radius: 12px;
+    padding: 24px;
+    background: #f8f5ef
+}
+
+.floor-tables {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(190px,1fr));
+    gap: 28px 36px;
+    padding: 12px
+}
+
+.table-position {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px
+}
+
+.chairs {
+    color: #8c8172;
+    letter-spacing: 14px;
+    font-size: 20px;
+    line-height: 1
+}
+
+.restaurant-table {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    min-height: 155px;
+    width: 100%;
+    max-width: 240px;
+    padding: 18px 12px;
+    border: 2px solid;
+    border-radius: 12px;
+    text-align: center;
+    text-decoration: none;
+    color: #182c22;
+    background: #fff;
+    box-shadow: 0 4px 0 #00000012
+}
+
+    .restaurant-table.available {
+        border-color: #23744a;
+        background: #edf8f0
+    }
+
+    .restaurant-table.booked {
+        border-color: #a73138;
+        background: #fff0f0;
+        color: #722329
+    }
+
+    .restaurant-table strong {
+        font-size: 1.3rem
+    }
+
+    .restaurant-table small {
+        font-size: .8rem
+    }
+
+.table-status {
+    font-weight: 700
+}
+
+.restaurant-table.shape-round {
+    border-radius: 48%
+}
+
+.restaurant-table.shape-rectangle {
+    max-width: 270px
+}
+
+.restaurant-table.shape-booth {
+    border-width: 7px 2px 2px
+}
+
+.restaurant-table.shape-counter {
+    border-top-width: 8px;
+    border-radius: 4px
+}
+
+a.restaurant-table:hover {
+    box-shadow: 0 5px 12px #0002;
+    text-decoration: underline
+}
+
+a.restaurant-table:focus-visible {
+    outline: 4px solid #1264b7;
+    outline-offset: 4px
+}
+
+@media(max-width:480px) {
+    .floor-room {
+        padding: 14px
+    }
+
+    .floor-tables {
+        grid-template-columns: 1fr;
+        padding: 4px
+    }
+}

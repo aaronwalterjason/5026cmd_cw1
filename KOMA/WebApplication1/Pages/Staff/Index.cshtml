@@ -9,3 +9,20 @@
 
 <p>Welcome, @User.Identity?.Name!</p>
 <p>This is your staff workspace for reservations, orders and billing.</p>
+
+<!-- Reservation Management -->
+<div class="card shadow-sm mt-4" style="max-width: 36rem;">
+    <div class="card-body">
+        <h2 class="h4">Reservations</h2>
+
+        <p>
+            View table availability, create bookings
+            and manage customer reservations.
+        </p>
+
+        <a asp-page="/Staff/Reservation/Index"
+           class="btn btn-primary">
+            Open reservations
+        </a>
+    </div>
+</div>
