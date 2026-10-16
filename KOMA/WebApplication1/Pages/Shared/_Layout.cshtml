@@ -8,12 +8,15 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/KOMA.styles.css" asp-append-version="true" />
+    @* KOMA theme (same look as the public homepage) - must load last *@
+    <link rel="stylesheet" href="~/css/koma-theme.css" asp-append-version="true" />
+    <meta name="theme-color" content="#263b49" />
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light koma-topbar mb-3">
             <div class="container">
-                <a class="navbar-brand" asp-area="" asp-page="/Index">KOMA</a>
+                <a class="navbar-brand koma-brand" asp-area="" asp-page="/Index" aria-label="KOMA home"><span aria-hidden="true">こま</span>KOMA</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -38,27 +41,24 @@
             </div>
         </nav>
     </header>
-    <div class="container">
-        @if (Context.Request.Path.StartsWithSegments("/Admin"))
-        {
-            <div class="row">
-                <div class="col-md-3 mb-3">
-                    <partial name="~/Pages/Admin/Shared/_AdminNav.cshtml" />
-                </div>
-                <div class="col-md-9">
-                    <main role="main" class="pb-3">
-                        @RenderBody()
-                    </main>
-                </div>
-            </div>
-        }
-        else
-        {
+    @if (Context.Request.Path.StartsWithSegments("/Admin"))
+    {
+        @* Admin pages: icon rail on the left (Pages/Admin/Shared/_AdminNav.cshtml) + full-width content. *@
+        <div class="admin-shell">
+            <partial name="~/Pages/Admin/Shared/_AdminNav.cshtml" />
+            <main role="main" class="admin-main pb-3">
+                @RenderBody()
+            </main>
+        </div>
+    }
+    else
+    {
+        <div class="container">
             <main role="main" class="pb-3">
                 @RenderBody()
             </main>
-        }
-    </div>
+        </div>
+    }
 
     <footer class="border-top footer text-muted">
         <div class="container">
@@ -69,6 +69,10 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    @if (Context.Request.Path.StartsWithSegments("/Admin"))
+    {
+        <script src="~/js/admin-rail.js" asp-append-version="true"></script>
+    }
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>
