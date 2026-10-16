@@ -1,30 +1,186 @@
 @page
 @model KOMA.Areas.Identity.Pages.Account.RegisterModel
+
 @{
-    ViewData["Title"] = "Register";
+    ViewData["Title"] = "Create an account";
+    Layout = "/Pages/Shared/_Layout.cshtml";
 }
-<h1>Create a customer account</h1>
-<form method="post" class="col-md-6">
-    <input type="hidden" asp-for="ReturnUrl" />
-    <div asp-validation-summary="All" class="text-danger"></div>
-    <div class="mb-3">
-        <label asp-for="Input.FullName" class="form-label"></label>
-        <input asp-for="Input.FullName" class="form-control" autocomplete="name" />
+
+<link rel="stylesheet"
+      href="~/css/koma-login.css"
+      asp-append-version="true" />
+
+<div class="koma-login">
+
+    <div class="koma-login-shell">
+
+        <!-- Brand Panel -->
+        <section class="koma-login-brand"
+                 aria-labelledby="register-brand-title">
+
+            <a asp-area=""
+               asp-page="/Index"
+               class="koma-login-logo">
+                <span lang="ja">こま</span>
+                KOMA
+            </a>
+
+            <div>
+                <p class="koma-login-eyebrow">JOIN KOMA</p>
+
+                <h1 id="register-brand-title">
+                    A place<br />
+                    <em>at our table.</em>
+                </h1>
+
+                <p class="koma-login-description">
+                    Create your account and make yourself at home.
+                    Your next good moment starts here.
+                </p>
+            </div>
+
+            <p class="koma-login-brand-note">
+                Japanese-inspired dining.
+            </p>
+
+        </section>
+
+        <!-- Customer Registration Form -->
+        <section class="koma-login-form-panel"
+                 aria-labelledby="register-title">
+
+            <div class="koma-login-form-content">
+
+                <p class="koma-login-eyebrow">NEW TO KOMA</p>
+
+                <h2 id="register-title">Create an account</h2>
+
+                <p class="koma-login-intro">
+                    Enter your details to create your customer account.
+                </p>
+
+                <form id="register-form" method="post">
+
+                    <input type="hidden" asp-for="ReturnUrl" />
+
+                    <div asp-validation-summary="ModelOnly"
+                         class="koma-login-errors"
+                         role="alert">
+                    </div>
+
+                    <!-- Full Name -->
+                    <div class="koma-login-field">
+                        <label asp-for="Input.FullName">
+                            Full name
+                        </label>
+
+                        <input asp-for="Input.FullName"
+                               autocomplete="name"
+                               maxlength="100"
+                               placeholder="Your full name"
+                               aria-required="true"
+                               aria-describedby="register-name-error" />
+
+                        <span asp-validation-for="Input.FullName"
+                              id="register-name-error"
+                              class="koma-login-field-error">
+                        </span>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="koma-login-field">
+                        <label asp-for="Input.Email">
+                            Email address
+                        </label>
+
+                        <input asp-for="Input.Email"
+                               type="email"
+                               autocomplete="email"
+                               inputmode="email"
+                               autocapitalize="none"
+                               spellcheck="false"
+                               placeholder="you@example.com"
+                               aria-required="true"
+                               aria-describedby="register-email-error" />
+
+                        <span asp-validation-for="Input.Email"
+                              id="register-email-error"
+                              class="koma-login-field-error">
+                        </span>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="koma-login-field">
+                        <label asp-for="Input.Password">
+                            Password
+                        </label>
+
+                        <input asp-for="Input.Password"
+                               type="password"
+                               autocomplete="new-password"
+                               maxlength="100"
+                               placeholder="Create a password"
+                               aria-required="true"
+                               aria-describedby="register-password-error" />
+
+                        <span asp-validation-for="Input.Password"
+                              id="register-password-error"
+                              class="koma-login-field-error">
+                        </span>
+                    </div>
+
+                    <!-- Confirm Password -->
+                    <div class="koma-login-field">
+                        <label asp-for="Input.ConfirmPassword">
+                            Confirm password
+                        </label>
+
+                        <input asp-for="Input.ConfirmPassword"
+                               type="password"
+                               autocomplete="new-password"
+                               maxlength="100"
+                               placeholder="Enter your password again"
+                               aria-required="true"
+                               aria-describedby="register-confirm-error" />
+
+                        <span asp-validation-for="Input.ConfirmPassword"
+                              id="register-confirm-error"
+                              class="koma-login-field-error">
+                        </span>
+                    </div>
+
+                    <button id="register-submit"
+                            type="submit"
+                            class="koma-login-submit">
+                        Create account
+                        <span aria-hidden="true">↗</span>
+                    </button>
+
+                </form>
+
+                <!-- Login Link -->
+                <p class="koma-login-register">
+                    Already have an account?
+                    <a asp-page="./Login"
+                       asp-route-returnUrl="@Model.ReturnUrl">
+                        Log in
+                    </a>
+                </p>
+
+                <a asp-area=""
+                   asp-page="/Index"
+                   class="koma-login-back">
+                    ← Back to home
+                </a>
+
+            </div>
+
+        </section>
+
     </div>
-    <div class="mb-3">
-        <label asp-for="Input.Email" class="form-label"></label>
-        <input asp-for="Input.Email" class="form-control" autocomplete="email" />
-    </div>
-    <div class="mb-3">
-        <label asp-for="Input.Password" class="form-label"></label>
-        <input asp-for="Input.Password" class="form-control" autocomplete="new-password" />
-    </div>
-    <div class="mb-3">
-        <label asp-for="Input.ConfirmPassword" class="form-label"></label>
-        <input asp-for="Input.ConfirmPassword" class="form-control" autocomplete="new-password" />
-    </div>
-    <button type="submit" class="btn btn-primary">Register</button>
-</form>
+
+</div>
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
 }

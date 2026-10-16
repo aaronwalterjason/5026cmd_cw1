@@ -22,6 +22,7 @@ namespace KOMA.Data
         public DbSet<MenuItem> MenuItems => Set<MenuItem>();
         public DbSet<Promotion> Promotions => Set<Promotion>();
         public DbSet<RestaurantSettings> RestaurantSettings => Set<RestaurantSettings>();
+        public DbSet<Reservation> Reservations => Set<Reservation>();
 
         // Engineer B: customer orders and their line items.
         public DbSet<Order> Orders => Set<Order>();
@@ -30,6 +31,27 @@ namespace KOMA.Data
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+
+            // Reservation table relationships.
+            builder.Entity<Reservation>()
+                .HasOne(r => r.RestaurantTable)
+                .WithMany()
+                .HasForeignKey(r => r.RestaurantTableId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<Reservation>()
+                .HasOne(r => r.CustomerUser)
+                .WithMany()
+                .HasForeignKey(r => r.CustomerUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<Reservation>()
+                .HasIndex(r => new
+                {
+                    r.RestaurantTableId,
+                    r.StartTime,
+                    r.EndTime
+                });
 
             // Keep Identity key lengths consistent in runtime and design-time tooling.
             builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserLogin<string>>()

@@ -1,0 +1,37 @@
+﻿@page "{id:int}"
+@model KOMA.Pages.Staff.Reservations.DetailsModel
+@using KOMA.Models
+@{ ViewData["Title"] = "Reservation details"; var booking = Model.Booking; }
+<h1>Reservation R-@booking.Id.ToString("D5")</h1>
+@if (TempData["SuccessMessage"] is string success) { <div class="alert alert-success" role="status">@success</div> }
+@if (TempData["ErrorMessage"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
+<div class="card mb-4"><div class="card-header"><strong>@booking.Status</strong></div><div class="card-body">
+    <dl class="row mb-0">
+        <dt class="col-sm-3">Customer</dt><dd class="col-sm-9">@booking.CustomerName</dd>
+        <dt class="col-sm-3">Contact number</dt><dd class="col-sm-9">@booking.ContactNumber</dd>
+        <dt class="col-sm-3">Email</dt><dd class="col-sm-9">@(booking.Email ?? "Not provided")</dd>
+        <dt class="col-sm-3">Table</dt><dd class="col-sm-9">@booking.RestaurantTable.TableNumber · @booking.RestaurantTable.DiningArea?.Name</dd>
+        <dt class="col-sm-3">Date and time</dt><dd class="col-sm-9">@booking.StartTime.ToString("dd MMM yyyy, HH:mm") – @booking.EndTime.ToString("HH:mm") (Malaysia)</dd>
+        <dt class="col-sm-3">Guests</dt><dd class="col-sm-9">@booking.GuestCount / capacity @booking.RestaurantTable.Capacity</dd>
+        <dt class="col-sm-3">Requests / preferences</dt><dd class="col-sm-9" style="white-space:pre-wrap">@(string.IsNullOrWhiteSpace(booking.SpecialRequests) ? "None" : booking.SpecialRequests)</dd>
+    </dl>
+</div></div>
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a asp-page="Index" asp-route-date="@booking.StartTime.ToString("yyyy-MM-dd")" asp-route-time="@booking.StartTime.ToString("HH:mm")" class="btn btn-outline-secondary">Back to layout</a>
+    @if (Model.CanChange)
+    {
+        <a asp-page="Edit" asp-route-id="@booking.Id" class="btn btn-primary">Edit reservation</a>
+        @if (booking.Status == ReservationStatus.Pending)
+        {
+            <form method="post" asp-page-handler="Confirm" asp-route-id="@booking.Id"><input type="hidden" name="rowVersion" value="@Convert.ToBase64String(booking.RowVersion)" /><button class="btn btn-success" type="submit">Confirm reservation</button></form>
+        }
+    }
+</div>
+@if (Model.CanChange)
+{
+    <form method="post" asp-page-handler="Cancel" asp-route-id="@booking.Id" class="border rounded p-3">
+        <input type="hidden" name="rowVersion" value="@Convert.ToBase64String(booking.RowVersion)" />
+        <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="confirmCancel" value="true" id="confirmCancel" required /><label class="form-check-label" for="confirmCancel">I confirm this reservation should be cancelled and its table released.</label></div>
+        <button type="submit" class="btn btn-outline-danger">Cancel reservation</button>
+    </form>
+}

@@ -1,0 +1,365 @@
+﻿/* KOMA Shared Login */
+
+body:has(.koma-login) {
+    min-height: 100dvh;
+    margin: 0;
+    background: #f4f1e9;
+    color: #22343d;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+    /* The login page supplies its own branding and home link. */
+    body:has(.koma-login) > header,
+    body:has(.koma-login) > footer {
+        display: none;
+    }
+
+    body:has(.koma-login) > .container {
+        width: 100%;
+        max-width: none;
+        padding: 0;
+    }
+
+    body:has(.koma-login) main.pb-3 {
+        padding-bottom: 0 !important;
+    }
+
+.koma-login,
+.koma-login * {
+    box-sizing: border-box;
+}
+
+.koma-login {
+    display: grid;
+    min-height: 100dvh;
+    align-items: center;
+    padding: 40px;
+}
+
+.koma-login-shell {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    max-width: 1120px;
+    min-height: 650px;
+    margin: auto;
+    overflow: hidden;
+    background: #fffdf8;
+    border: 1px solid #d5d5c9;
+    border-radius: 26px;
+    box-shadow: 0 20px 60px rgb(38 59 73 / 8%);
+}
+
+/* Brand Panel */
+.koma-login-brand {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 48px;
+    padding: 48px;
+    background: #263b49;
+    color: #f4f1e9;
+}
+
+.koma-login-logo {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 14px;
+    color: #f4f1e9;
+    font-family: Georgia, serif;
+    font-size: 32px;
+    letter-spacing: 5px;
+    text-decoration: none;
+}
+
+    .koma-login-logo:hover {
+        color: #d9c7a8;
+    }
+
+    .koma-login-logo > span {
+        padding: 8px 5px;
+        background: #974535;
+        color: #f4f1e9;
+        font-size: 14px;
+        letter-spacing: 0;
+        writing-mode: vertical-rl;
+    }
+
+.koma-login-eyebrow {
+    margin: 0 0 16px;
+    color: #974535;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+
+.koma-login-brand .koma-login-eyebrow {
+    color: #d9c7a8;
+}
+
+.koma-login-brand h1 {
+    margin: 0 0 24px;
+    font-family: Georgia, serif;
+    font-size: clamp(40px, 4.5vw, 60px);
+    font-weight: 400;
+    line-height: 1.15;
+}
+
+.koma-login-description {
+    max-width: 330px;
+    margin: 0;
+    color: #e1e5df;
+    font-size: 15px;
+    line-height: 1.9;
+}
+
+.koma-login-brand-note {
+    margin: 0;
+    color: #d9c7a8;
+    font-size: 12px;
+    letter-spacing: 1px;
+}
+
+/* Form Panel */
+.koma-login-form-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 52px 44px;
+}
+
+.koma-login-form-content {
+    width: 100%;
+    max-width: 400px;
+}
+
+.koma-login-form-panel h2 {
+    margin: 0 0 14px;
+    color: #263b49;
+    font-family: Georgia, serif;
+    font-size: 38px;
+    font-weight: 400;
+}
+
+.koma-login-intro {
+    margin-bottom: 30px;
+    color: #59645f;
+    font-size: 15px;
+    line-height: 1.7;
+}
+
+.koma-login-field {
+    margin-bottom: 22px;
+}
+
+    .koma-login-field > label {
+        display: block;
+        margin-bottom: 9px;
+        color: #263b49;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .koma-login-field > input {
+        width: 100%;
+        min-height: 52px;
+        padding: 13px 15px;
+        background: #fffdf8;
+        color: #22343d;
+        border: 1px solid #b7bbae;
+        border-radius: 10px;
+        font: inherit;
+        font-size: 16px;
+    }
+
+        .koma-login-field > input::placeholder {
+            color: #68736d;
+        }
+
+        .koma-login-field > input:focus {
+            border-color: #974535;
+            outline: 3px solid rgb(151 69 53 / 20%);
+            outline-offset: 1px;
+        }
+
+.koma-login-field-error,
+.koma-login-errors {
+    color: #9d2727;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.koma-login-field-error {
+    display: block;
+    margin-top: 6px;
+}
+
+.koma-login-errors.validation-summary-errors {
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    background: #fbece8;
+    border: 1px solid #d9a69b;
+    border-radius: 10px;
+}
+
+.koma-login-errors ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+/* Form Actions */
+.koma-login-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px 18px;
+    margin: 6px 0 24px;
+    font-size: 14px;
+}
+
+.koma-login-remember {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 44px;
+    cursor: pointer;
+}
+
+    .koma-login-remember input {
+        width: 18px;
+        height: 18px;
+        accent-color: #263b49;
+    }
+
+.koma-login-options a,
+.koma-login-register a {
+    color: #974535;
+    text-underline-offset: 3px;
+}
+
+.koma-login-submit {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    width: 100%;
+    min-height: 52px;
+    padding: 14px 24px;
+    background: #263b49;
+    color: #f4f1e9;
+    border: 1px solid #263b49;
+    border-radius: 999px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+    .koma-login-submit:hover {
+        background: #405768;
+        border-color: #405768;
+    }
+
+    .koma-login-submit span {
+        font-size: 21px;
+    }
+
+.koma-login-register {
+    margin: 26px 0 20px;
+    color: #59645f;
+    font-size: 14px;
+    line-height: 1.8;
+}
+
+.koma-login-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: #59645f;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+    .koma-login-back:hover {
+        color: #974535;
+        text-decoration: underline;
+    }
+
+.koma-login a:focus-visible,
+.koma-login button:focus-visible,
+.koma-login input[type="checkbox"]:focus-visible {
+    outline: 3px solid #974535;
+    outline-offset: 4px;
+}
+
+/* Tablet: compact side-by-side panels */
+@media (min-width: 768px) and (max-width: 1023.98px) {
+    .koma-login {
+        padding: 28px;
+    }
+
+    .koma-login-shell {
+        grid-template-columns: 0.85fr 1.15fr;
+        min-height: 610px;
+    }
+
+    .koma-login-brand,
+    .koma-login-form-panel {
+        padding: 32px 28px;
+    }
+
+        .koma-login-brand h1 {
+            font-size: 40px;
+        }
+
+        .koma-login-form-panel h2 {
+            font-size: 34px;
+        }
+}
+
+/* Mobile: compact brand header above the form */
+@media (max-width: 767.98px) {
+    .koma-login {
+        display: block;
+        padding: 16px;
+    }
+
+    .koma-login-shell {
+        grid-template-columns: 1fr;
+        min-height: auto;
+        border-radius: 20px;
+    }
+
+    .koma-login-brand {
+        gap: 24px;
+        padding: 26px;
+    }
+
+    .koma-login-logo {
+        font-size: 27px;
+    }
+
+    .koma-login-brand h1 {
+        margin-bottom: 0;
+        font-size: 36px;
+    }
+
+    .koma-login-description,
+    .koma-login-brand-note {
+        display: none;
+    }
+
+    .koma-login-form-panel {
+        padding: 30px 24px;
+    }
+
+        .koma-login-form-panel h2 {
+            font-size: 32px;
+        }
+
+    .koma-login-intro {
+        margin-bottom: 24px;
+    }
+}

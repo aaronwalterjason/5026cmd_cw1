@@ -12,8 +12,8 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 
-builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
-    {
+builder.Services.AddDefaultIdentity<KOMA.Models.ApplicationUser>(options =>
+{
         options.SignIn.RequireConfirmedAccount = false;   // turn on once email sending is wired up
         options.Password.RequireNonAlphanumeric = false;  // relaxed for coursework demo logins
     })
@@ -22,6 +22,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 
 builder.Services.AddRazorPages();
 builder.Services.AddScoped<AccountService>();
+builder.Services.AddScoped<ReservationService>();
 builder.Services.AddScoped<MenuImageService>();
 // Check role changes on the next request, rather than retaining old role claims.
 builder.Services.Configure<SecurityStampValidatorOptions>(options =>
