@@ -5,24 +5,58 @@
     ViewData["Title"] = "Staff Dashboard";
 }
 
-<h1>Staff Dashboard</h1>
+<link rel="stylesheet"
+      href="~/css/staff-dashboard.css"
+      asp-append-version="true" />
 
-<p>Welcome, @User.Identity?.Name!</p>
-<p>This is your staff workspace for reservations, orders and billing.</p>
+<link rel="stylesheet"
+      href="~/css/staff-responsive.css"
+      asp-append-version="true" />
 
-<!-- Reservation Management -->
-<div class="card shadow-sm mt-4" style="max-width: 36rem;">
-    <div class="card-body">
-        <h2 class="h4">Reservations</h2>
+<div class="staff-dashboard">
 
-        <p>
-            View table availability, create bookings
-            and manage customer reservations.
+    <!-- Dashboard Header -->
+    <header>
+        <p class="staff-eyebrow">KOMA · Staff workspace</p>
+
+        <h1>Staff Dashboard</h1>
+
+        <p class="staff-welcome">
+            Welcome, @User.Identity?.Name!
         </p>
 
-        <a asp-page="/Staff/Reservation/Index"
-           class="btn btn-primary">
-            Open reservations
-        </a>
+        <p class="staff-intro">
+            Manage restaurant reservations and help every guest
+            enjoy their time at KOMA.
+        </p>
+    </header>
+
+    <!-- Staff Functions -->
+    <div class="staff-feature-grid">
+
+        <!-- Reservations -->
+        <section class="staff-feature-card"
+                 aria-labelledby="reservations-title">
+
+            <span class="staff-feature-label">
+                GUEST BOOKINGS
+            </span>
+
+            <h2 id="reservations-title">Reservations</h2>
+
+            <p>
+                Check table availability, view guest details
+                and manage upcoming reservations.
+            </p>
+
+            <a asp-page="/Staff/Reservation/Index"
+               class="staff-button">
+                Open reservations
+                <span aria-hidden="true">↗</span>
+            </a>
+
+        </section>
+
     </div>
+
 </div>

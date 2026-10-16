@@ -1,0 +1,150 @@
+﻿@page
+@model LoginModel
+
+@{
+    ViewData["Title"] = "Log in";
+    Layout = "/Pages/Shared/_Layout.cshtml";
+}
+
+<link rel="stylesheet"
+      href="~/css/koma-login.css"
+      asp-append-version="true" />
+
+<div class="koma-login">
+
+    <div class="koma-login-shell">
+
+        <!-- Brand Panel -->
+        <section class="koma-login-brand"
+                 aria-labelledby="login-brand-title">
+
+            <a asp-area=""
+               asp-page="/Index"
+               class="koma-login-logo">
+                <span lang="ja">こま</span>
+                KOMA
+            </a>
+
+            <div>
+                <p class="koma-login-eyebrow">WELCOME TO KOMA</p>
+
+                <h1 id="login-brand-title">
+                    Good food.<br />
+                    <em>Good company.</em>
+                </h1>
+
+                <p class="koma-login-description">
+                    A familiar place to return to.
+                    Sign in and make yourself at home.
+                </p>
+            </div>
+
+            <p class="koma-login-brand-note">
+                Japanese-inspired dining.
+            </p>
+
+        </section>
+
+        <!-- Login Form -->
+        <section class="koma-login-form-panel"
+                 aria-labelledby="login-title">
+
+            <div class="koma-login-form-content">
+
+                <p class="koma-login-eyebrow">YOUR ACCOUNT</p>
+
+                <h2 id="login-title">Welcome back</h2>
+
+                <p class="koma-login-intro">
+                    Enter your email and password to continue.
+                </p>
+
+                <form id="account"
+                      method="post"
+                      asp-route-returnUrl="@Model.ReturnUrl">
+
+                    <div asp-validation-summary="ModelOnly"
+                         class="koma-login-errors"
+                         role="alert">
+                    </div>
+
+                    <div class="koma-login-field">
+                        <label asp-for="Input.Email">Email address</label>
+
+                        <input asp-for="Input.Email"
+                               type="email"
+                               autocomplete="username"
+                               inputmode="email"
+                               autocapitalize="none"
+                               spellcheck="false"
+                               placeholder="you@example.com"
+                               aria-required="true"
+                               aria-describedby="login-email-error" />
+
+                        <span asp-validation-for="Input.Email"
+                              id="login-email-error"
+                              class="koma-login-field-error">
+                        </span>
+                    </div>
+
+                    <div class="koma-login-field">
+                        <label asp-for="Input.Password">Password</label>
+
+                        <input asp-for="Input.Password"
+                               type="password"
+                               autocomplete="current-password"
+                               placeholder="Enter your password"
+                               aria-required="true"
+                               aria-describedby="login-password-error" />
+
+                        <span asp-validation-for="Input.Password"
+                              id="login-password-error"
+                              class="koma-login-field-error">
+                        </span>
+                    </div>
+
+                    <div class="koma-login-options">
+                        <label class="koma-login-remember">
+                            <input asp-for="Input.RememberMe" />
+                            <span>Remember me</span>
+                        </label>
+
+                        <a asp-page="./ForgotPassword">
+                            Forgot password?
+                        </a>
+                    </div>
+
+                    <button id="login-submit"
+                            type="submit"
+                            class="koma-login-submit">
+                        Log in
+                        <span aria-hidden="true">↗</span>
+                    </button>
+
+                </form>
+
+                <p class="koma-login-register">
+                    New to KOMA?
+                    <a asp-page="./Register"
+                       asp-route-returnUrl="@Model.ReturnUrl">
+                        Create a customer account
+                    </a>
+                </p>
+
+                <a asp-area=""
+                   asp-page="/Index"
+                   class="koma-login-back">
+                    ← Back to home
+                </a>
+
+            </div>
+
+        </section>
+
+    </div>
+
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

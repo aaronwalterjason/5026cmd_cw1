@@ -2,8 +2,9 @@
 @model KOMA.Pages.Staff.Reservations.IndexModel
 @using KOMA.Models
 @{ ViewData["Title"] = "Reservations"; }
-<link rel="stylesheet" href="~/css/staff-reservations.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/staff-reservation.css" asp-append-version="true" />
 
+<div class="staff-reservations">
 <!-- Reservation Header -->
 <div class="d-flex justify-content-between flex-wrap gap-2 align-items-center mb-4">
     <div><h1>Reservations</h1><p class="text-muted mb-0">Select a date and one-hour slot. All times are Malaysia time.</p></div>
@@ -68,3 +69,4 @@
         </table></div>
     }
 }
+</div>
