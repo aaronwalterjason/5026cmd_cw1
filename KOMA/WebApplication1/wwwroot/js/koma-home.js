@@ -15,27 +15,68 @@
             if (event.matches) { reveals.forEach(element => element.classList.remove('reveal-pending')); observer.disconnect(); }
         });
     }
-    const track = document.querySelector('.food-track');
-    if (!track) return;
-    const arrows = document.querySelectorAll('[data-direction]');
-    const updateArrows = () => arrows.forEach(button => {
-        button.disabled = Number(button.dataset.direction) < 0 ? track.scrollLeft <= 2 : track.scrollLeft >= track.scrollWidth - track.clientWidth - 2;
+    document.querySelectorAll('.food-gallery').forEach(gallery => {
+        const track = gallery.querySelector('.food-track');
+        const cards = Array.from(track.querySelectorAll('.food-card'));
+        let hovered = false, focused = false, timer;
+        let animationFrame;
+        let restoreSnap;
+        const cancelSlide = () => {
+            window.cancelAnimationFrame(animationFrame);
+            if (restoreSnap !== undefined) {
+                track.style.scrollSnapType = restoreSnap;
+                restoreSnap = undefined;
+            }
+        };
+        const animateSlide = target => {
+            cancelSlide();
+            if (reducedMotion.matches) {
+                track.scrollTo({ left: target, behavior: 'instant' });
+                return;
+            }
+            const start = track.scrollLeft;
+            const startedAt = performance.now();
+            const duration = 1200;
+            restoreSnap = track.style.scrollSnapType;
+            track.style.scrollSnapType = 'none';
+            const tick = now => {
+                const progress = Math.min((now - startedAt) / duration, 1);
+                const eased = (1 - Math.cos(Math.PI * progress)) / 2;
+                track.scrollTo({ left: start + (target - start) * eased, behavior: 'instant' });
+                if (progress < 1) animationFrame = window.requestAnimationFrame(tick);
+                else cancelSlide();
+            };
+            animationFrame = window.requestAnimationFrame(tick);
+        };
+        track.addEventListener('pointerdown', cancelSlide);
+        track.addEventListener('wheel', cancelSlide, { passive: true });
+        reducedMotion.addEventListener('change', cancelSlide);
+        const move = direction => {
+            const max = track.scrollWidth - track.clientWidth;
+            if (max <= 2) return;
+            const step = cards.length > 1 ? cards[1].offsetLeft - cards[0].offsetLeft : track.clientWidth;
+            let next = track.scrollLeft + direction * step;
+            if (direction > 0 && track.scrollLeft >= max - 2) next = 0;
+            if (direction < 0 && track.scrollLeft <= 2) next = max;
+            animateSlide(Math.max(0, Math.min(max, next)));
+        };
+        const restart = () => {
+            window.clearInterval(timer);
+            if (cards.length > 1 && !hovered && !focused && !document.hidden && !reducedMotion.matches) timer = window.setInterval(() => move(1), 5000);
+        };
+        gallery.addEventListener('mouseenter', () => { hovered = true; restart(); });
+        gallery.addEventListener('mouseleave', () => { hovered = false; restart(); });
+        gallery.addEventListener('focusin', () => { focused = true; restart(); });
+        gallery.addEventListener('focusout', event => { focused = gallery.contains(event.relatedTarget); restart(); });
+        track.addEventListener('keydown', event => {
+            if (event.target !== track || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+            event.preventDefault();
+            move(event.key === 'ArrowLeft' ? -1 : 1);
+        });
+        document.addEventListener('visibilitychange', restart);
+        reducedMotion.addEventListener('change', restart);
+        restart();
     });
-    document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => {
-        document.querySelectorAll('[data-filter]').forEach(filter => filter.setAttribute('aria-pressed', String(filter === button)));
-        track.querySelectorAll('.food-card').forEach(card => { card.hidden = button.dataset.filter !== 'all' && !card.dataset.category.split(' ').includes(button.dataset.filter); });
-        const empty = document.querySelector('.food-empty');
-        empty.hidden = Array.from(track.querySelectorAll('.food-card')).some(card => !card.hidden);
-        empty.textContent = 'No dishes in this selection yet. Check back soon.';
-        track.scrollTo({ left: 0, behavior: 'instant' });
-        updateArrows();
-    }));
-    arrows.forEach(button => button.addEventListener('click', () => {
-        track.scrollBy({ left: Number(button.dataset.direction) * track.clientWidth * 0.85, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
-    }));
-    track.addEventListener('scroll', updateArrows, { passive: true });
-    window.addEventListener('resize', updateArrows);
-    updateArrows();
     document.querySelectorAll('[data-order-message]').forEach(button => button.addEventListener('click', () => {
         document.querySelector('.order-status').textContent = button.dataset.orderMessage;
     }));
