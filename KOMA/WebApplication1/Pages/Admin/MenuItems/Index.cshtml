@@ -22,7 +22,7 @@
         <tr>
             <td>@i.Name</td>
             <td>@i.MenuCategory?.Name</td>
-            <td>@i.Price.ToString("C")</td>
+            <td>RM @i.Price.ToString("N2")</td>
             <td>@(i.IsAvailable ? "Yes" : "No")</td>
             <td>@(i.IsRecommended ? "Recommended" : "") @(i.IsSeasonal ? "Seasonal" : "")</td>
             <td>

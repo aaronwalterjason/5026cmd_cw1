@@ -30,7 +30,12 @@
 
     <div class="mb-3">
         <label asp-for="Item.Price" class="form-label"></label>
-        <input asp-for="Item.Price" class="form-control" />
+        <div class="input-group">
+            <span class="input-group-text">RM</span>
+            <input asp-for="Item.Price" type="number" step="any" min="0" inputmode="decimal"
+                   class="form-control js-price" placeholder="e.g. 12.90"
+                   value="@(Model.Item.Price > 0 ? Model.Item.Price.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "")" />
+        </div>
         <span asp-validation-for="Item.Price" class="text-danger"></span>
     </div>
 
@@ -66,3 +71,14 @@
     <a asp-page="./Index" class="btn btn-link">Cancel</a>
 </form>
 
+@section Scripts {
+    <script>
+        // Tidy the price to 2 decimal places when the admin leaves the box (12.9 -> 12.90).
+        document.querySelectorAll('.js-price').forEach(function (box) {
+            box.addEventListener('blur', function () {
+                var v = parseFloat(box.value.replace(',', '.'));
+                if (!isNaN(v)) box.value = v.toFixed(2);
+            });
+        });
+    </script>
+}

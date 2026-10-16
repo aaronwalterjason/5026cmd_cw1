@@ -12,7 +12,7 @@ public class IndexModel(ApplicationDbContext db) : PageModel
     {
         Dishes = await db.MenuItems.AsNoTracking()
             .Where(i => i.IsAvailable && i.MenuCategory!.IsActive && (i.IsRecommended || i.IsSeasonal))
-            .OrderBy(i => i.MenuCategory!.DisplayOrder).ThenBy(i => i.Name)
+            .OrderBy(i => i.MenuCategory!.Name).ThenBy(i => i.Name)
             .ToListAsync();
     }
 }

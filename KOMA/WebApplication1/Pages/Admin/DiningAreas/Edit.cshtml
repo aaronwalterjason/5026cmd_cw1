@@ -16,9 +16,19 @@
         <span asp-validation-for="DiningArea.Name" class="text-danger"></span>
     </div>
 
-    <div class="mb-3">
-        <label asp-for="DiningArea.Zone" class="form-label"></label>
-        <input asp-for="DiningArea.Zone" class="form-control" />
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label asp-for="DiningArea.Zone" class="form-label"></label>
+            <select asp-for="DiningArea.Zone" class="form-select"
+                    asp-items="@(new Microsoft.AspNetCore.Mvc.Rendering.SelectList(KOMA.Models.DiningArea.ZoneOptions))"></select>
+            <span asp-validation-for="DiningArea.Zone" class="text-danger"></span>
+        </div>
+        <div class="col-md-6 mb-3">
+            <label asp-for="DiningArea.Floor" class="form-label"></label>
+            <select asp-for="DiningArea.Floor" class="form-select"
+                    asp-items="@(new Microsoft.AspNetCore.Mvc.Rendering.SelectList(KOMA.Models.DiningArea.FloorOptions))"></select>
+            <span asp-validation-for="DiningArea.Floor" class="text-danger"></span>
+        </div>
     </div>
 
     <div class="mb-3">

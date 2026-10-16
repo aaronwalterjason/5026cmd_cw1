@@ -16,7 +16,7 @@ namespace KOMA.Pages.Admin.MenuCategories
 
         public async Task OnGetAsync()
         {
-            Categories = await _db.MenuCategories.OrderBy(c => c.DisplayOrder).ToListAsync();
+            Categories = await _db.MenuCategories.OrderBy(c => c.Name).ToListAsync();
         }
     }
 }

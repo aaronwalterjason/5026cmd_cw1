@@ -50,7 +50,7 @@ public class CreateModel(ApplicationDbContext _db, MenuImageService images) : Pa
     }
     private async Task LoadOptionsAsync()
     {
-        var categories = await _db.MenuCategories.OrderBy(c => c.DisplayOrder).ToListAsync();
+        var categories = await _db.MenuCategories.OrderBy(c => c.Name).ToListAsync();
         CategoryOptions = new SelectList(categories, nameof(MenuCategory.Id), nameof(MenuCategory.Name), Item.MenuCategoryId);
     }
 }
