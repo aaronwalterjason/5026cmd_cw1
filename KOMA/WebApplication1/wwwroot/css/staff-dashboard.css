@@ -1,0 +1,157 @@
+﻿/* KOMA Staff Dashboard */
+
+body:has(.staff-dashboard) {
+    background: #f4f1e9;
+    color: #22343d;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+    /* Navigation */
+    body:has(.staff-dashboard) .navbar {
+        background: #f4f1e9 !important;
+        border-bottom: 1px solid #d5d5c9 !important;
+        box-shadow: none !important;
+    }
+
+    body:has(.staff-dashboard) .navbar-brand {
+        color: #263b49;
+        font-family: Georgia, serif;
+        font-size: 28px;
+        letter-spacing: 4px;
+    }
+
+    body:has(.staff-dashboard) .navbar .nav-link {
+        color: #263b49 !important;
+    }
+
+        body:has(.staff-dashboard) .navbar .nav-link:hover {
+            color: #974535 !important;
+        }
+
+/* Dashboard Header */
+.staff-dashboard {
+    padding: 36px 0 60px;
+}
+
+    .staff-dashboard .staff-eyebrow {
+        margin-bottom: 12px;
+        color: #974535;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+    }
+
+    .staff-dashboard h1 {
+        margin-bottom: 16px;
+        color: #263b49;
+        font-family: Georgia, serif;
+        font-size: clamp(36px, 5vw, 54px);
+        font-weight: 400;
+    }
+
+    .staff-dashboard .staff-intro {
+        max-width: 650px;
+        margin-bottom: 32px;
+        color: #59645f;
+        line-height: 1.8;
+    }
+
+    .staff-dashboard .staff-welcome {
+        margin-bottom: 8px;
+        overflow-wrap: anywhere;
+    }
+
+    /* Feature Cards */
+    .staff-dashboard .staff-feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 24px;
+    }
+
+    .staff-dashboard .staff-feature-card {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 32px;
+        background: #fffdf8;
+        border: 1px solid #d5d5c9;
+        border-radius: 22px;
+        box-shadow: 0 7px 18px rgb(38 59 73 / 5%);
+    }
+
+    .staff-dashboard .staff-feature-label {
+        margin-bottom: 18px;
+        color: #974535;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+    }
+
+    .staff-dashboard .staff-feature-card h2 {
+        margin-bottom: 16px;
+        color: #263b49;
+        font-family: Georgia, serif;
+        font-size: 30px;
+        font-weight: 400;
+    }
+
+    .staff-dashboard .staff-feature-card p {
+        margin-bottom: 26px;
+        color: #59645f;
+        line-height: 1.8;
+    }
+
+    .staff-dashboard .staff-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        min-height: 48px;
+        margin-top: auto;
+        padding: 13px 24px;
+        background: #263b49;
+        color: #f4f1e9;
+        border: 1px solid #263b49;
+        border-radius: 999px;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background-color 0.2s;
+    }
+
+        .staff-dashboard .staff-button:hover {
+            background: #405768;
+            border-color: #405768;
+            color: #fff;
+        }
+
+        .staff-dashboard .staff-button:focus-visible {
+            outline: 3px solid #974535;
+            outline-offset: 4px;
+        }
+
+/* Mobile */
+@media (max-width: 600px) {
+    .staff-dashboard {
+        padding-top: 24px;
+    }
+
+        .staff-dashboard .staff-feature-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .staff-dashboard .staff-feature-card {
+            padding: 24px;
+        }
+
+        .staff-dashboard .staff-button {
+            width: 100%;
+        }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .staff-dashboard .staff-button {
+        transition: none;
+    }
+}

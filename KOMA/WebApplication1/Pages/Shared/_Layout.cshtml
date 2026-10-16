@@ -32,6 +32,17 @@
                                 <a class="nav-link text-dark" asp-area="" asp-page="/Admin/Dashboard">Admin</a>
                             </li>
                         }
+                        <!-- Staff Dashboard Link -->
+                        @if (User.IsInRole("Staff"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark"
+                                   asp-area=""
+                                   asp-page="/Staff/Index">
+                                    Staff Dashboard
+                                </a>
+                            </li>
+                        }
                     </ul>
                     <partial name="_LoginPartial" />
                 </div>
