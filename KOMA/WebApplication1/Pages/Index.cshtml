@@ -16,17 +16,20 @@
 </section>
 <section class="food-section wave-pattern" id="food" aria-labelledby="food-title">
     <div class="food-heading reveal"><p class="eyebrow">SOMETHING GOOD IS ON THE TABLE</p><h2 id="food-title">What are you craving?</h2><p>A familiar favourite or something a little different.<br />Take a look around. Find your next good bite.</p></div>
-    <div class="food-toolbar" hidden="@(Model.Dishes.Count == 0)">
-        <div class="food-filters" aria-label="Food selection">
-            <button type="button" data-filter="all" aria-pressed="true">All favourites</button>
-            <button type="button" data-filter="recommended" aria-pressed="false">Recommended</button>
-            <button type="button" data-filter="seasonal" aria-pressed="false">Seasonal specials</button>
-        </div>
-        <div class="carousel-controls" aria-label="Food carousel controls"><button type="button" data-direction="-1" aria-label="Previous dishes">←</button><button type="button" data-direction="1" aria-label="Next dishes">→</button></div>
-    </div>
-    <p class="food-empty" role="status" hidden="@(Model.Dishes.Count > 0)">Our next favourites are on the way. Check back soon.</p>
-    <div class="food-track" aria-label="Featured dishes" tabindex="0">
-        @foreach (var dish in Model.Dishes)
+    @foreach (var category in new[] { "Recommended", "Seasonal Specials" })
+    {
+        var dishes = Model.Dishes.Where(dish => category == "Recommended" ? dish.IsRecommended : dish.IsSeasonal).ToList();
+        var galleryId = category == "Recommended" ? "recommended" : "seasonal";
+        <section class="food-gallery" aria-labelledby="@(galleryId)-title" aria-roledescription="carousel">
+            <div class="food-toolbar">
+                <h3 id="@(galleryId)-title">@category</h3>
+            </div>
+            @if (dishes.Count == 0)
+            {
+                <p class="food-empty">New dishes are on the way. Check back soon.</p>
+            }
+            <div class="food-track" aria-label="@category dishes" tabindex="0">
+        @foreach (var dish in dishes)
         {
             <article class="food-card" data-category="@((dish.IsRecommended ? "recommended " : "") + (dish.IsSeasonal ? "seasonal" : ""))">
                 <div class="dish-photo">
@@ -52,12 +55,40 @@
             </article>
         }
     </div>
+        </section>
+    }
     <p class="order-status" role="status" aria-live="polite">@if (Request.Query.ContainsKey("dish") && User.Identity?.IsAuthenticated == true) { <text>@(User.IsInRole("Customer") ? "You are signed in. Online ordering is not available yet. Please check back soon." : "Ordering is available to customer accounts. Please sign in with a customer account.")</text> }</p>
 </section>
-<section class="story reveal" id="story"><p class="eyebrow">THE KOMA WAY</p><h2>A full table.<br /><em>A happy heart.</em></h2><p>A good meal is about more than what is on the plate. It is the conversation, the company, and a little time together. Come as you are. Stay for another bite.</p></section>
-<section class="experience" id="experience"><div class="reveal"><p class="eyebrow">MAKE YOURSELF AT HOME</p><h2>Little reasons to linger.</h2></div><div class="cards"><article class="reveal"><span class="eyebrow">01 / THE FOOD</span><h3>Find a new favourite.</h3><p>Japanese-inspired flavours, from a delicate bite to a satisfying crunch.</p></article><article class="reveal"><span class="eyebrow">02 / THE COMPANY</span><h3>Share a little joy.</h3><p>Catch up, celebrate, or simply spend a little time around the table.</p></article><article class="reveal"><span class="eyebrow">03 / THE MOMENT</span><h3>Make it your own.</h3><p>A quick catch-up or a long conversation. Good moments start here.</p></article></div></section>
-<section class="invitation reveal"><p class="eyebrow">YOUR NEXT GOOD MOMENT</p><h2>Come for the food.<br /><em>Stay for the company.</em></h2>
+<section class="story reveal" id="story">
+    <p class="eyebrow">THE KOMA WAY</p>
+    <h2>Good food brings us together.</h2>
+    <p>We believe the best meals are as much about the people as the food. Bring your favourite company, settle in, and enjoy a meal at your own pace.</p>
+</section>
+<section class="experience" id="experience">
+    <div class="reveal">
+        <p class="eyebrow">MAKE YOURSELF AT HOME</p>
+        <h2>More than a meal.</h2>
+    </div>
+    <div class="cards">
+        <article class="reveal">
+            <span class="eyebrow">01 / THE FOOD</span>
+            <h3>Find your next favourite.</h3>
+            <p>Explore Japanese-inspired flavours, from delicate bites to crisp, satisfying crunches.</p>
+        </article>
+        <article class="reveal">
+            <span class="eyebrow">02 / THE COMPANY</span>
+            <h3>There’s room for everyone.</h3>
+            <p>Bring friends, gather family, or enjoy a quiet meal on your own.</p>
+        </article>
+        <article class="reveal">
+            <span class="eyebrow">03 / THE MOMENT</span>
+            <h3>Stay a little longer.</h3>
+            <p>Catch up over a meal, celebrate an occasion, or simply enjoy being here.</p>
+        </article>
+    </div>
+</section>
+<section class="invitation reveal">
+    <h2>Savour the food and the company.</h2>
     @if (User.Identity?.IsAuthenticated == true) { <a class="button light" asp-area="Identity" asp-page="/Account/Manage/Index">Your account <span aria-hidden="true">↗</span></a> }
     else { <a class="button light" asp-area="Identity" asp-page="/Account/Register">Join KOMA <span aria-hidden="true">↗</span></a> }
 </section>
-
