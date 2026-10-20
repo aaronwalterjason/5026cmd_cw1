@@ -30,7 +30,13 @@ namespace KOMA.Pages.Admin.DiningAreas
                 return Page();
             }
 
-            _db.DiningAreas.Update(DiningArea);
+            // Copy only the fields on this form, so the area's floor and layout position are kept.
+            var existing = await _db.DiningAreas.FindAsync(DiningArea.Id);
+            if (existing is null) return NotFound();
+            existing.Name = DiningArea.Name;
+            existing.Zone = DiningArea.Zone;
+            existing.Description = DiningArea.Description;
+            existing.IsActive = DiningArea.IsActive;
             await _db.SaveChangesAsync();
 
             TempData["StatusMessage"] = $"'{DiningArea.Name}' was updated.";

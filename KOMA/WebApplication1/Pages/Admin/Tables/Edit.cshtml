@@ -17,10 +17,9 @@
     </div>
 
     <div class="mb-3">
-        <label asp-for="Table.DiningAreaId" class="form-label">Dining Area</label>
-        <select asp-for="Table.DiningAreaId" asp-items="Model.DiningAreaOptions" class="form-select">
-        </select>
-        <span asp-validation-for="Table.DiningAreaId" class="text-danger"></span>
+        <label class="form-label">Dining Area</label>
+        <input class="form-control" value="@Model.AreaName" disabled />
+        <p class="form-text">To move this table to another area, drag it on the floor layout designer.</p>
     </div>
 
     <div class="mb-3">

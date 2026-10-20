@@ -1,0 +1,191 @@
+@page
+@model KOMA.Pages.Admin.Orders.IndexModel
+@using KOMA.Pages.Admin.Orders
+@{
+    ViewData["Title"] = "Orders";
+    string? from = Model.From?.ToString("yyyy-MM-dd");
+    string? to = Model.To?.ToString("yyyy-MM-dd");
+    var sel = Model.Selected;
+}
+
+@if (TempData["StatusMessage"] is string status)
+{
+    <div class="alert alert-success ord-flash" role="status">@status</div>
+}
+
+<div class="ord-shell">
+
+    @* =================== LEFT: list =================== *@
+    <aside class="ord-side">
+        <div class="ord-side-head">
+            <h1 class="mb-0">Orders</h1>
+            <a class="small" asp-page="/Admin/Revenue/Index">Revenue →</a>
+        </div>
+
+        <form method="get" class="ord-filters" id="ord-filters">
+            @if (Model.Show is not null) { <input type="hidden" name="show" value="@Model.ShowKey" /> }
+            @if (Model.Type.HasValue) { <input type="hidden" name="type" value="@Model.Type" /> }
+            <label class="visually-hidden" for="search">Search orders</label>
+            <input type="search" id="search" name="search" value="@Model.Search" class="form-control ord-search"
+                   placeholder="Search order no., customer or table" />
+            <div class="ord-dates">
+                <label class="small text-muted" for="from">From</label>
+                <input type="date" id="from" name="from" value="@from" class="form-control form-control-sm" data-autosubmit />
+                <label class="small text-muted" for="to">to</label>
+                <input type="date" id="to" name="to" value="@to" class="form-control form-control-sm" data-autosubmit />
+                @if (from is not null || to is not null || !string.IsNullOrWhiteSpace(Model.Search) || Model.Type.HasValue || Model.Show is not null)
+                {
+                    <a asp-page="./Index" class="small ms-auto">Clear</a>
+                }
+            </div>
+        </form>
+
+        <nav class="ord-chips" aria-label="Show">
+            @foreach (var c in Model.Chips)
+            {
+                var chipRoute = Model.Route(null, show: c.Key == "all" ? null : c.Key);
+                <a asp-page="./Index" asp-all-route-data="chipRoute"
+                   class="ord-chip @(Model.ShowKey == c.Key ? "is-on" : "")" aria-current="@(Model.ShowKey == c.Key ? "true" : null)">
+                    @c.Label <span>@c.Count</span>
+                </a>
+            }
+        </nav>
+
+        <nav class="ord-types" aria-label="Order type">
+            @foreach (var t in Model.TypeSummaries)
+            {
+                var on = Model.Type == t.Type;
+                <a asp-page="./Index" asp-all-route-data="Model.Route(null, type: on ? null : t.Type.ToString())"
+                   class="ord-type @(on ? "is-on" : "")" aria-pressed="@(on ? "true" : "false")"
+                   title="RM @t.Sales.ToString("N2") paid">
+                    <span class="ord-dot @IndexModel.TypeTone(t.Type)"></span>
+                    <span class="ord-type-name">@t.Type.DisplayName()</span>
+                    <strong>@t.Count</strong>
+                </a>
+            }
+        </nav>
+
+        <div class="card ord-list" id="ord-list">
+            @if (Model.InProgress.Any())
+            {
+                <div class="ord-group">In progress</div>
+                @foreach (var o in Model.InProgress)
+                {
+                    var isSel = sel?.Id == o.Id;
+                    <a asp-page="./Index" asp-all-route-data="Model.Route(o.Id)" class="ord-row @(isSel ? "is-selected" : "")"
+                       aria-current="@(isSel ? "true" : null)">
+                        <span class="ord-tile">@(o.RestaurantTable?.TableNumber ?? "—")</span>
+                        <span class="ord-row-main">
+                            <span class="ord-row-name">@IndexModel.CustomerName(o)</span>
+                            <span class="ord-row-sub"><span class="ord-dot @IndexModel.TypeTone(o.OrderType)"></span>@o.OrderType.DisplayName() · @o.OrderedAt.ToString("h:mm tt")</span>
+                        </span>
+                        <span class="ord-row-end">
+                            <span class="ord-row-total">RM @o.TotalAmount.ToString("N2")</span>
+                            <span class="ord-pill @IndexModel.StatusTone(o.Status)">@o.Status.DisplayName()</span>
+                        </span>
+                    </a>
+                }
+            }
+            @if (Model.Earlier.Any())
+            {
+                <div class="ord-group is-muted">Finished</div>
+                @foreach (var o in Model.Earlier)
+                {
+                    var isSel = sel?.Id == o.Id;
+                    <a asp-page="./Index" asp-all-route-data="Model.Route(o.Id)" class="ord-row is-done @(isSel ? "is-selected" : "")"
+                       aria-current="@(isSel ? "true" : null)">
+                        <span class="ord-tile">@(o.RestaurantTable?.TableNumber ?? "—")</span>
+                        <span class="ord-row-main">
+                            <span class="ord-row-name">@IndexModel.CustomerName(o)</span>
+                            <span class="ord-row-sub">@o.OrderedAt.ToString("d MMM, h:mm tt")@(o.Status == OrderStatus.Cancelled ? " · Cancelled" : "")</span>
+                        </span>
+                        <span class="ord-row-end"><span class="ord-row-total">RM @o.TotalAmount.ToString("N2")</span></span>
+                    </a>
+                }
+            }
+            @if (Model.ShownOrders == 0)
+            {
+                <p class="text-muted small m-3">No orders match these filters.</p>
+            }
+            @if (Model.IsTruncated)
+            {
+                <p class="text-muted small m-3">Showing the newest @Model.ShownOrders of @Model.MatchingOrders. Narrow the dates to see older ones.</p>
+            }
+        </div>
+    </aside>
+
+    @* =================== RIGHT: selected order (swapped in place by the script below) =================== *@
+    <div id="ord-detail-slot" class="ord-detail-slot" aria-live="polite">
+        <partial name="_OrderDetail" model="Model" />
+    </div>
+</div>
+
+<script>
+    // Dates submit straight away; keep the selected order visible in the list after a reload.
+    document.querySelectorAll('[data-autosubmit]').forEach(el =>
+        el.addEventListener('change', () => document.getElementById('ord-filters').submit()));
+    document.querySelector('.ord-row.is-selected')?.scrollIntoView({ block: 'nearest' });
+
+    // Make the page fill the window below the top bar so the detail card can be centred in it
+    // (same gap above and below the card).
+    (() => {
+        const shell = document.querySelector('.ord-shell');
+        if (!shell) return;
+        const bar = document.querySelector('.koma-topbar');
+        const root = document.documentElement;
+        const fit = () => {
+            if (window.innerWidth < 992) { shell.style.removeProperty('--ord-h'); return; }
+            const top = shell.getBoundingClientRect().top + window.scrollY;            // where the page content starts
+            const barBottom = bar ? bar.getBoundingClientRect().bottom + window.scrollY : 0;
+            const pad = Math.max(top - barBottom, 16);                                 // space under the top bar, repeated at the bottom
+            let h = window.innerHeight - top - pad;
+            shell.style.setProperty('--ord-h', h + 'px');
+            // Anything below the shell (footer, padding) would still make the page scroll - take that off too.
+            const overflow = root.scrollHeight - window.innerHeight;
+            if (overflow > 0) { h -= overflow; shell.style.setProperty('--ord-h', h + 'px'); }
+        };
+        fit();
+        window.addEventListener('resize', fit);
+    })();
+
+    // Clicking an order loads only its detail panel (Index?handler=Detail) instead of the whole page.
+    (() => {
+        const list = document.getElementById('ord-list');
+        const slot = document.getElementById('ord-detail-slot');
+        if (!list || !slot) return;
+        const cache = new Map();
+        const detailUrl = href => { const u = new URL(href, location.href); u.searchParams.set('handler', 'Detail'); return u.toString(); };
+        const load = href => {
+            const url = detailUrl(href);
+            if (!cache.has(url)) {
+                cache.set(url, fetch(url, { headers: { 'X-Requested-With': 'fetch' } })
+                    .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+                    .catch(err => { cache.delete(url); throw err; }));
+            }
+            return cache.get(url);
+        };
+        // Start loading as soon as the pointer rests on a row, so the click feels instant.
+        list.addEventListener('pointerover', e => {
+            const a = e.target.closest('a.ord-row');
+            if (a && !a.classList.contains('is-selected')) load(a.href).catch(() => {});
+        });
+        list.addEventListener('click', async e => {
+            const a = e.target.closest('a.ord-row');
+            if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+            e.preventDefault();
+            list.querySelectorAll('.ord-row.is-selected').forEach(r => { r.classList.remove('is-selected'); r.removeAttribute('aria-current'); });
+            a.classList.add('is-selected');
+            a.setAttribute('aria-current', 'true');
+            slot.classList.add('is-loading');
+            try {
+                slot.innerHTML = await load(a.href);
+                history.replaceState(null, '', a.href);
+                if (window.innerWidth < 992) slot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch {
+                location.href = a.href;   // fall back to a normal page load
+            } finally {
+                slot.classList.remove('is-loading');
+            }
+        });
+    })();
+</script>

@@ -25,8 +25,7 @@ namespace KOMA.Pages.Admin.DiningAreas
 
         public async Task<IActionResult> OnPostAsync()
         {
-            // TODO: block delete (or cascade with confirmation) if the area still has tables,
-            // and check Engineer B's reservation table for a foreign-key reference first.
+            // Its tables are deleted with it (cascade). Past orders keep their history: their table link is cleared.
             var area = await _db.DiningAreas.FindAsync(DiningArea.Id);
             if (area is not null)
             {

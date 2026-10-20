@@ -1,38 +1,398 @@
 @page
 @model KOMA.Pages.Admin.DashboardModel
+@using System.Globalization
 @{
-    ViewData["Title"] = "Admin Dashboard";
+    ViewData["Title"] = "Today";
+    var inv = CultureInfo.InvariantCulture;
+    string Pct(double v, double total) => (total <= 0 ? 0 : v / total * 100).ToString("0.###", inv) + "%";
+    string Num(double v) => v.ToString("0.###", inv);
+    var maxOrders = Model.OrdersByHour.Count == 0 ? 0 : Model.OrdersByHour.Max(b => b.Orders);
 }
 
-<h1>Admin Dashboard</h1>
-<p class="text-muted">Overview of restaurant setup.</p>
+@* ---------- Header ---------- *@
+<div class="d-flex flex-wrap align-items-baseline gap-2 mb-3">
+    <h1 class="mb-0 me-2">Today</h1>
+    <span class="text-muted me-auto">@Model.Now.ToString("dddd, d MMMM yyyy")</span>
+    <span class="small text-muted" id="refresh-info">Updated @Model.Now.ToString("h:mm tt")</span>
+    <div class="form-check form-switch small mb-0">
+        <input class="form-check-input" type="checkbox" id="auto-refresh" checked />
+        <label class="form-check-label" for="auto-refresh">Auto-refresh</label>
+    </div>
+</div>
 
-<div class="row g-3">
-    <div class="col-md-3">
+@* ---------- Today's numbers (navy lead card + ring) ---------- *@
+@{
+    var salesLine = Model.CompareText(Model.SalesToday, Model.SalesSameDayLastWeek, true, "First sales this weekday", out var salesUp);
+    var ordersLine = Model.CompareText(Model.OrdersToday, Model.OrdersSameDayLastWeek, false, "First orders this weekday", out var ordersUp);
+    const double Ring = 163.36;   // circumference of the r=26 ring
+    var seatedDash = (Model.SeatedShare * Ring).ToString("0.##", inv);
+    var payDash = (Model.PaymentShare * Ring).ToString("0.##", inv);
+    var payOffset = (-Model.SeatedShare * Ring).ToString("0.##", inv);
+}
+<div class="kpi-row mb-3">
+    <a asp-page="/Admin/Revenue/Index" asp-route-period="day" class="kpi-card kpi-lead">
+        <span class="kpi-eyebrow">SALES SO FAR · @Model.Now.ToString("ddd d MMM").ToUpperInvariant()</span>
+        <span class="kpi-big"><span class="kpi-rm">RM</span>@Model.SalesToday.ToString("N2")</span>
+        <span class="kpi-foot">
+            <span>@salesLine</span>
+            <span class="kpi-pill">@Model.PaidOrdersToday paid</span>
+        </span>
+    </a>
+
+    <a asp-page="/Admin/Orders/Index" asp-route-from="@Model.Now.ToString("yyyy-MM-dd")" asp-route-to="@Model.Now.ToString("yyyy-MM-dd")" class="kpi-card">
+        <span class="kpi-label">Orders today</span>
+        <span class="kpi-num">@Model.OrdersToday</span>
+        <span class="kpi-sub @(Model.OrdersSameDayLastWeek == 0 ? "" : ordersUp ? "is-up" : "is-down")">@ordersLine</span>
+    </a>
+
+    <div class="kpi-card">
+        <span class="kpi-label">Average order</span>
+        <span class="kpi-num kpi-num-sm">RM @Model.AverageOrder.ToString("N2")</span>
+        <span class="kpi-sub">@Model.ItemsSoldToday items sold</span>
+    </div>
+
+    <div class="kpi-card kpi-ring-card">
+        <svg class="kpi-ring" width="76" height="76" viewBox="0 0 64 64" role="img"
+             aria-label="@Model.OccupiedPercent percent of tables in use">
+            <circle class="ring-track" cx="32" cy="32" r="26" fill="none" stroke="#eee7db" stroke-width="7"></circle>
+            @if (Model.SeatedShare > 0)
+            {
+                <circle class="ring-seated" cx="32" cy="32" r="26" fill="none" stroke="#263b49" stroke-width="7" stroke-linecap="round"
+                        stroke-dasharray="@seatedDash @Ring.ToString(inv)" transform="rotate(-90 32 32)"></circle>
+            }
+            @if (Model.PaymentShare > 0)
+            {
+                <circle class="ring-pay" cx="32" cy="32" r="26" fill="none" stroke="#974535" stroke-width="7" stroke-linecap="round"
+                        stroke-dasharray="@payDash @Ring.ToString(inv)" stroke-dashoffset="@payOffset" transform="rotate(-90 32 32)"></circle>
+            }
+            <text class="ring-text" x="32" y="37" text-anchor="middle" font-family="Georgia, serif" font-size="15" fill="#22343d">@Model.OccupiedPercent%</text>
+        </svg>
+        <span class="kpi-ring-text">
+            <span class="kpi-label">Tables in use</span>
+            <span class="kpi-num kpi-num-sm">@Model.TablesOccupied <span class="kpi-of">/ @Model.TablesTotal</span></span>
+            @if (Model.TablesAwaitingPayment > 0)
+            {
+                <span class="kpi-sub is-down">@Model.TablesAwaitingPayment awaiting payment</span>
+            }
+            else
+            {
+                <span class="kpi-sub">@Model.SeatsInUse of @Model.SeatsTotal seats</span>
+            }
+        </span>
+    </div>
+</div>
+
+@*  Layout (Option B - "command centre"):
+      wide screens  : [ schedule + orders by hour | live floor map | alerts + latest orders ]
+      medium screens: map on top, the two side columns side by side below it
+      phones        : everything stacked, map first *@
+<div class="row g-3 mb-3 dash-columns">
+
+    @* ================= LEFT: schedule, orders by hour ================= *@
+    <div class="col-12 col-lg-6 col-xl-3 order-2 order-xl-1 d-flex flex-column gap-3">
+        <div class="card p-3 border-dashed">
+            <h2 class="h6">📅 Reservation schedule</h2>
+            <p class="small text-muted mb-2">Today's bookings by time slot, with who has arrived, will appear here.</p>
+            <p class="small text-muted mb-0"><em>Coming with the reservations module.</em></p>
+            @* TODO (Engineer B): list today's Reservations ordered by time - time, name, party size, table, arrived yes/no. *@
+        </div>
+
         <div class="card p-3">
-            <div class="fs-2">@Model.DiningAreaCount</div>
-            <div>Dining Areas</div>
+            <h2 class="h6">Orders by hour</h2>
+            @if (maxOrders == 0)
+            {
+                <p class="text-muted small mb-0">No orders yet today.</p>
+            }
+            else
+            {
+                <ul class="list-unstyled mb-0 hour-list" aria-label="Orders per hour today">
+                    @foreach (var b in Model.OrdersByHour)
+                    {
+                        var pct = (double)b.Orders / maxOrders * 100;
+                        var label = DateTime.Today.AddHours(b.Hour).ToString("h tt");
+                        <li class="hour-row @(b.Hour == Model.Now.Hour ? "is-now" : "") @(b.Hour > Model.Now.Hour ? "is-future" : "")"
+                            title="@label: @b.Orders order(s), RM @b.Sales.ToString("N2") paid">
+                            <span class="hour-label">@label</span>
+                            <span class="hour-track"><span class="hour-bar" style="width:@pct.ToString("0.#", inv)%"></span></span>
+                            <span class="hour-value">@b.Orders</span>
+                        </li>
+                    }
+                </ul>
+                <p class="small text-muted mt-2 mb-0">Current hour in amber · hover for sales.</p>
+            }
+        </div>
+
+    </div>
+
+    @* ================= CENTRE: live floor map ================= *@
+    <div class="col-12 col-xl-6 order-1 order-xl-2">
+        <div class="card p-3 h-100">
+            <div class="d-flex flex-wrap justify-content-between align-items-baseline mb-2">
+                <h2 class="h6 mb-0">Live seating</h2>
+                <div class="small d-flex flex-wrap gap-3 text-muted">
+                    <span><span class="live-key live-free"></span>Free</span>
+                    <span><span class="live-key live-occupied"></span>Seated</span>
+                    <span><span class="live-key live-payment"></span>Awaiting payment</span>
+                    <span><span class="live-key live-inactive"></span>Closed</span>
+                </div>
+            </div>
+
+            @if (!Model.Floors.Any())
+            {
+                <p class="text-muted mb-0">No floor layouts yet. <a asp-page="/Admin/Layouts/Create">Create a floor</a> to see live seating here.</p>
+            }
+            else
+            {
+                <ul class="nav nav-tabs nav-sm mb-2" role="tablist">
+                    @for (int i = 0; i < Model.Floors.Count; i++)
+                    {
+                        var f = Model.Floors[i];
+                        var seated = f.DiningAreas.SelectMany(a => a.Tables).Count(t => Model.SeatedOrderByTable.ContainsKey(t.Id));
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link py-1 @(i == 0 ? "active" : "")" id="floor-tab-@f.Id" data-bs-toggle="tab"
+                                    data-bs-target="#floor-pane-@f.Id" type="button" role="tab" data-floor-id="@f.Id">
+                                @f.Name <span class="badge bg-light text-dark">@seated</span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+                <div class="tab-content">
+                    @for (int i = 0; i < Model.Floors.Count; i++)
+                    {
+                        var f = Model.Floors[i];
+                        <div class="tab-pane fade @(i == 0 ? "show active" : "")" id="floor-pane-@f.Id" role="tabpanel">
+                            @if (!f.DiningAreas.Any())
+                            {
+                                <p class="text-muted small mb-0">Nothing drawn on this floor yet. <a asp-page="/Admin/Layouts/Designer" asp-route-id="@f.Id">Open the layout</a>.</p>
+                            }
+                            <div class="lay-preview live-map" style="aspect-ratio:@f.Width / @f.Height" data-floor-w="@f.Width" data-floor-h="@f.Height">
+                                @foreach (var a in f.DiningAreas)
+                                {
+                                    <div class="lay-preview-area @KOMA.Pages.Admin.Layouts.IndexModel.ZoneClass(a.Zone) @(a.IsActive ? "" : "is-closed")"
+                                         style="left:@Pct(a.LayoutX, f.Width);top:@Pct(a.LayoutY, f.Height);width:@Pct(a.LayoutWidth, f.Width);height:@Pct(a.LayoutHeight, f.Height)">
+                                        <span class="live-area-name">@a.Name</span>
+                                    </div>
+                                }
+                                @foreach (var a in f.DiningAreas)
+                                {
+                                    foreach (var t in a.Tables)
+                                    {
+                                        var state = Model.StateOf(t, a);
+                                        Model.SeatedOrderByTable.TryGetValue(t.Id, out var o);
+                                        var css = state switch
+                                        {
+                                            DashboardModel.SeatState.Occupied => "live-occupied",
+                                            DashboardModel.SeatState.AwaitingPayment => "live-payment",
+                                            DashboardModel.SeatState.Inactive => "live-inactive",
+                                            _ => "live-free"
+                                        };
+                                        var tip = o is null
+                                            ? $"Table {t.TableNumber} · {t.Capacity} seats · {(state == DashboardModel.SeatState.Inactive ? "closed" : "free")}"
+                                            : $"Table {t.TableNumber} · {o.CustomerName} · {o.Status.DisplayName()} · seated {DashboardModel.Minutes(o.OrderedAt, Model.Now)} · RM {o.TotalAmount:N2}";
+                                        var style = $"left:{Pct(t.LayoutX, f.Width)};top:{Pct(t.LayoutY, f.Height)};width:{Pct(t.LayoutWidth, f.Width)};height:{Pct(t.LayoutHeight, f.Height)}";
+                                        @* Clicking a table opens the popup below (filled from TablePopupJson). *@
+                                        <button type="button" class="lay-preview-table live-table @css @(t.Shape == TableShape.Round ? "is-round" : "")"
+                                                title="@tip" aria-label="@tip" style="@style" data-table-id="@t.Id"
+                                                data-x="@Num(t.LayoutX)" data-y="@Num(t.LayoutY)" data-w="@Num(t.LayoutWidth)" data-h="@Num(t.LayoutHeight)"
+                                                data-shape="@t.Shape" data-capacity="@t.Capacity"><span>@t.TableNumber</span></button>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+                <p class="small text-muted mt-2 mb-0">Hover over a table for a summary; click it for details.</p>
+            }
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card p-3">
-            <div class="fs-2">@Model.TableCount</div>
-            <div>Tables</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card p-3">
-            <div class="fs-2">@Model.MenuItemCount</div>
-            <div>Menu Items</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card p-3">
-            <div class="fs-2">@Model.ActivePromotionCount</div>
-            <div>Active Promotions</div>
+
+    @* ================= RIGHT: latest orders ================= *@
+    <div class="col-12 col-lg-6 col-xl-3 order-3 d-flex flex-column gap-3">
+        <div class="card p-3 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h2 class="h6 mb-0">Latest orders</h2>
+                <a asp-page="/Admin/Orders/Index" class="small">All &rarr;</a>
+            </div>
+            <ul class="list-unstyled small mb-0 latest-list">
+                @foreach (var o in Model.LatestOrders)
+                {
+                    <li>
+                        <button type="button" class="latest-item" data-order-id="@o.Id" aria-label="Show order @o.OrderNumber">
+                            <span class="d-flex justify-content-between">
+                                <span class="fw-semibold latest-num">@o.OrderNumber</span>
+                                <span>RM @o.TotalAmount.ToString("N2")</span>
+                            </span>
+                            <span class="d-flex justify-content-between text-muted">
+                                <span>@o.OrderedAt.ToString("h:mm tt") · @KOMA.Pages.Admin.Orders.IndexModel.CustomerName(o) · @(o.RestaurantTable?.TableNumber ?? "—")</span>
+                                <span class="badge @KOMA.Pages.Admin.Orders.IndexModel.BadgeClass(o.Status)">@o.Status.DisplayName()</span>
+                            </span>
+                        </button>
+                    </li>
+                }
+                @if (!Model.LatestOrders.Any())
+                {
+                    <li class="text-muted">No orders yet today.</li>
+                }
+            </ul>
         </div>
     </div>
 </div>
 
-@* Advanced tier (Week 9): replace/extend this grid with the analytics dashboard
-   (peak hours, reservation trends, table utilisation, sales chart). *@
+
+@* ---------- Table popup ---------- *@
+<div class="modal fade table-pop" id="table-modal" tabindex="-1" aria-labelledby="pop-status" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered table-pop-dialog">
+        <div class="modal-content pop-card">
+            @* Coloured band: matches the table's colour on the live map *@
+            <div class="pop-band" id="pop-band">
+                <div class="pop-num" id="pop-num"></div>
+                <div class="pop-head">
+                    <div class="pop-status" id="pop-status"></div>
+                    <div class="pop-where" id="pop-where"></div>
+                </div>
+                <button type="button" class="pop-close" data-bs-dismiss="modal" aria-label="Close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="pop-body" id="pop-body"></div>
+        </div>
+    </div>
+</div>
+<script type="application/json" id="table-popup-data">@Html.Raw(Model.TablePopupJson)</script>
+<script type="application/json" id="order-popup-data">@Html.Raw(Model.OrderPopupJson)</script>
+
+@section Scripts {
+    <script src="~/js/layout-chairs.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            // Chairs around each table on the live map.
+            document.querySelectorAll('.live-map').forEach(function (box) {
+                var fw = +box.dataset.floorW, fh = +box.dataset.floorH;
+                box.querySelectorAll('.live-table').forEach(function (el) {
+                    var t = { x: +el.dataset.x, y: +el.dataset.y, w: +el.dataset.w, h: +el.dataset.h,
+                              shape: el.dataset.shape, capacity: el.dataset.capacity };
+                    KomaChairs.positions(t).forEach(function (c) {
+                        var ch = document.createElement('div');
+                        ch.className = 'lay-preview-chair' + (c.kind === 'bench' ? ' is-bench' : '');
+                        ch.style.left = (c.x / fw * 100) + '%';
+                        ch.style.top = (c.y / fh * 100) + '%';
+                        ch.style.width = (c.w / fw * 100) + '%';
+                        ch.style.height = (c.h / fh * 100) + '%';
+                        box.insertBefore(ch, el);
+                    });
+                });
+            });
+
+            // Table popup: fill the modal from the data sent with the page and show it.
+            var popupData = JSON.parse(document.getElementById('table-popup-data').textContent || '{}');
+            var modalEl = document.getElementById('table-modal');
+            var modal = window.bootstrap ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+            function esc(s) {
+                return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                });
+            }
+
+            var icons = {
+                person: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
+                receipt: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+                chevron: '<svg class="pop-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>'
+            };
+            var looks = { Occupied: 'is-seated', AwaitingPayment: 'is-payment', Free: 'is-free', Inactive: 'is-closed', Done: 'is-done', Cancelled: 'is-closed' };
+            var orderPopupData = JSON.parse(document.getElementById('order-popup-data').textContent || '{}');
+            var steps = ['Pending', 'Preparing', 'Ready', 'Served'];
+
+            function showPopup(t) {
+                    if (!t || !modal) return;
+                    var o = t.order;
+
+                    var band = document.getElementById('pop-band');
+                    band.className = 'pop-band ' + (looks[t.state] || '');
+                    document.getElementById('pop-num').textContent = t.number;
+                    // Live orders show how long they've been seated; finished ones show when they were ordered.
+                    document.getElementById('pop-status').textContent = t.stateLabel + (o ? ' · ' + (o.active ? o.seatedFor : o.orderedAt) : '');
+                    document.getElementById('pop-where').textContent = t.number === '—'
+                        ? t.zone + ' · no table'
+                        : t.area + ' · ' + t.zone + ' · ' + t.capacity + ' seats';
+
+                    var body;
+                    if (!o) {
+                        body =
+                            '<p class="pop-free">' + (t.state === 'Inactive'
+                                ? 'This table is closed. Turn it back on in the floor layout.'
+                                : 'Free right now - ready for the next guests.') + '</p>' +
+                            '<div class="pop-row muted">' + esc(t.floor) + ' · ' + esc(t.shape) + ' table</div>';
+                    } else {
+                        var progress = steps.map(function (label, i) {
+                            var cls = i < o.step ? 'done' : i === o.step ? 'current' : '';
+                            return '<div class="pop-step ' + cls + '"><div class="pop-step-bar"></div><span>' + label + '</span></div>';
+                        }).join('');
+                        var count = o.items.reduce(function (n, i) { return n + i.qty; }, 0);
+                        var lines = o.items.map(function (i) {
+                            return '<div class="pop-line"><span>' + i.qty + ' × ' + esc(i.name) + '</span><span>RM ' + esc(i.line) + '</span></div>';
+                        }).join('');
+                        body =
+                            '<div class="pop-row strong">' + icons.person + esc(o.customer) + '</div>' +
+                            '<div class="pop-row muted">' + icons.receipt + esc(o.type) + ' · ' + esc(o.number) + '</div>' +
+                            (o.cancelled ? '<div class="pop-row muted">This order was cancelled.</div>'
+                                         : '<div class="pop-label">Order progress</div><div class="pop-steps">' + progress + '</div>') +
+                            '<div class="pop-items">' +
+                                '<button type="button" class="pop-items-toggle" aria-expanded="true" aria-controls="pop-lines">' +
+                                    '<span>' + count + ' item' + (count === 1 ? '' : 's') + '</span>' +
+                                    '<span class="pop-items-total">RM ' + esc(o.total) + icons.chevron + '</span>' +
+                                '</button>' +
+                                '<div class="pop-lines" id="pop-lines">' + (lines || '<div class="pop-line muted">No items yet</div>') + '</div>' +
+                            '</div>' +
+                            (o.notes ? '<p class="pop-notes">Note: ' + esc(o.notes) + '</p>' : '') +
+                            '<div class="pop-pay ' + (o.payment === 'Paid' ? 'is-paid' : '') + '">' + esc(o.payment) + '</div>';
+                    }
+                    var bodyEl = document.getElementById('pop-body');
+                    bodyEl.innerHTML = body;
+
+                    // Fold / unfold the item list.
+                    var toggle = bodyEl.querySelector('.pop-items-toggle');
+                    if (toggle) toggle.addEventListener('click', function () {
+                        var open = toggle.getAttribute('aria-expanded') !== 'true';
+                        toggle.setAttribute('aria-expanded', String(open));
+                        toggle.parentElement.classList.toggle('is-collapsed', !open);
+                    });
+                    modal.show();
+            }
+
+            document.querySelectorAll('.live-table[data-table-id]').forEach(function (el) {
+                el.addEventListener('click', function () { showPopup(popupData[el.dataset.tableId]); });
+            });
+            document.querySelectorAll('.latest-item[data-order-id]').forEach(function (el) {
+                el.addEventListener('click', function () { showPopup(orderPopupData[el.dataset.orderId]); });
+            });
+
+            // Remember the chosen floor tab and the auto-refresh switch between refreshes.
+            function load(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+            function save(key, v) { try { localStorage.setItem(key, v); } catch (e) { } }
+
+            var savedFloor = load('koma.dashboard.floor');
+            var tab = savedFloor && document.querySelector('[data-floor-id="' + savedFloor + '"]');
+            if (tab && window.bootstrap) bootstrap.Tab.getOrCreateInstance(tab).show();
+            document.querySelectorAll('[data-floor-id]').forEach(function (b) {
+                b.addEventListener('shown.bs.tab', function () { save('koma.dashboard.floor', b.dataset.floorId); });
+            });
+
+            // Refresh the page every minute so seating and orders stay current.
+            var toggle = document.getElementById('auto-refresh');
+            toggle.checked = load('koma.dashboard.autorefresh') !== 'off';
+            var timer = null;
+            function schedule() {
+                clearTimeout(timer);
+                if (toggle.checked) timer = setTimeout(function () {
+                    // Don't reload while a table popup is open - try again in a minute.
+                    if (document.querySelector('.modal.show')) { schedule(); return; }
+                    location.reload();
+                }, 60000);
+                document.getElementById('refresh-info').textContent =
+                    'Updated @Model.Now.ToString("h:mm tt")' + (toggle.checked ? ' · refreshes every minute' : ' · auto-refresh off');
+            }
+            toggle.addEventListener('change', function () { save('koma.dashboard.autorefresh', toggle.checked ? 'on' : 'off'); schedule(); });
+            schedule();
+        })();
+    </script>
+}

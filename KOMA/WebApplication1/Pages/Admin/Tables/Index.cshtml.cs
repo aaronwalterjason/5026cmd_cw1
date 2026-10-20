@@ -16,7 +16,7 @@ namespace KOMA.Pages.Admin.Tables
 
         public async Task OnGetAsync()
         {
-            Tables = await _db.RestaurantTables.Include(t => t.DiningArea).OrderBy(t => t.TableNumber).ToListAsync();
+            Tables = await _db.RestaurantTables.Include(t => t.DiningArea).ThenInclude(a => a!.FloorLayout).OrderBy(t => t.TableNumber).ToListAsync();
         }
     }
 }

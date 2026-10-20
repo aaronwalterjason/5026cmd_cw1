@@ -1,0 +1,124 @@
+@model KOMA.Pages.Admin.Orders.IndexModel
+@using KOMA.Pages.Admin.Orders
+@* The right-hand panel of the Orders page. Rendered inside Index, and on its own by
+   Index?handler=Detail&id=.. so clicking an order swaps only this panel. *@
+@{
+    var sel = Model.Selected;
+    var payMethods = new[] { PaymentMethod.Cash, PaymentMethod.Card, PaymentMethod.TouchNGo, PaymentMethod.OnlineBanking };
+}
+@if (sel is null)
+{
+    <section class="card ord-detail ord-empty">
+        <p class="text-muted mb-0">Select an order to see its details.</p>
+    </section>
+}
+else
+{
+    var next = IndexModel.NextStatus(sel);
+    var cancelled = sel.Status == OrderStatus.Cancelled;
+    var finished = sel.Status is OrderStatus.Completed or OrderStatus.Cancelled;
+    var currentStep = Array.IndexOf(IndexModel.Steps, sel.Status);
+
+    <section class="card ord-detail" id="order-detail" aria-labelledby="ord-detail-name">
+        <header class="ord-d-head">
+            <div>
+                <div class="ord-eyebrow">
+                    @sel.OrderNumber · @sel.OrderType.DisplayName().ToUpperInvariant()
+                    @if (sel.RestaurantTable is not null) { <text> · TABLE @sel.RestaurantTable.TableNumber</text> }
+                </div>
+                <h2 id="ord-detail-name" class="ord-d-name">@IndexModel.CustomerName(sel)</h2>
+                <div class="ord-d-sub">
+                    Ordered @sel.OrderedAt.ToString("ddd d MMM, h:mm tt")
+                    @if (IndexModel.IsActive(sel.Status)) { <text> · @IndexModel.Elapsed(sel) ago</text> }
+                    @if (sel.RestaurantTable?.DiningArea is not null) { <text> · @sel.RestaurantTable.DiningArea.Name</text> }
+                    · @(sel.Customer?.Email ?? "No account")
+                </div>
+            </div>
+            <div class="ord-d-total">
+                <span>RM @sel.TotalAmount.ToString("N2")</span>
+                <span class="ord-pay-pill @("ord-pay-" + sel.PaymentStatus.ToString().ToLowerInvariant())">
+                    @sel.PaymentStatus.DisplayName()@(sel.PaymentMethod.HasValue && sel.PaymentStatus != PaymentStatus.Unpaid ? " · " + sel.PaymentMethod.Value.DisplayName() : "")
+                </span>
+            </div>
+        </header>
+
+        @if (cancelled)
+        {
+            <div class="ord-cancelled" role="status">This order was cancelled@(sel.PaymentStatus == PaymentStatus.Refunded ? " and refunded" : "").</div>
+        }
+        else
+        {
+            <ol class="ord-steps" aria-label="Order progress">
+                @for (int i = 0; i < IndexModel.Steps.Length; i++)
+                {
+                    var s = IndexModel.Steps[i];
+                    var state = i < currentStep ? "is-done" : i == currentStep ? "is-current" : "";
+                    <li class="@state" aria-current="@(i == currentStep ? "step" : null)">
+                        <span class="ord-step-bar"></span>
+                        <span class="ord-step-name">@s.DisplayName()</span>
+                        <span class="ord-step-time">
+                            @(s == OrderStatus.Pending ? sel.OrderedAt.ToString("h:mm tt")
+                              : s == OrderStatus.Completed && sel.Status == OrderStatus.Completed && sel.PaidAt.HasValue ? sel.PaidAt.Value.ToString("h:mm tt") : "")
+                        </span>
+                    </li>
+                }
+            </ol>
+        }
+
+        <div class="ord-items">
+            @foreach (var i in sel.Items)
+            {
+                <div class="ord-item">
+                    <span class="ord-qty">×@i.Quantity</span>
+                    <span>@(i.MenuItem?.Name ?? "(removed item)")</span>
+                    <span class="ord-unit">RM @i.UnitPrice.ToString("N2")</span>
+                    <span class="ord-line">RM @i.LineTotal.ToString("N2")</span>
+                </div>
+            }
+            @if (!sel.Items.Any()) { <p class="text-muted small my-3">No items on this order.</p> }
+            <div class="ord-items-foot">
+                <span>@sel.Items.Count dish@(sel.Items.Count == 1 ? "" : "es") · @sel.Items.Sum(i => i.Quantity) items</span>
+                <span>Total <strong>RM @sel.TotalAmount.ToString("N2")</strong></span>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(sel.Notes))
+        {
+            <p class="ord-notes"><strong>Notes:</strong> @sel.Notes</p>
+        }
+        @if (sel.PaidAt.HasValue && sel.PaymentStatus != PaymentStatus.Unpaid)
+        {
+            <p class="small text-muted mb-0">Paid @sel.PaidAt.Value.ToString("d MMM yyyy, h:mm tt")@(sel.PaymentMethod.HasValue ? " by " + sel.PaymentMethod.Value.DisplayName() : "").</p>
+        }
+
+        <div class="ord-actions">
+            @if (next.HasValue)
+            {
+                <form method="post" asp-page-handler="Advance" asp-all-route-data="Model.Route(sel.Id)">
+                    <input type="hidden" name="orderId" value="@sel.Id" />
+                    <button type="submit" class="btn @(sel.PaymentStatus == PaymentStatus.Unpaid && sel.Status == OrderStatus.Served ? "btn-outline-primary" : "btn-primary")">@IndexModel.NextLabel(next.Value)</button>
+                </form>
+            }
+            @if (sel.PaymentStatus == PaymentStatus.Unpaid && !cancelled)
+            {
+                <form method="post" asp-page-handler="Pay" asp-all-route-data="Model.Route(sel.Id)" class="ord-payform">
+                    <input type="hidden" name="orderId" value="@sel.Id" />
+                    <label class="visually-hidden" for="pay-method">Payment method</label>
+                    <select id="pay-method" name="method" class="form-select">
+                        @foreach (var m in payMethods) { <option value="@m">@m.DisplayName()</option> }
+                    </select>
+                    <button type="submit" class="btn @(next.HasValue ? "btn-outline-primary" : "btn-primary")">Take payment</button>
+                </form>
+            }
+            <button type="button" class="btn btn-outline-primary" onclick="window.print()">Print bill</button>
+            @if (!finished)
+            {
+                <form method="post" asp-page-handler="Cancel" asp-all-route-data="Model.Route(sel.Id)"
+                      onsubmit="return confirm('Cancel @(sel.OrderNumber)?@(sel.PaymentStatus == PaymentStatus.Paid ? " It will be marked as refunded." : "")');" class="ms-auto">
+                    <input type="hidden" name="orderId" value="@sel.Id" />
+                    <button type="submit" class="btn ord-btn-cancel">Cancel order</button>
+                </form>
+            }
+        </div>
+    </section>
+}

@@ -19,17 +19,23 @@ namespace KOMA.Models
         [StringLength(40)]
         public string Zone { get; set; } = "Indoor";
 
-        // Picked from FloorOptions on the admin form.
-        [Required(ErrorMessage = "Please choose a floor.")]
-        [StringLength(30)]
-        public string Floor { get; set; } = "Ground Floor";
+        // The floor this area is drawn on. Set by the layout designer.
+        [Display(Name = "Floor")]
+        public int? FloorLayoutId { get; set; }
+        public FloorLayout? FloorLayout { get; set; }
+
+        // Position and size on the floor layout, in metres from the floor's top-left corner.
+        public double LayoutX { get; set; }
+        public double LayoutY { get; set; }
+        public double LayoutWidth { get; set; } = 6;
+        public double LayoutHeight { get; set; } = 4;
 
         public bool IsActive { get; set; } = true;
 
         public ICollection<RestaurantTable> Tables { get; set; } = new List<RestaurantTable>();
 
-        // Fixed choices shown in the Zone / Floor dropdowns. Add to these lists to offer more options.
+        // Fixed choices shown in the Zone dropdown. Add to this list to offer more options
+        // (and give the new zone a colour in wwwroot/css/site.css: .zone-...).
         public static readonly string[] ZoneOptions = { "Indoor", "Outdoor", "Private Room", "Counter Seating" };
-        public static readonly string[] FloorOptions = { "Ground Floor", "Level 1", "Level 2", "Rooftop" };
     }
 }

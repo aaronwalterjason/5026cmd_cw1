@@ -1,0 +1,167 @@
+@page
+@model KOMA.Pages.Admin.Orders.IndexModel
+@using KOMA.Pages.Admin.Orders
+@{
+    ViewData["Title"] = "Orders";
+    string? from = Model.From?.ToString("yyyy-MM-dd");
+    string? to = Model.To?.ToString("yyyy-MM-dd");
+    string? type = Model.Type?.ToString();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Orders</h1>
+    <a class="btn btn-outline-primary" asp-page="/Admin/Revenue/Index">Revenue dashboard &rarr;</a>
+</div>
+
+@* ---------- Summary ---------- *@
+<div class="row g-2 mb-2">
+    <div class="col-6 col-lg-4">
+        <div class="card p-3 h-100">
+            <div class="text-muted small">Total orders</div>
+            <div class="fs-3 fw-semibold">@Model.TotalOrders</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-4">
+        <div class="card p-3 h-100">
+            <div class="text-muted small">Paid sales</div>
+            <div class="fs-3 fw-semibold">RM @Model.PaidTotal.ToString("N2")</div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-4">
+        <div class="card p-3 h-100">
+            <div class="text-muted small">Awaiting payment</div>
+            <div class="fs-3 fw-semibold">@Model.UnpaidActiveCount</div>
+        </div>
+    </div>
+</div>
+
+@* ---------- Order types ---------- *@
+<div class="d-flex justify-content-between align-items-baseline mt-3 mb-2">
+    <h2 class="h6 mb-0">Order types</h2>
+    @if (Model.Type.HasValue)
+    {
+        <a class="small" asp-page="./Index" asp-route-from="@from" asp-route-to="@to" asp-route-search="@Model.Search">Show all types</a>
+    }
+</div>
+<div class="row g-2 mb-3">
+    @foreach (var t in Model.TypeSummaries)
+    {
+        var selected = Model.Type == t.Type;
+        <div class="col-md-4">
+            <a asp-page="./Index" asp-route-type="@(selected ? null : t.Type.ToString())"
+               asp-route-from="@from" asp-route-to="@to" asp-route-search="@Model.Search"
+               class="card p-3 h-100 text-decoration-none text-body @(selected ? "border-dark border-2" : "")">
+                <div class="d-flex justify-content-between">
+                    <span class="badge @IndexModel.TypeBadgeClass(t.Type)">@IndexModel.TypeIcon(t.Type) @t.Type.DisplayName()</span>
+                    <span class="text-muted small">@t.Percent.ToString("N0")%</span>
+                </div>
+                <div class="fs-4 fw-semibold mt-2">@t.Count <span class="fs-6 fw-normal text-muted">orders</span></div>
+                <div class="small text-muted">RM @t.Sales.ToString("N2") paid</div>
+                <div class="progress mt-2" style="height:4px" role="presentation">
+                    <div class="progress-bar bg-dark" style="width:@t.Percent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                </div>
+            </a>
+        </div>
+    }
+</div>
+
+<h2 class="h6 mb-2">Order status</h2>
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a class="btn btn-sm @(Model.Status is null ? "btn-dark" : "btn-outline-dark")"
+       asp-page="./Index" asp-route-type="@type" asp-route-from="@from" asp-route-to="@to" asp-route-search="@Model.Search">
+        All <span class="badge bg-light text-dark ms-1">@Model.TotalOrders</span>
+    </a>
+    @foreach (var (status, count) in Model.StatusCounts)
+    {
+        <a class="btn btn-sm @(Model.Status == status ? "btn-dark" : "btn-outline-dark")"
+           asp-page="./Index" asp-route-type="@type" asp-route-status="@status" asp-route-from="@from" asp-route-to="@to" asp-route-search="@Model.Search">
+            <span class="badge @IndexModel.BadgeClass(status) me-1">&nbsp;</span>@status.DisplayName()
+            <span class="badge bg-light text-dark ms-1">@count</span>
+        </a>
+    }
+</div>
+
+@* ---------- Filters ---------- *@
+<form method="get" class="row g-2 align-items-end mb-3">
+    @if (Model.Status.HasValue)
+    {
+        <input type="hidden" name="status" value="@Model.Status" />
+    }
+    @if (Model.Type.HasValue)
+    {
+        <input type="hidden" name="type" value="@Model.Type" />
+    }
+    <div class="col-sm-3">
+        <label class="form-label small mb-1" for="from">From</label>
+        <input type="date" id="from" name="from" value="@from" class="form-control form-control-sm" />
+    </div>
+    <div class="col-sm-3">
+        <label class="form-label small mb-1" for="to">To</label>
+        <input type="date" id="to" name="to" value="@to" class="form-control form-control-sm" />
+    </div>
+    <div class="col-sm-4">
+        <label class="form-label small mb-1" for="search">Search</label>
+        <input type="search" id="search" name="search" value="@Model.Search" class="form-control form-control-sm"
+               placeholder="Order no., customer name or table" />
+    </div>
+    <div class="col-sm-2 d-flex gap-1">
+        <button type="submit" class="btn btn-sm btn-primary flex-fill">Filter</button>
+        <a asp-page="./Index" class="btn btn-sm btn-outline-secondary">Clear</a>
+    </div>
+</form>
+
+@* ---------- List ---------- *@
+<div class="table-responsive">
+<table class="table table-hover align-middle">
+    <thead>
+        <tr>
+            <th>Order</th>
+            <th>Date &amp; time</th>
+            <th>Customer</th>
+            <th>Type</th>
+            <th>Table</th>
+            <th class="text-end">Items</th>
+            <th class="text-end">Total</th>
+            <th>Status</th>
+            <th>Payment</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var o in Model.Orders)
+    {
+        <tr>
+            <td class="fw-semibold">@o.OrderNumber</td>
+            <td>@o.OrderedAt.ToString("dd MMM yyyy, h:mm tt")</td>
+            <td>@IndexModel.CustomerName(o)</td>
+            <td><span class="badge @IndexModel.TypeBadgeClass(o.OrderType)">@IndexModel.TypeIcon(o.OrderType) @o.OrderType.DisplayName()</span></td>
+            <td>@(o.RestaurantTable?.TableNumber ?? "—")</td>
+            <td class="text-end">@o.Items.Sum(i => i.Quantity)</td>
+            <td class="text-end">RM @o.TotalAmount.ToString("N2")</td>
+            <td><span class="badge @IndexModel.BadgeClass(o.Status)">@o.Status.DisplayName()</span></td>
+            <td>
+                @if (o.PaymentStatus == PaymentStatus.Paid)
+                {
+                    <span class="text-success">Paid</span>
+                    <div class="small text-muted">@o.PaymentMethod?.DisplayName()</div>
+                }
+                else
+                {
+                    <span class="text-muted">@o.PaymentStatus.DisplayName()</span>
+                }
+            </td>
+            <td><a class="btn btn-sm btn-outline-secondary" asp-page="./Details" asp-route-id="@o.Id">View</a></td>
+        </tr>
+    }
+    @if (!Model.Orders.Any())
+    {
+        <tr><td colspan="10" class="text-muted">No orders match these filters.</td></tr>
+    }
+    </tbody>
+</table>
+</div>
+
+@if (Model.IsTruncated)
+{
+    <p class="text-muted small">Showing the newest @Model.Orders.Count of @Model.MatchingOrders orders. Narrow the dates to see older ones.</p>
+}

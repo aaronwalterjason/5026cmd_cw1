@@ -18,6 +18,7 @@ namespace KOMA.Pages.Admin.Tables
         public RestaurantTable Table { get; set; } = new();
 
         public SelectList DiningAreaOptions { get; set; } = null!;
+        public string AreaName { get; set; } = "";
 
         public async Task<IActionResult> OnGetAsync(int id)
         {
@@ -36,7 +37,13 @@ namespace KOMA.Pages.Admin.Tables
                 return Page();
             }
 
-            _db.RestaurantTables.Update(Table);
+            // Copy only the fields on this form, so the table's dining area and layout position are kept.
+            var existing = await _db.RestaurantTables.FindAsync(Table.Id);
+            if (existing is null) return NotFound();
+            existing.TableNumber = Table.TableNumber;
+            existing.Capacity = Table.Capacity;
+            existing.Shape = Table.Shape;
+            existing.IsActive = Table.IsActive;
             await _db.SaveChangesAsync();
 
             TempData["StatusMessage"] = $"Table '{Table.TableNumber}' was updated.";
@@ -47,6 +54,10 @@ namespace KOMA.Pages.Admin.Tables
         {
             var areas = await _db.DiningAreas.OrderBy(a => a.Name).ToListAsync();
             DiningAreaOptions = new SelectList(areas, nameof(DiningArea.Id), nameof(DiningArea.Name), Table.DiningAreaId);
+            var id = Table.DiningAreaId;
+            if (id == 0 && Table.Id != 0)
+                id = await _db.RestaurantTables.Where(t => t.Id == Table.Id).Select(t => t.DiningAreaId).FirstOrDefaultAsync();
+            AreaName = areas.FirstOrDefault(a => a.Id == id)?.Name ?? "";
         }
     }
 }

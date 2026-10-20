@@ -1,0 +1,133 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
+using KOMA.Data;
+using KOMA.Models;
+
+namespace KOMA.Pages.Admin.Orders
+{
+    // Admin view of every customer order: a status summary plus a filterable list.
+    [Authorize(Roles = "Administrator")]
+    public class IndexModel : PageModel
+    {
+        private readonly ApplicationDbContext _db;
+        public IndexModel(ApplicationDbContext db) => _db = db;
+
+        private const int MaxRows = 200;
+
+        // ---- Filters (from the query string, e.g. /Admin/Orders?status=Pending&from=2026-10-01) ----
+        [BindProperty(SupportsGet = true)] public OrderStatus? Status { get; set; }
+        [BindProperty(SupportsGet = true)] public OrderType? Type { get; set; }
+        [BindProperty(SupportsGet = true)] public DateTime? From { get; set; }
+        [BindProperty(SupportsGet = true)] public DateTime? To { get; set; }
+        [BindProperty(SupportsGet = true)] public string? Search { get; set; }
+
+        // ---- Results ----
+        public IList<Order> Orders { get; set; } = new List<Order>();
+        public Dictionary<OrderStatus, int> StatusCounts { get; set; } = new();
+        public List<TypeSummary> TypeSummaries { get; set; } = new();
+        public int TotalOrders { get; set; }
+        public int MatchingOrders { get; set; }
+        public decimal PaidTotal { get; set; }
+        public int UnpaidActiveCount { get; set; }
+        public bool IsTruncated => MatchingOrders > Orders.Count;
+
+        public async Task OnGetAsync()
+        {
+            // Date + search filters apply to both the summary cards and the list.
+            var query = _db.Orders.AsNoTracking().AsQueryable();
+            if (From.HasValue) query = query.Where(o => o.OrderedAt >= From.Value.Date);
+            if (To.HasValue) query = query.Where(o => o.OrderedAt < To.Value.Date.AddDays(1));
+            if (!string.IsNullOrWhiteSpace(Search))
+            {
+                var term = Search.Trim();
+                var idTerm = term.ToUpperInvariant().Replace("KOMA-", "");
+                int.TryParse(idTerm, out var id);
+                query = query.Where(o =>
+                    o.Id == id ||
+                    o.CustomerName.Contains(term) ||
+                    (o.Customer != null && o.Customer.Email!.Contains(term)) ||
+                    (o.RestaurantTable != null && o.RestaurantTable.TableNumber.Contains(term)));
+            }
+
+            // Order-type section: count, paid sales and share for each type (ignores the type/status filters).
+            var byType = await query.GroupBy(o => o.OrderType)
+                .Select(g => new
+                {
+                    g.Key,
+                    Count = g.Count(),
+                    Sales = g.Sum(o => o.PaymentStatus == PaymentStatus.Paid ? o.TotalAmount : 0m)
+                })
+                .ToListAsync();
+            var allTypes = byType.Sum(t => t.Count);
+            TypeSummaries = TypeDisplayOrder.Select(t =>
+            {
+                var row = byType.FirstOrDefault(x => x.Key == t);
+                var count = row?.Count ?? 0;
+                return new TypeSummary(t, count, row?.Sales ?? 0, allTypes == 0 ? 0 : count * 100.0 / allTypes);
+            }).ToList();
+
+            // The type filter narrows the status summary and list below it.
+            if (Type.HasValue) query = query.Where(o => o.OrderType == Type.Value);
+
+            // Summary: how many orders are in each status (ignores the status filter, so all cards stay visible).
+            var counts = await query.GroupBy(o => o.Status)
+                .Select(g => new { g.Key, Count = g.Count() })
+                .ToListAsync();
+            StatusCounts = Enum.GetValues<OrderStatus>()
+                .ToDictionary(s => s, s => counts.FirstOrDefault(c => c.Key == s)?.Count ?? 0);
+            TotalOrders = StatusCounts.Values.Sum();
+            PaidTotal = await query.Where(o => o.PaymentStatus == PaymentStatus.Paid).SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
+            UnpaidActiveCount = await query.CountAsync(o =>
+                o.PaymentStatus == PaymentStatus.Unpaid && o.Status != OrderStatus.Cancelled);
+
+            // List: apply the status filter too, newest first.
+            if (Status.HasValue) query = query.Where(o => o.Status == Status.Value);
+            MatchingOrders = await query.CountAsync();
+            Orders = await query
+                .Include(o => o.Customer)
+                .Include(o => o.RestaurantTable)
+                .Include(o => o.Items)
+                .OrderByDescending(o => o.OrderedAt)
+                .Take(MaxRows)
+                .ToListAsync();
+        }
+
+        // Bootstrap colour for each status badge.
+        public static string BadgeClass(OrderStatus status) => status switch
+        {
+            OrderStatus.Pending => "bg-secondary",
+            OrderStatus.Preparing => "bg-warning text-dark",
+            OrderStatus.ReadyToServe => "bg-info text-dark",
+            OrderStatus.Served => "bg-primary",
+            OrderStatus.Completed => "bg-success",
+            OrderStatus.Cancelled => "bg-danger",
+            _ => "bg-light text-dark"
+        };
+
+        // Always show a person's name: the name saved on the order, else the account's name.
+        public static string CustomerName(Order o) =>
+            !string.IsNullOrWhiteSpace(o.CustomerName) ? o.CustomerName
+            : o.Customer?.FullName ?? "Guest";
+
+        public record TypeSummary(OrderType Type, int Count, decimal Sales, double Percent);
+
+        public static readonly OrderType[] TypeDisplayOrder =
+            { OrderType.OnlinePreOrder, OrderType.TableTablet, OrderType.WalkIn };
+
+        public static string TypeBadgeClass(OrderType type) => type switch
+        {
+            OrderType.OnlinePreOrder => "bg-primary-subtle text-primary-emphasis border border-primary-subtle",
+            OrderType.TableTablet => "bg-success-subtle text-success-emphasis border border-success-subtle",
+            _ => "bg-warning-subtle text-warning-emphasis border border-warning-subtle"
+        };
+
+        public static string TypeIcon(OrderType type) => type switch
+        {
+            OrderType.OnlinePreOrder => "🌐",
+            OrderType.TableTablet => "📱",
+            _ => "🚶"
+        };
+    }
+}

@@ -31,7 +31,7 @@ public class IndexModel(ApplicationDbContext context) : PageModel
         var start = Date.Value.ToDateTime(Time!.Value);
         var end = start.AddMinutes(ReservationRules.SlotMinutes);
         FutureSlot = start > ReservationRules.MalaysiaNow;
-        Tables = await context.RestaurantTables.AsNoTracking().Include(t => t.DiningArea)
+        Tables = await context.RestaurantTables.AsNoTracking().Include(t => t.DiningArea).ThenInclude(a => a!.FloorLayout)
             .Where(t => t.IsActive && t.DiningArea!.IsActive).OrderBy(t => t.DiningAreaId).ThenBy(t => t.TableNumber).ToListAsync();
         // Include inactive tables' reservations in the list to preserve access to their bookings.
         Bookings = await context.Reservations.AsNoTracking().Include(r => r.RestaurantTable)

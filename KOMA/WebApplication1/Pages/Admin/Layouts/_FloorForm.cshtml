@@ -1,0 +1,54 @@
+@model KOMA.Models.FloorLayout
+@* Shared fields for Create/Edit. Rendered with <partial name="_FloorForm" for="Floor" /> so field names keep the "Floor." prefix. *@
+
+<div class="row">
+    <div class="col-md-8 mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" placeholder="e.g. Ground Floor" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="col-md-4 mb-3">
+        <label asp-for="Level" class="form-label"></label>
+        <input asp-for="Level" type="number" class="form-control" />
+        <div class="form-text">0 = ground, 1 = level 1…</div>
+        <span asp-validation-for="Level" class="text-danger"></span>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label asp-for="Description" class="form-label"></label>
+    <input asp-for="Description" class="form-control" placeholder="Optional" />
+</div>
+
+<fieldset class="mb-3">
+    <legend class="form-label fs-6 mb-1">Floor size</legend>
+    <p class="form-text mt-0">
+        <strong>Click and drag on the grid</strong> to draw the floor. Each square is 1 metre.
+        You can also type the size below.
+    </p>
+
+    <div class="floor-drawer" id="floor-drawer"
+         data-max-w="@KOMA.Models.FloorLayout.MaxWidth" data-max-h="@KOMA.Models.FloorLayout.MaxHeight"
+         data-min="@KOMA.Models.FloorLayout.MinSize">
+        <div class="floor-drawer-grid" id="floor-drawer-grid">
+            <div class="floor-drawer-rect" id="floor-drawer-rect">
+                <span class="floor-drawer-size" id="floor-drawer-size"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-2">
+        <div class="col-6 col-md-3">
+            <label asp-for="Width" class="form-label small mb-1"></label>
+            <input asp-for="Width" type="number" class="form-control form-control-sm" id="floor-width"
+                   min="@KOMA.Models.FloorLayout.MinSize" max="@KOMA.Models.FloorLayout.MaxWidth" />
+            <span asp-validation-for="Width" class="text-danger small"></span>
+        </div>
+        <div class="col-6 col-md-3">
+            <label asp-for="Height" class="form-label small mb-1"></label>
+            <input asp-for="Height" type="number" class="form-control form-control-sm" id="floor-height"
+                   min="@KOMA.Models.FloorLayout.MinSize" max="@KOMA.Models.FloorLayout.MaxHeight" />
+            <span asp-validation-for="Height" class="text-danger small"></span>
+        </div>
+    </div>
+</fieldset>

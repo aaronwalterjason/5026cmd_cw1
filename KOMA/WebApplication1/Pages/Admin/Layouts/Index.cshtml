@@ -1,0 +1,93 @@
+@page
+@model KOMA.Pages.Admin.Layouts.IndexModel
+@{
+    ViewData["Title"] = "Floor Layouts";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Floor Layouts</h1>
+    <a class="btn btn-primary" asp-page="./Create">+ New floor layout</a>
+</div>
+
+@if (TempData["StatusMessage"] is string status)
+{
+    <div class="alert alert-info">@status</div>
+}
+
+<p class="text-muted">
+    Each floor has its own layout. Open a floor to draw its dining areas and add tables inside them.
+</p>
+
+@if (!Model.Floors.Any())
+{
+    <div class="card p-4 text-center">
+        <p class="mb-2">No floor layouts yet.</p>
+        <p class="text-muted small">Start by creating a floor (e.g. "Ground Floor") and drawing its size.</p>
+        <div><a class="btn btn-primary" asp-page="./Create">Create your first floor</a></div>
+    </div>
+}
+
+<div class="row g-3">
+@foreach (var f in Model.Floors)
+{
+    var tables = f.DiningAreas.SelectMany(a => a.Tables).ToList();
+    <div class="col-md-6">
+        <div class="card h-100">
+            <a asp-page="./Designer" asp-route-id="@f.Id" class="d-block p-3 pb-0" title="Open the @f.Name layout">
+                @* Small read-only preview of the floor, drawn with percentages so it scales to the card. *@
+                <div class="lay-preview" style="aspect-ratio:@f.Width / @f.Height" data-floor-w="@f.Width" data-floor-h="@f.Height">
+                    @foreach (var a in f.DiningAreas)
+                    {
+                        <div class="lay-preview-area @IndexModel.ZoneClass(a.Zone)"
+                             style="left:@IndexModel.Pct(a.LayoutX, f.Width);top:@IndexModel.Pct(a.LayoutY, f.Height);width:@IndexModel.Pct(a.LayoutWidth, f.Width);height:@IndexModel.Pct(a.LayoutHeight, f.Height)"></div>
+                    }
+                    @foreach (var t in tables)
+                    {
+                        <div class="lay-preview-table @(t.Shape == TableShape.Round ? "is-round" : "")"
+                             data-x="@t.LayoutX" data-y="@t.LayoutY" data-w="@t.LayoutWidth" data-h="@t.LayoutHeight"
+                             data-shape="@t.Shape" data-capacity="@t.Capacity"
+                             style="left:@IndexModel.Pct(t.LayoutX, f.Width);top:@IndexModel.Pct(t.LayoutY, f.Height);width:@IndexModel.Pct(t.LayoutWidth, f.Width);height:@IndexModel.Pct(t.LayoutHeight, f.Height)"></div>
+                    }
+                </div>
+            </a>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-baseline">
+                    <h2 class="h5 mb-0">@f.Name</h2>
+                    <span class="text-muted small">Level @f.Level · @f.Width m × @f.Height m</span>
+                </div>
+                <p class="small text-muted mb-2">
+                    @f.DiningAreas.Count dining area(s) · @tables.Count table(s) · @tables.Sum(t => t.Capacity) seats
+                    @if (!string.IsNullOrWhiteSpace(f.Description)) { <br />@f.Description }
+                </p>
+                <a class="btn btn-sm btn-primary" asp-page="./Designer" asp-route-id="@f.Id">Open layout</a>
+                <a class="btn btn-sm btn-outline-secondary" asp-page="./Edit" asp-route-id="@f.Id">Edit floor</a>
+                <a class="btn btn-sm btn-outline-danger" asp-page="./Delete" asp-route-id="@f.Id">Delete</a>
+            </div>
+        </div>
+    </div>
+}
+</div>
+
+@section Scripts {
+    <script src="~/js/layout-chairs.js" asp-append-version="true"></script>
+    <script>
+        // Add the chairs around each table in the small previews.
+        document.querySelectorAll('.lay-preview').forEach(function (box) {
+            var fw = +box.dataset.floorW, fh = +box.dataset.floorH;
+            box.querySelectorAll('.lay-preview-table').forEach(function (el) {
+                var n = function (v) { return parseFloat(String(v).replace(',', '.')); };
+                var t = { x: n(el.dataset.x), y: n(el.dataset.y), w: n(el.dataset.w), h: n(el.dataset.h),
+                          shape: el.dataset.shape, capacity: el.dataset.capacity };
+                KomaChairs.positions(t).forEach(function (c) {
+                    var ch = document.createElement('div');
+                    ch.className = 'lay-preview-chair' + (c.kind === 'bench' ? ' is-bench' : '');
+                    ch.style.left = (c.x / fw * 100) + '%';
+                    ch.style.top = (c.y / fh * 100) + '%';
+                    ch.style.width = (c.w / fw * 100) + '%';
+                    ch.style.height = (c.h / fh * 100) + '%';
+                    box.insertBefore(ch, el);
+                });
+            });
+        });
+    </script>
+}

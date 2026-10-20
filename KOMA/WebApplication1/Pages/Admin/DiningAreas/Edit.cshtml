@@ -16,20 +16,13 @@
         <span asp-validation-for="DiningArea.Name" class="text-danger"></span>
     </div>
 
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <label asp-for="DiningArea.Zone" class="form-label"></label>
-            <select asp-for="DiningArea.Zone" class="form-select"
-                    asp-items="@(new Microsoft.AspNetCore.Mvc.Rendering.SelectList(KOMA.Models.DiningArea.ZoneOptions))"></select>
-            <span asp-validation-for="DiningArea.Zone" class="text-danger"></span>
-        </div>
-        <div class="col-md-6 mb-3">
-            <label asp-for="DiningArea.Floor" class="form-label"></label>
-            <select asp-for="DiningArea.Floor" class="form-select"
-                    asp-items="@(new Microsoft.AspNetCore.Mvc.Rendering.SelectList(KOMA.Models.DiningArea.FloorOptions))"></select>
-            <span asp-validation-for="DiningArea.Floor" class="text-danger"></span>
-        </div>
+    <div class="mb-3">
+        <label asp-for="DiningArea.Zone" class="form-label"></label>
+        <select asp-for="DiningArea.Zone" class="form-select"
+                asp-items="@(new Microsoft.AspNetCore.Mvc.Rendering.SelectList(KOMA.Models.DiningArea.ZoneOptions))"></select>
+        <span asp-validation-for="DiningArea.Zone" class="text-danger"></span>
     </div>
+    <p class="form-text">To move or resize this area, or change its floor, use the floor layout designer.</p>
 
     <div class="mb-3">
         <label asp-for="DiningArea.Description" class="form-label"></label>

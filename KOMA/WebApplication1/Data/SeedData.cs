@@ -35,6 +35,15 @@ public static class SeedData
             await db.SaveChangesAsync();
         }
 
+        // Sample orders for the Order List / Revenue Dashboard (Development only, see DemoOrderSeeder).
+        if (services.GetRequiredService<IHostEnvironment>().IsDevelopment())
+        {
+            foreach (var (email, name) in DemoOrderSeeder.DemoCustomers)
+                await EnsureAsync(email, "Customer#12345", "Customer", name);
+            await DemoOrderSeeder.SeedAsync(db);
+            await DemoOrderSeeder.EnsureTodayAsync(db);
+        }
+
         async Task EnsureAsync(string email, string password, string role, string name)
         {
             if (await users.FindByEmailAsync(email) != null) return;

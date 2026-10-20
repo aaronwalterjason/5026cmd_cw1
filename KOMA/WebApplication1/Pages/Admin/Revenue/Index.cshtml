@@ -1,0 +1,206 @@
+@page
+@model KOMA.Pages.Admin.Revenue.IndexModel
+@using System.Globalization
+@{
+    ViewData["Title"] = "Revenue";
+    var inv = CultureInfo.InvariantCulture;
+    var salesLine = Model.Compare(Model.TotalRevenue, Model.PrevRevenue, true, out var salesCss);
+    var ordersLine = Model.Compare(Model.PaidOrders, Model.PrevOrders, false, out var ordersCss);
+    var avgLine = Model.Compare(Model.AverageOrderValue, Model.PrevAverage, true, out var avgCss);
+    var gridValues = new[] { Model.AxisMax, Model.AxisMax * 2 / 3, Model.AxisMax / 3, 0m };
+    var hasSales = Model.TotalRevenue > 0;
+}
+
+@* ---------- Header: title + one toolbar ---------- *@
+<div class="rv-head">
+    <h1 class="rv-title">Revenue <span>· @Model.PeriodLabel</span></h1>
+
+    <div class="rv-tools">
+        <nav class="rv-pills" aria-label="Period">
+            <a asp-page="./Index" asp-route-period="day" class="@(Model.Period == "day" ? "is-on" : "")" aria-current="@(Model.Period == "day" ? "page" : null)">Day</a>
+            <a asp-page="./Index" asp-route-period="month" class="@(Model.Period == "month" ? "is-on" : "")" aria-current="@(Model.Period == "month" ? "page" : null)">Month</a>
+            <a asp-page="./Index" asp-route-period="year" class="@(Model.Period == "year" ? "is-on" : "")" aria-current="@(Model.Period == "year" ? "page" : null)">Year</a>
+        </nav>
+
+        <div class="rv-stepper">
+            <a asp-page="./Index" asp-all-route-data="Model.PrevRoute" class="rv-arrow" aria-label="Previous @Model.Period">‹</a>
+            @* The period label is the picker itself: changing it reloads the page (no Show button). *@
+            <form method="get" class="rv-picker">
+                <input type="hidden" name="period" value="@Model.Period" />
+                @if (Model.Period == "day")
+                {
+                    <input type="date" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" max="@DateTime.Today.ToString("yyyy-MM-dd")"
+                           aria-label="Choose a day" onchange="this.form.submit()" />
+                }
+                else if (Model.Period == "month")
+                {
+                    <input type="month" name="month" value="@Model.Month" max="@DateTime.Today.ToString("yyyy-MM")"
+                           aria-label="Choose a month" onchange="this.form.submit()" />
+                }
+                else
+                {
+                    <select name="year" aria-label="Choose a year" onchange="this.form.submit()">
+                        @foreach (var y in Model.YearOptions)
+                        {
+                            <option value="@y" selected="@(y == Model.Year)">@y</option>
+                        }
+                    </select>
+                }
+                <noscript><button type="submit" class="btn btn-sm btn-primary">Show</button></noscript>
+            </form>
+            @if (Model.HasNext)
+            {
+                <a asp-page="./Index" asp-all-route-data="Model.NextRoute" class="rv-arrow" aria-label="Next @Model.Period">›</a>
+            }
+            else
+            {
+                <span class="rv-arrow is-disabled" aria-hidden="true">›</span>
+            }
+        </div>
+
+        <a asp-page="/Admin/Orders/Index" class="btn btn-outline-primary rv-orders">View orders →</a>
+    </div>
+</div>
+
+@* ---------- Summary cards ---------- *@
+<div class="kpi-row rv-kpis mb-3">
+    <div class="kpi-card kpi-lead">
+        <span class="kpi-eyebrow">SALES · @Model.SpanLabel</span>
+        <span class="kpi-big"><span class="kpi-rm">RM</span>@Model.TotalRevenue.ToString("N2")</span>
+        <span class="kpi-sub @salesCss">@salesLine</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Paid orders</span>
+        <span class="kpi-num">@Model.PaidOrders</span>
+        <span class="kpi-sub @ordersCss">@ordersLine</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Average order</span>
+        <span class="kpi-num kpi-num-sm">RM @Model.AverageOrderValue.ToString("N2")</span>
+        <span class="kpi-sub @avgCss">@avgLine</span>
+    </div>
+    <div class="kpi-card">
+        <span class="kpi-label">Items sold</span>
+        <span class="kpi-num">@Model.ItemsSold</span>
+        <span class="kpi-sub">@(Model.PaidOrders == 0 ? "—" : (Model.ItemsSold / (double)Model.PaidOrders).ToString("0.0") + " per order")</span>
+    </div>
+</div>
+
+@* ---------- Chart ---------- *@
+<section class="card rv-chart-card mb-3" aria-labelledby="rv-chart-title">
+    <div class="rv-chart-head">
+        <h2 class="h6 mb-0" id="rv-chart-title">@Model.BreakdownTitle</h2>
+        @if (hasSales)
+        {
+            <span class="rv-avg-key"><span></span>Average RM @Model.AveragePerBucket.ToString("N2") / @Model.BucketWord</span>
+        }
+    </div>
+
+    @if (!hasSales)
+    {
+        <p class="text-muted mb-0 py-4 text-center">No sales in @Model.PeriodLabel yet.</p>
+    }
+    else if (Model.Period == "month")
+    {
+        @* Month view: calendar heatmap - each day shaded from light to navy by its sales. *@
+        var maxDay = Model.Breakdown.Max(b => b.Amount);
+        var offset = ((int)Model.Start.DayOfWeek + 6) % 7;   // Monday-first weeks
+        var cellsUsed = offset + Model.Breakdown.Count;
+        var trailing = (7 - cellsUsed % 7) % 7;
+        var best = Model.Breakdown.Where(b => b.Amount > 0).OrderByDescending(b => b.Amount).FirstOrDefault();
+        <div class="rv-cal-legend" aria-hidden="true">
+            @if (best is not null) { <span class="me-auto">Best day: <strong>@best.FullLabel · RM @best.Amount.ToString("N2")</strong></span> }
+            <span>Less</span><i class="lvl-0"></i><i class="lvl-1"></i><i class="lvl-2"></i><i class="lvl-3"></i><i class="lvl-4"></i><span>More</span>
+        </div>
+        <div class="rv-cal" role="grid" aria-label="Sales by day, @Model.PeriodLabel">
+            @foreach (var wd in new[] { "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" })
+            {
+                <div class="rv-cal-wd" role="columnheader">@wd</div>
+            }
+            @for (int i = 0; i < offset; i++) { <div class="rv-cal-blank" aria-hidden="true"></div> }
+            @for (int i = 0; i < Model.Breakdown.Count; i++)
+            {
+                var b = Model.Breakdown[i];
+                var date = Model.Start.AddDays(i);
+                var level = b.IsFuture || b.Amount <= 0 || maxDay <= 0 ? 0 : (int)Math.Ceiling(b.Amount / maxDay * 4);
+                var css = $"rv-cal-day lvl-{level}{(b.IsCurrent ? " is-current" : "")}{(b.IsFuture ? " is-future" : "")}";
+                var tip = $"{b.FullLabel} · RM {b.Amount:N2} · {b.Orders} order{(b.Orders == 1 ? "" : "s")}";
+                if (b.IsFuture)
+                {
+                    <div class="@css" style="--i:@i" role="gridcell" aria-label="@b.FullLabel, not yet">
+                        <span class="rv-cal-num">@date.Day</span>
+                    </div>
+                }
+                else
+                {
+                    <a class="@css" style="--i:@i" role="gridcell" title="@tip" aria-label="@tip. Open this day."
+                       asp-page="./Index" asp-route-period="day" asp-route-date="@date.ToString("yyyy-MM-dd")">
+                        <span class="rv-cal-num">@date.Day</span>
+                        <span class="rv-cal-amt">@(b.Amount > 0 ? "RM " + b.Amount.ToString("N2") : "—")</span>
+                        @if (b.Orders > 0) { <span class="rv-cal-ord">@b.Orders order@(b.Orders == 1 ? "" : "s")</span> }
+                    </a>
+                }
+            }
+            @for (int i = 0; i < trailing; i++) { <div class="rv-cal-blank" aria-hidden="true"></div> }
+        </div>
+        <p class="small text-muted mt-2 mb-0">Click a day to see its sales by hour.</p>
+    }
+    else
+    {
+        <div class="rv-chart">
+            <div class="rv-axis" aria-hidden="true">
+                @foreach (var g in gridValues) { <span>RM @g.ToString("0.##", inv)</span> }
+            </div>
+            <div class="rv-plot">
+                <div class="rv-area">
+                    <div class="rv-grid" style="bottom:100%"></div>
+                    <div class="rv-grid" style="bottom:66.67%"></div>
+                    <div class="rv-grid" style="bottom:33.33%"></div>
+                    <div class="rv-avg" style="bottom:@Model.Pct(Model.AveragePerBucket)" aria-hidden="true"></div>
+                    <div class="rv-bars" style="--n:@Model.Breakdown.Count">
+                        @for (int i = 0; i < Model.Breakdown.Count; i++)
+                        {
+                            var b = Model.Breakdown[i];
+                            var tip = $"{b.FullLabel} · RM {b.Amount:N2} · {b.Orders} order{(b.Orders == 1 ? "" : "s")}";
+                            <div class="rv-col @(b.IsCurrent ? "is-current" : "") @(b.IsFuture ? "is-future" : "")"
+                                 tabindex="@(b.IsFuture ? "-1" : "0")" aria-label="@(b.IsFuture ? b.FullLabel + ", not yet" : tip)">
+                                @if (b.IsFuture)
+                                {
+                                    <div class="rv-bar is-future-bar"></div>
+                                }
+                                else
+                                {
+                                    <div class="rv-bar" style="height:@(b.Amount > 0 ? Model.Pct(b.Amount) : "2px");--i:@i">
+                                        <div class="rv-tip" role="presentation">@(b.IsCurrent ? (Model.Period == "day" ? "Now · " : Model.Period == "month" ? "Today · " : "This month · ") : "")@tip</div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="rv-labels" aria-hidden="true">
+                    @foreach (var b in Model.Breakdown)
+                    {
+                        <span class="@(b.IsCurrent ? "is-current" : "")">@b.Label</span>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</section>
+
+@if (hasSales)
+{
+    <details class="mt-3 small">
+        <summary>Show @Model.BreakdownTitle.ToLower() as a table</summary>
+        <table class="table table-sm mt-2">
+            <thead><tr><th>Period</th><th class="text-end">Orders</th><th class="text-end">Sales</th></tr></thead>
+            <tbody>
+            @foreach (var b in Model.Breakdown.Where(b => b.Orders > 0))
+            {
+                <tr><td>@b.FullLabel</td><td class="text-end">@b.Orders</td><td class="text-end">RM @b.Amount.ToString("N2")</td></tr>
+            }
+            </tbody>
+        </table>
+    </details>
+}

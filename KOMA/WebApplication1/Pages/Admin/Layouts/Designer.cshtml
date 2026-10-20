@@ -1,0 +1,91 @@
+@page "{id:int}"
+@model KOMA.Pages.Admin.Layouts.DesignerModel
+@{
+    ViewData["Title"] = $"{Model.Floor.Name} layout";
+}
+
+@* ---------- Header: floors + save ---------- *@
+<div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+    <a asp-page="./Index" class="btn btn-sm btn-link px-0">&larr; Floor layouts</a>
+    <h1 class="h4 mb-0 me-2">@Model.Floor.Name</h1>
+    <span class="text-muted small me-auto">@Model.Floor.Width m × @Model.Floor.Height m</span>
+
+    <a asp-page="./Edit" asp-route-id="@Model.Floor.Id" class="btn btn-sm btn-outline-secondary">Edit floor size</a>
+    <form method="post" id="layout-form" class="d-inline">
+        <input type="hidden" name="Payload" id="layout-payload" />
+        <button type="submit" class="btn btn-sm btn-primary" id="layout-save">Save layout</button>
+    </form>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+    @foreach (var f in Model.AllFloors)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(f.Id == Model.Floor.Id ? "active" : "")" asp-page="./Designer" asp-route-id="@f.Id">@f.Name</a>
+        </li>
+    }
+    <li class="nav-item"><a class="nav-link" asp-page="./Create">+ Floor</a></li>
+</ul>
+
+@if (TempData["StatusMessage"] is string status)
+{
+    <div class="alert alert-success py-2">@status</div>
+}
+@if (Model.Errors.Any())
+{
+    <div class="alert alert-danger py-2" role="alert">
+        <strong>The layout was not saved.</strong> Fix these and click Save again:
+        <ul class="mb-0">
+            @foreach (var e in Model.Errors) { <li>@e</li> }
+        </ul>
+    </div>
+}
+
+<div class="row g-3 layout-designer">
+    @* ---------- Left: tools + list ---------- *@
+    <div class="col-lg-3 col-xl-2">
+        <div class="card p-2 mb-3">
+            <div class="small text-muted px-1 mb-1">Tools</div>
+            <div class="btn-group-vertical w-100" role="group" aria-label="Layout tools">
+                <button type="button" class="btn btn-outline-dark text-start lay-tool active" data-tool="select" title="Shortcut: V">
+                    <span class="lay-tool-icon">⬚</span> Select &amp; move
+                </button>
+                <button type="button" class="btn btn-outline-dark text-start lay-tool" data-tool="area" title="Shortcut: A">
+                    <span class="lay-tool-icon">▭</span> Draw dining area
+                </button>
+                <button type="button" class="btn btn-outline-dark text-start lay-tool" data-tool="table" title="Shortcut: T">
+                    <span class="lay-tool-icon">◯</span> Add table
+                </button>
+            </div>
+        </div>
+
+        <div class="card p-2">
+            <div class="d-flex justify-content-between px-1 mb-1">
+                <span class="small text-muted">On this floor</span>
+                <span class="small text-muted" id="lay-counts"></span>
+            </div>
+            <div id="lay-list" class="lay-list"></div>
+        </div>
+    </div>
+
+    @* ---------- Centre: the floor ---------- *@
+    <div class="col-lg-6 col-xl-7">
+        <div id="lay-message" class="lay-message" role="status" aria-live="polite"></div>
+        <div id="lay-wrap" class="lay-wrap">
+            <div id="lay-floor" class="lay-floor" tabindex="0" aria-label="Floor layout. Use the tools on the left to draw dining areas and add tables."></div>
+        </div>
+        <div class="d-flex flex-wrap gap-3 mt-2 small text-muted" id="lay-legend"></div>
+    </div>
+
+    @* ---------- Right: details of the selected item ---------- *@
+    <div class="col-lg-3 col-xl-3">
+        <div class="card p-3" id="lay-props"></div>
+    </div>
+</div>
+
+<script type="application/json" id="layout-data">@Html.Raw(Model.DesignerJson)</script>
+
+@section Scripts {
+    <script src="~/js/layout-chairs.js" asp-append-version="true"></script>
+    <script src="~/js/layout-designer.js" asp-append-version="true"></script>
+}

@@ -33,7 +33,7 @@
         <section class="floor-room mb-4" aria-label="@diningArea.Name">
             <div class="d-flex justify-content-between flex-wrap mb-3">
                 <h2 class="h4">@diningArea.Name</h2>
-                <span>@diningArea.Floor · @diningArea.Zone</span>
+                <span>@(diningArea.FloorLayout?.Name ?? "No floor") · @diningArea.Zone</span>
             </div>
             <div class="floor-tables">
                 @foreach (var table in area)

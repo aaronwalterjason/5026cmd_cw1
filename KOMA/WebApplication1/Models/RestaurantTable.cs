@@ -25,6 +25,13 @@ namespace KOMA.Models
         public int DiningAreaId { get; set; }
         public DiningArea? DiningArea { get; set; }
 
+        // Position and size on the floor layout, in metres from the floor's top-left corner
+        // (same coordinates as the dining area, so the table always sits inside its area).
+        public double LayoutX { get; set; }
+        public double LayoutY { get; set; }
+        public double LayoutWidth { get; set; } = 1;
+        public double LayoutHeight { get; set; } = 1;
+
         // TODO (Engineer B, Intermediate tier): availability is computed from Reservations,
         // not stored here - don't add an "IsAvailable" flag, it will go stale.
     }

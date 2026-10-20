@@ -6,7 +6,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1>Dining Areas</h1>
-    <a class="btn btn-primary" asp-page="./Create">+ New dining area</a>
+    <a class="btn btn-primary" asp-page="/Admin/Layouts/Index">+ New dining area (on a floor layout)</a>
 </div>
 
 @if (TempData["StatusMessage"] is string status)
@@ -30,7 +30,16 @@
     {
         <tr>
             <td>@area.Name</td>
-            <td>@area.Floor</td>
+            <td>
+                @if (area.FloorLayout is not null)
+                {
+                    <a asp-page="/Admin/Layouts/Designer" asp-route-id="@area.FloorLayoutId">@area.FloorLayout.Name</a>
+                }
+                else
+                {
+                    <span class="text-muted">Not on a floor</span>
+                }
+            </td>
             <td>@area.Zone</td>
             <td>@area.Tables.Count</td>
             <td>@(area.IsActive ? "Yes" : "No")</td>

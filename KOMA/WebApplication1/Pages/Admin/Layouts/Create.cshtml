@@ -1,0 +1,18 @@
+@page
+@model KOMA.Pages.Admin.Layouts.CreateModel
+@{
+    ViewData["Title"] = "New Floor Layout";
+}
+
+<h1>New Floor Layout</h1>
+
+<form method="post">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <partial name="_FloorForm" for="Floor" />
+    <button type="submit" class="btn btn-primary">Create and open layout</button>
+    <a asp-page="./Index" class="btn btn-link">Cancel</a>
+</form>
+
+@section Scripts {
+    <script src="~/js/floor-size-drawer.js" asp-append-version="true"></script>
+}

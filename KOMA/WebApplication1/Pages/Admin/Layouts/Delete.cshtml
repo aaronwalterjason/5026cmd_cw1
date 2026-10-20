@@ -1,0 +1,21 @@
+@page "{id:int}"
+@model KOMA.Pages.Admin.Layouts.DeleteModel
+@{
+    ViewData["Title"] = "Delete Floor Layout";
+}
+
+<h1>Delete Floor</h1>
+
+<div class="alert alert-warning">
+    Are you sure you want to delete <strong>@Model.Floor.Name</strong>?
+    @if (Model.AreaCount > 0)
+    {
+        <text>This will also delete its <strong>@Model.AreaCount dining area(s)</strong> and <strong>@Model.TableCount table(s)</strong>.</text>
+    }
+    This cannot be undone.
+</div>
+
+<form method="post">
+    <button type="submit" class="btn btn-danger">Delete floor</button>
+    <a asp-page="./Index" class="btn btn-link">Cancel</a>
+</form>
