@@ -122,13 +122,23 @@ namespace KOMA.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
-                    b.Property<string>("Floor")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                    b.Property<int?>("FloorLayoutId")
+                        .HasColumnType("int");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
+
+                    b.Property<double>("LayoutHeight")
+                        .HasColumnType("float");
+
+                    b.Property<double>("LayoutWidth")
+                        .HasColumnType("float");
+
+                    b.Property<double>("LayoutX")
+                        .HasColumnType("float");
+
+                    b.Property<double>("LayoutY")
+                        .HasColumnType("float");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -142,7 +152,40 @@ namespace KOMA.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FloorLayoutId");
+
                     b.ToTable("DiningAreas");
+                });
+
+            modelBuilder.Entity("KOMA.Models.FloorLayout", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("FloorLayouts");
                 });
 
             modelBuilder.Entity("KOMA.Models.MenuCategory", b =>
@@ -216,6 +259,92 @@ namespace KOMA.Migrations
                     b.HasIndex("PromotionId");
 
                     b.ToTable("MenuItems");
+                });
+
+            modelBuilder.Entity("KOMA.Models.Order", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CustomerId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("OrderType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("OrderedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PaymentMethod")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PaymentStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("RestaurantTableId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("OrderedAt");
+
+                    b.HasIndex("PaidAt");
+
+                    b.HasIndex("RestaurantTableId");
+
+                    b.ToTable("Orders");
+                });
+
+            modelBuilder.Entity("KOMA.Models.OrderItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("MenuItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(8,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MenuItemId");
+
+                    b.HasIndex("OrderId");
+
+                    b.ToTable("OrderItems");
                 });
 
             modelBuilder.Entity("KOMA.Models.Promotion", b =>
@@ -354,6 +483,18 @@ namespace KOMA.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
+
+                    b.Property<double>("LayoutHeight")
+                        .HasColumnType("float");
+
+                    b.Property<double>("LayoutWidth")
+                        .HasColumnType("float");
+
+                    b.Property<double>("LayoutX")
+                        .HasColumnType("float");
+
+                    b.Property<double>("LayoutY")
+                        .HasColumnType("float");
 
                     b.Property<int>("Shape")
                         .HasColumnType("int");
@@ -539,6 +680,16 @@ namespace KOMA.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("KOMA.Models.DiningArea", b =>
+                {
+                    b.HasOne("KOMA.Models.FloorLayout", "FloorLayout")
+                        .WithMany("DiningAreas")
+                        .HasForeignKey("FloorLayoutId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("FloorLayout");
+                });
+
             modelBuilder.Entity("KOMA.Models.MenuItem", b =>
                 {
                     b.HasOne("KOMA.Models.MenuCategory", "MenuCategory")
@@ -554,6 +705,42 @@ namespace KOMA.Migrations
                     b.Navigation("MenuCategory");
 
                     b.Navigation("Promotion");
+                });
+
+            modelBuilder.Entity("KOMA.Models.Order", b =>
+                {
+                    b.HasOne("KOMA.Models.ApplicationUser", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("KOMA.Models.RestaurantTable", "RestaurantTable")
+                        .WithMany()
+                        .HasForeignKey("RestaurantTableId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("RestaurantTable");
+                });
+
+            modelBuilder.Entity("KOMA.Models.OrderItem", b =>
+                {
+                    b.HasOne("KOMA.Models.MenuItem", "MenuItem")
+                        .WithMany()
+                        .HasForeignKey("MenuItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KOMA.Models.Order", "Order")
+                        .WithMany("Items")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MenuItem");
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("KOMA.Models.Reservation", b =>
@@ -661,7 +848,17 @@ namespace KOMA.Migrations
                     b.Navigation("Tables");
                 });
 
+            modelBuilder.Entity("KOMA.Models.FloorLayout", b =>
+                {
+                    b.Navigation("DiningAreas");
+                });
+
             modelBuilder.Entity("KOMA.Models.MenuCategory", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("KOMA.Models.Order", b =>
                 {
                     b.Navigation("Items");
                 });
