@@ -1,5 +1,23 @@
 # KOMA — how to run this
 
+## Shared reservation pages
+
+The create/edit form is `Pages/Reservations/Edit` and the details/confirmation page is
+`Pages/Reservations/Details`. Customers, staff and administrators use these same pages
+after login. The staff availability overview remains at `/Staff/Reservation/Index` and
+links to the shared pages. Old staff Edit/Details URLs have been replaced.
+
+Customers reach `/Reservations/Index` through My Reservations on the homepage or main
+navigation. This list contains only their own account-linked bookings. New bookings
+prefill their profile details and are linked to the signed-in account by ReservationService.
+Customers may edit/cancel their own future bookings. New bookings are confirmed immediately after availability checks pass; staff confirmation is only retained for older pending records.
+Staff can still enter telephone/walk-in bookings without a customer account.
+
+Manual checks: create as customer and verify it appears in the staff overview; edit from
+both roles; verify another customer cannot open the details/edit URL or change the booking;
+verify customer confirmation is rejected; cancel and check the table becomes available;
+try a conflicting booking and verify rejection. Logged-out access should redirect to login.
+
 This is a real, runnable ASP.NET Core Razor Pages project (not just a folder of files to
 merge in) — Identity/RBAC, a SQL Server DbContext, a shared Bootstrap layout, and the
 Administrator module fully wired end to end. Staff and Customer pages aren't built yet —

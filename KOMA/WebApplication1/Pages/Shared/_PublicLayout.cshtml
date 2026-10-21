@@ -20,6 +20,10 @@
                 {
                     <a asp-area="" asp-page="/Admin/Dashboard">Dashboard</a>
                 }
+                @if (User.IsInRole("Customer"))
+                {
+                    <a asp-area="" asp-page="/Reservations/Index">My Reservations</a>
+                }
                 <!-- Staff Dashboard Link -->
                 @if (User.IsInRole("Staff"))
                 {

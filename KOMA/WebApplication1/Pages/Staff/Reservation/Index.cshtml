@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model KOMA.Pages.Staff.Reservations.IndexModel
 @using KOMA.Models
 @{ ViewData["Title"] = "Reservations"; }
@@ -40,7 +40,7 @@
                 {
                     var booking = Model.Bookings.FirstOrDefault(r => r.RestaurantTableId == table.Id && r.Status != ReservationStatus.Cancelled);
                     var state = booking == null ? "available" : "booked";
-                    var url = booking != null ? Url.Page("Details", new { id = booking.Id }) : Model.FutureSlot ? Url.Page("Edit", new { tableId = table.Id, date = Model.Date!.Value.ToString("yyyy-MM-dd"), time = Model.Time!.Value.ToString("HH:mm") }) : null;
+                    var url = booking != null ? Url.Page("/Reservations/Details", new { id = booking.Id }) : Model.FutureSlot ? Url.Page("/Reservations/Edit", new { tableId = table.Id, date = Model.Date!.Value.ToString("yyyy-MM-dd"), time = Model.Time!.Value.ToString("HH:mm") }) : null;
                     <div class="table-position">
                         <span class="chairs" aria-hidden="true">▰ ▰</span>
                         @if (url != null)
@@ -65,7 +65,7 @@
     {
         <div class="table-responsive"><table class="table table-bordered table-hover align-middle">
             <thead class="table-light"><tr><th>Reference</th><th>Table</th><th>Customer</th><th>Guests</th><th>Status</th><th>Action</th></tr></thead>
-            <tbody>@foreach (var booking in Model.Bookings) { <tr><td>R-@booking.Id.ToString("D5")</td><td>@booking.RestaurantTable.TableNumber</td><td>@booking.CustomerName</td><td>@booking.GuestCount</td><td>@booking.Status</td><td><a asp-page="Details" asp-route-id="@booking.Id">View details</a></td></tr> }</tbody>
+            <tbody>@foreach (var booking in Model.Bookings) { <tr><td>R-@booking.Id.ToString("D5")</td><td>@booking.RestaurantTable.TableNumber</td><td>@booking.CustomerName</td><td>@booking.GuestCount</td><td>@booking.Status</td><td><a asp-page="/Reservations/Details" asp-route-id="@booking.Id">View details</a></td></tr> }</tbody>
         </table></div>
     }
 }

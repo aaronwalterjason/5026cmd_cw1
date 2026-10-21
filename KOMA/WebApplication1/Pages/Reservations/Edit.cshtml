@@ -1,5 +1,5 @@
-﻿@page "{id:int?}"
-@model KOMA.Pages.Staff.Reservations.EditModel
+@page "{id:int?}"
+@model KOMA.Pages.Reservations.EditModel
 @{ ViewData["Title"] = Model.Id.HasValue ? "Edit reservation" : "Create reservation"; }
 <h1>@ViewData["Title"]</h1>
 <p class="text-muted">Bookings last one hour. All times are Malaysia time. Availability is checked again when you save.</p>
@@ -7,7 +7,14 @@
     <div asp-validation-summary="All" class="text-danger" role="alert"></div>
     <input asp-for="Input.RowVersion" type="hidden" />
     <div class="row g-3">
-        <div class="col-md-6"><label asp-for="Input.RestaurantTableId" class="form-label"></label><select asp-for="Input.RestaurantTableId" asp-items="Model.Tables" class="form-select"><option value="">Choose a table</option></select><span asp-validation-for="Input.RestaurantTableId" class="text-danger"></span></div>
+        @if (Model.IsStaff)
+        {
+            <div class="col-md-6"><label asp-for="Input.RestaurantTableId" class="form-label"></label><select asp-for="Input.RestaurantTableId" asp-items="Model.Tables" class="form-select"><option value="">Choose a table</option></select><span asp-validation-for="Input.RestaurantTableId" class="text-danger"></span></div>
+        }
+        else
+        {
+            <div class="col-md-6"><label asp-for="Input.PreferredZone" class="form-label"></label><select asp-for="Input.PreferredZone" asp-items="Model.Zones" class="form-select" required><option value="">Choose a dining area</option></select><span asp-validation-for="Input.PreferredZone" class="text-danger"></span><div class="form-text">We will assign a suitable table for your party.</div></div>
+        }
         <div class="col-md-6"><label asp-for="Input.GuestCount" class="form-label"></label><input asp-for="Input.GuestCount" class="form-control" /><span asp-validation-for="Input.GuestCount" class="text-danger"></span></div>
         <div class="col-md-6"><label asp-for="Input.Date" class="form-label"></label><input asp-for="Input.Date" type="date" class="form-control" /><span asp-validation-for="Input.Date" class="text-danger"></span></div>
         <div class="col-md-6"><label asp-for="Input.Time" class="form-label"></label><select asp-for="Input.Time" class="form-select">@foreach (var slot in Model.Slots) { <option value="@slot.ToString("HH:mm")">@slot.ToString("HH:mm") – @slot.AddHours(1).ToString("HH:mm")</option> }</select><span asp-validation-for="Input.Time" class="text-danger"></span></div>
@@ -16,6 +23,15 @@
         <div class="col-12"><label asp-for="Input.Email" class="form-label">Email (optional)</label><input asp-for="Input.Email" class="form-control" /><span asp-validation-for="Input.Email" class="text-danger"></span></div>
         <div class="col-12"><label asp-for="Input.SpecialRequests" class="form-label"></label><textarea asp-for="Input.SpecialRequests" class="form-control" rows="3"></textarea><span asp-validation-for="Input.SpecialRequests" class="text-danger"></span></div>
     </div>
-    <div class="d-flex gap-2 mt-4"><button class="btn btn-primary" type="submit">Save reservation</button><a asp-page="Index" asp-route-date="@Model.Input.Date.ToString("yyyy-MM-dd")" asp-route-time="@Model.Input.Time.ToString("HH:mm")" class="btn btn-outline-secondary">Back to layout</a></div>
+    @if (Model.SuggestedZone != null)
+    {
+        <div id="area-suggestion" class="alert alert-info mt-3" role="alert">
+            <p>@Model.SuggestionMessage</p>
+            <button class="btn btn-primary" type="submit" name="acceptedZone" value="@Model.SuggestedZone">Reserve in @Model.SuggestedZone</button>
+            <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('area-suggestion').remove(); document.getElementById('Input_PreferredZone').focus();">Change reservation details</button>
+            <p class="small mt-2 mb-0">Availability will be checked again when you accept.</p>
+        </div>
+    }
+    <div class="d-flex gap-2 mt-4"><button class="btn btn-primary" type="submit">Save reservation</button><a asp-page="@Model.BackPage" asp-route-date="@Model.Input.Date.ToString("yyyy-MM-dd")" asp-route-time="@Model.Input.Time.ToString("HH:mm")" class="btn btn-outline-secondary">@(Model.IsStaff ? "Back to layout" : "My reservations")</a></div>
 </form>
 @section Scripts { <partial name="_ValidationScriptsPartial" /> }

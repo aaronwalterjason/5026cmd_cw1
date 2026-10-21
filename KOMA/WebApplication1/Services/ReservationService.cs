@@ -9,8 +9,9 @@ namespace KOMA.Services;
 
 public class ReservationInput
 {
-    [Range(1, int.MaxValue), Display(Name = "Table")]
+    [Display(Name = "Table")]
     public int RestaurantTableId { get; set; }
+    [Display(Name = "Dining area preference")] public string? PreferredZone { get; set; }
     [Required, StringLength(100), Display(Name = "Customer name")]
     public string CustomerName { get; set; } = "";
     [Required, Phone, StringLength(30), Display(Name = "Contact number")]
@@ -23,7 +24,8 @@ public class ReservationInput
     public int GuestCount { get; set; } = 1;
     [StringLength(500), Display(Name = "Special requests / dining preferences")]
     public string? SpecialRequests { get; set; }
-    public string RowVersion { get; set; } = "";
+    // New bookings have no concurrency token; existing bookings must match it in SaveAsync.
+    public string? RowVersion { get; set; }
 }
 
 public static class ReservationRules
@@ -54,7 +56,7 @@ public static class ReservationRules
         => start < otherEnd && end > otherStart;
 }
 
-public record BookingResult(int? Id, string? Error);
+public record BookingResult(int? Id, string? Error, string? SuggestedZone = null);
 
 // Shared business rules. Page handlers do not write reservations directly.
 public class ReservationService(ApplicationDbContext context)
@@ -82,22 +84,42 @@ public class ReservationService(ApplicationDbContext context)
             if (booking.StartTime <= ReservationRules.MalaysiaNow) return new(null, "Past or started reservations cannot be changed.");
             if (Convert.ToBase64String(booking.RowVersion) != input.RowVersion) return new(null, "This booking changed. Reload the page before editing again.");
         }
-        var table = await _context.RestaurantTables.Include(t => t.DiningArea)
-            .SingleOrDefaultAsync(t => t.Id == input.RestaurantTableId);
-        if (table == null || !table.IsActive || table.DiningArea?.IsActive != true)
-            return new(null, "Select an active table in an active dining area.");
         var settings = await _context.RestaurantSettings.FirstOrDefaultAsync();
         if (settings == null) return new(null, "Restaurant opening hours have not been configured.");
-        var error = ReservationRules.Validate(input, table.Capacity, settings, ReservationRules.MalaysiaNow);
+        var error = ReservationRules.Validate(input, int.MaxValue, settings, ReservationRules.MalaysiaNow);
         if (error != null) return new(null, error);
         var start = input.Date.ToDateTime(input.Time);
         var end = start.AddMinutes(ReservationRules.SlotMinutes);
-        if (await _context.Reservations.AnyAsync(r => r.RestaurantTableId == table.Id && r.Id != (id ?? 0)
-            && r.Status != ReservationStatus.Cancelled && r.StartTime < end && r.EndTime > start))
-            return new(null, "That table is already booked for this slot. Choose another table or time.");
+        var available = _context.RestaurantTables.Include(t => t.DiningArea)
+            .Where(t => t.IsActive && t.DiningArea!.IsActive && t.Capacity >= input.GuestCount)
+            .Where(t => !_context.Reservations.Any(r => r.RestaurantTableId == t.Id && r.Id != (id ?? 0)
+                && r.Status != ReservationStatus.Cancelled && r.StartTime < end && r.EndTime > start));
+        RestaurantTable? table;
+        if (IsStaff(actor))
+        {
+            table = await available.SingleOrDefaultAsync(t => t.Id == input.RestaurantTableId);
+            if (table == null) return new(null, "That table is unavailable or too small for your party. Choose another table or time.");
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(input.PreferredZone) ||
+                !await _context.DiningAreas.AnyAsync(a => a.IsActive && a.Zone == input.PreferredZone))
+                return new(null, "Choose a dining area preference.");
+            // Assignment and saving share the booking lock, including alternative acceptance.
+            table = await available.Where(t => t.DiningArea!.Zone == input.PreferredZone)
+                .OrderBy(t => t.Capacity).ThenBy(t => t.Id).FirstOrDefaultAsync();
+            if (table == null)
+            {
+                var alternative = await available.OrderBy(t => t.Capacity).ThenBy(t => t.Id).FirstOrDefaultAsync();
+                if (alternative == null)
+                    return new(null, "No suitable tables are available for your party at this time. Please change the date, time or number of guests.");
+                return new(null, $"No suitable tables are available in {input.PreferredZone} for your party at this time. We can offer {alternative.DiningArea!.Zone} instead. Your reservation has not been saved.",
+                    alternative.DiningArea.Zone);
+            }
+        }
         if (booking == null)
         {
-            booking = new Reservation { CreatedByUserId = userId, CustomerUserId = actor.IsInRole("Customer") ? userId : null };
+            booking = new Reservation { CreatedByUserId = userId, CustomerUserId = actor.IsInRole("Customer") ? userId : null, Status = ReservationStatus.Confirmed };
             _context.Reservations.Add(booking);
         }
         booking.RestaurantTableId = table.Id;

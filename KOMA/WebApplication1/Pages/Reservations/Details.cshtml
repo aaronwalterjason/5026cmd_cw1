@@ -1,5 +1,5 @@
-﻿@page "{id:int}"
-@model KOMA.Pages.Staff.Reservations.DetailsModel
+@page "{id:int}"
+@model KOMA.Pages.Reservations.DetailsModel
 @using KOMA.Models
 @{ ViewData["Title"] = "Reservation details"; var booking = Model.Booking; }
 <h1>Reservation R-@booking.Id.ToString("D5")</h1>
@@ -17,11 +17,11 @@
     </dl>
 </div></div>
 <div class="d-flex flex-wrap gap-2 mb-3">
-    <a asp-page="Index" asp-route-date="@booking.StartTime.ToString("yyyy-MM-dd")" asp-route-time="@booking.StartTime.ToString("HH:mm")" class="btn btn-outline-secondary">Back to layout</a>
+    <a asp-page="@Model.BackPage" asp-route-date="@booking.StartTime.ToString("yyyy-MM-dd")" asp-route-time="@booking.StartTime.ToString("HH:mm")" class="btn btn-outline-secondary">@(Model.IsStaff ? "Back to layout" : "My reservations")</a>
     @if (Model.CanChange)
     {
         <a asp-page="Edit" asp-route-id="@booking.Id" class="btn btn-primary">Edit reservation</a>
-        @if (booking.Status == ReservationStatus.Pending)
+        @if (Model.IsStaff && booking.Status == ReservationStatus.Pending)
         {
             <form method="post" asp-page-handler="Confirm" asp-route-id="@booking.Id"><input type="hidden" name="rowVersion" value="@Convert.ToBase64String(booking.RowVersion)" /><button class="btn btn-success" type="submit">Confirm reservation</button></form>
         }
