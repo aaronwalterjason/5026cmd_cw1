@@ -23,41 +23,15 @@
 @if (Model.ValidSlot)
 {
     <p><span class="text-success fw-bold">✓ Available</span> · <span class="text-danger fw-bold">− Booked</span> · Pending bookings also hold a table.</p>
-    <p class="text-muted">Schematic layout grouped by dining area; table positions do not represent the exact restaurant floor plan. Refresh availability before taking a booking.</p>
+    <p class="text-muted">
+        Layout saved by the administrator.
+        Availability is for the selected date and time.
+        Refresh availability before taking a booking.
+        Grey tables are closed.
+    </p>
     @if (!Model.FutureSlot) { <div class="alert alert-info">You are viewing a past or started slot. New reservations are disabled.</div> }
     @if (!Model.Tables.Any()) { <div class="alert alert-info">No active tables are available. Ask the administrator to configure dining areas and tables.</div> }
-    @foreach (var area in Model.Tables.GroupBy(t => t.DiningAreaId))
-    {
-        var diningArea = area.First().DiningArea!;
-
-        <section class="floor-room mb-4" aria-label="@diningArea.Name">
-            <div class="d-flex justify-content-between flex-wrap mb-3">
-                <h2 class="h4">@diningArea.Name</h2>
-                <span>@(diningArea.FloorLayout?.Name ?? "No floor") · @diningArea.Zone</span>
-            </div>
-            <div class="floor-tables">
-                @foreach (var table in area)
-                {
-                    var booking = Model.Bookings.FirstOrDefault(r => r.RestaurantTableId == table.Id && r.Status != ReservationStatus.Cancelled);
-                    var state = booking == null ? "available" : "booked";
-                    var url = booking != null ? Url.Page("Details", new { id = booking.Id }) : Model.FutureSlot ? Url.Page("Edit", new { tableId = table.Id, date = Model.Date!.Value.ToString("yyyy-MM-dd"), time = Model.Time!.Value.ToString("HH:mm") }) : null;
-                    <div class="table-position">
-                        <span class="chairs" aria-hidden="true">▰ ▰</span>
-                        @if (url != null)
-                        {
-                            <a href="@url" class="restaurant-table @state shape-@table.Shape.ToString().ToLowerInvariant()">
-                                <strong>@table.TableNumber</strong><span>Capacity: @table.Capacity guests</span>
-                                <span class="table-status">@(booking == null ? "✓ Available" : "− Booked")</span>
-                                <small>@(booking == null ? "Create reservation" : $"{booking.Status} · View details")</small>
-                            </a>
-                        }
-                        else { <div class="restaurant-table available"><strong>@table.TableNumber</strong><span>Capacity: @table.Capacity guests</span><span>✓ No booking</span><small>Slot has started</small></div> }
-                        <span class="chairs" aria-hidden="true">▰ ▰</span>
-                    </div>
-                }
-            </div>
-        </section>
-    }
+    <partial name="_ReservationFloor" model="Model" />
     <!-- Reservation List -->
     <h2 class="h4 mt-4">Bookings for this slot</h2>
     @if (!Model.Bookings.Any()) { <p class="text-muted">No reservations for the selected slot.</p> }
@@ -70,3 +44,51 @@
     }
 }
 </div>
+
+@section Scripts {
+    <script src="~/js/layout-chairs.js"
+            asp-append-version="true"></script>
+
+    <script>
+        (() => {
+            document.querySelectorAll('.reservation-map').forEach(box => {
+                const floorWidth = Number(box.dataset.floorW);
+                const floorHeight = Number(box.dataset.floorH);
+
+                box.querySelectorAll('.reservation-map-table').forEach(table => {
+                    const dimensions = {
+                        x: Number(table.dataset.x),
+                        y: Number(table.dataset.y),
+                        w: Number(table.dataset.w),
+                        h: Number(table.dataset.h),
+                        shape: table.dataset.shape,
+                        capacity: Number(table.dataset.capacity)
+                    };
+
+                    KomaChairs.positions(dimensions).forEach(chair => {
+                        const element = document.createElement('div');
+
+                        element.className = 'lay-preview-chair' +
+                            (chair.kind === 'bench' ? ' is-bench' : '');
+
+                        element.setAttribute('aria-hidden', 'true');
+
+                        element.style.left =
+                            (chair.x / floorWidth * 100) + '%';
+
+                        element.style.top =
+                            (chair.y / floorHeight * 100) + '%';
+
+                        element.style.width =
+                            (chair.w / floorWidth * 100) + '%';
+
+                        element.style.height =
+                            (chair.h / floorHeight * 100) + '%';
+
+                        box.insertBefore(element, table);
+                    });
+                });
+            });
+        })();
+    </script>
+}

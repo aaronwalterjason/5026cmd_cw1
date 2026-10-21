@@ -310,3 +310,99 @@ body:has(.staff-reservations) {
         transform: none;
     }
 }
+
+/* Admin-designed floor displayed on the Staff reservation page */
+.staff-reservations .reservation-floor {
+    padding: 1rem;
+    border: 1px solid #cbbda6;
+    border-radius: 16px;
+    background: #eee8dc;
+    min-width: 0;
+}
+
+.staff-reservations .reservation-floor-scroll {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.staff-reservations .reservation-map {
+    width: 100%;
+    min-width: 720px;
+    max-height: none;
+    background: #faf8f2;
+}
+
+.staff-reservations .reservation-map-table {
+    flex-direction: column;
+    gap: 1px;
+    padding: 0;
+    line-height: 1.1;
+    text-align: center;
+    text-decoration: none;
+    font-family: Arial, sans-serif;
+    font-size: 0.65rem;
+}
+
+    .staff-reservations .reservation-map-table small {
+        font-size: 0.55rem;
+        font-weight: normal;
+    }
+
+    .staff-reservations .reservation-map-table.reservation-available {
+        background: #eaf4e8;
+        border: 2px solid #56805e;
+        color: #244d31;
+    }
+
+    .staff-reservations .reservation-map-table.reservation-booked {
+        background: #fbe7e5;
+        border: 2px solid #b34c46;
+        color: #842f2b;
+    }
+
+    .staff-reservations .reservation-map-table.reservation-closed {
+        background: #e8e8e8;
+        border: 2px dashed #929292;
+        color: #666;
+    }
+
+    .staff-reservations .reservation-map-table[href] {
+        cursor: pointer;
+    }
+
+        .staff-reservations .reservation-map-table[href]:hover,
+        .staff-reservations .reservation-map-table[href]:focus-visible {
+            outline: 3px solid #263b49;
+            outline-offset: 2px;
+            z-index: 4;
+        }
+
+    .staff-reservations .reservation-map-table[aria-disabled="true"] {
+        cursor: default;
+    }
+
+.staff-reservations .reservation-map .lay-preview-chair {
+    pointer-events: none;
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1199px) {
+    .staff-reservations .reservation-map {
+        min-width: 850px;
+    }
+}
+
+/* Desktop */
+@media (min-width: 1200px) {
+    .staff-reservations .reservation-map {
+        min-width: 1000px;
+    }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+    .staff-reservations .reservation-floor {
+        padding: 0.75rem;
+    }
+}
