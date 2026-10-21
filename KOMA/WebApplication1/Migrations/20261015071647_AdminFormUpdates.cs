@@ -14,12 +14,14 @@ namespace KOMA.Migrations
                 name: "DisplayOrder",
                 table: "MenuCategories");
 
-            migrationBuilder.AddColumn<int>(
-                name: "Shape",
-                table: "RestaurantTables",
-                type: "int",
-                nullable: false,
-                defaultValue: 0);
+            // The staff repair migration may already have added this column.
+            migrationBuilder.Sql(@"
+                IF COL_LENGTH('dbo.RestaurantTables', 'Shape') IS NULL
+                BEGIN
+                    ALTER TABLE [dbo].[RestaurantTables]
+                    ADD [Shape] int NOT NULL DEFAULT (0);
+                END
+            ");
 
             migrationBuilder.AddColumn<string>(
                 name: "Description",
@@ -40,13 +42,14 @@ namespace KOMA.Migrations
                 oldMaxLength: 40,
                 oldNullable: true);
 
-            migrationBuilder.AddColumn<string>(
-                name: "Floor",
-                table: "DiningAreas",
-                type: "nvarchar(30)",
-                maxLength: 30,
-                nullable: false,
-                defaultValue: "Ground Floor");   // existing areas start on Ground Floor
+            // Preserve Floor values when the staff repair has already run.
+            migrationBuilder.Sql(@"
+                IF COL_LENGTH('dbo.DiningAreas', 'Floor') IS NULL
+                BEGIN
+                    ALTER TABLE [dbo].[DiningAreas]
+                    ADD [Floor] nvarchar(30) NOT NULL DEFAULT (N'Ground Floor');
+                END
+            ");
         }
 
         /// <inheritdoc />
