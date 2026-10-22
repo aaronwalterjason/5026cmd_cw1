@@ -1,0 +1,124 @@
+﻿@model KOMA.Pages.Staff.Reservations.IndexModel
+@using KOMA.Models
+@using System.Globalization
+
+@functions {
+    private static string Num(double value)
+        => value.ToString(CultureInfo.InvariantCulture);
+
+    private static string Pct(double value, double total)
+        => Num(value / total * 100) + "%";
+}
+
+@if (!Model.Floors.Any())
+{
+    <div class="alert alert-info">
+        No floor layouts have been created yet.
+        Ask the administrator to create and save a layout.
+    </div>
+}
+
+@foreach (var floor in Model.Floors)
+{
+    <section class="reservation-floor mb-4">
+        <h2 class="h4">@floor.Name</h2>
+
+        <p class="small text-muted">
+            Select a table to create a reservation or view its booking.
+            On smaller screens, scroll sideways to see the whole floor.
+        </p>
+
+        <div class="reservation-floor-scroll"
+             tabindex="0"
+             role="region"
+             aria-label="@($"{floor.Name} table layout")">
+
+            <div class="lay-preview live-map reservation-map"
+                 style="aspect-ratio:@floor.Width / @floor.Height"
+                 data-floor-w="@floor.Width"
+                 data-floor-h="@floor.Height">
+
+                @foreach (var area in floor.DiningAreas)
+                {
+                    <div class="lay-preview-area @KOMA.Pages.Admin.Layouts.IndexModel.ZoneClass(area.Zone) @(area.IsActive ? "" : "is-closed")"
+                         style="left:@Pct(area.LayoutX, floor.Width);top:@Pct(area.LayoutY, floor.Height);width:@Pct(area.LayoutWidth, floor.Width);height:@Pct(area.LayoutHeight, floor.Height)">
+                        <span class="live-area-name">@area.Name</span>
+                    </div>
+                }
+
+                @foreach (var area in floor.DiningAreas)
+                {
+                    foreach (var table in area.Tables)
+                    {
+                        var booking = Model.Bookings.FirstOrDefault(r =>
+                            r.RestaurantTableId == table.Id &&
+                            r.Status != ReservationStatus.Cancelled);
+
+                        var closed = !area.IsActive || !table.IsActive;
+
+                        var stateClass = closed
+                            ? "reservation-closed"
+                            : booking != null
+                                ? "reservation-booked"
+                                : "reservation-available";
+
+                        var status = closed
+                            ? "Closed"
+                            : booking != null
+                                ? "Booked"
+                                : Model.FutureSlot
+                                    ? "Available"
+                                    : "No booking";
+
+                        var symbol = closed ? "×" : booking != null ? "−" : "✓";
+
+                        string? url = null;
+
+                        if (booking != null)
+                        {
+                            url = Url.Page(
+                                "/Staff/Reservation/Details",
+                                new { id = booking.Id });
+                        }
+                        else if (!closed && Model.FutureSlot)
+                        {
+                            url = Url.Page(
+                                "/Staff/Reservation/Edit",
+                                new
+                                {
+                                    tableId = table.Id,
+                                    date = Model.Date!.Value.ToString("yyyy-MM-dd"),
+                                    time = Model.Time!.Value.ToString("HH:mm")
+                                });
+                        }
+
+                        var label =
+                            $"Table {table.TableNumber}, capacity {table.Capacity} guests, {status}";
+
+                        var style =
+                            $"left:{Pct(table.LayoutX, floor.Width)};" +
+                            $"top:{Pct(table.LayoutY, floor.Height)};" +
+                            $"width:{Pct(table.LayoutWidth, floor.Width)};" +
+                            $"height:{Pct(table.LayoutHeight, floor.Height)};";
+
+                        <a href="@url"
+                           class="lay-preview-table live-table reservation-map-table @stateClass @(table.Shape == TableShape.Round ? "is-round" : "")"
+                           style="@style"
+                           title="@label"
+                           aria-label="@label"
+                           aria-disabled="@(url == null ? "true" : "false")"
+                           data-x="@Num(table.LayoutX)"
+                           data-y="@Num(table.LayoutY)"
+                           data-w="@Num(table.LayoutWidth)"
+                           data-h="@Num(table.LayoutHeight)"
+                           data-shape="@table.Shape"
+                           data-capacity="@table.Capacity">
+                            <span>@table.TableNumber @symbol</span>
+                            <small>@table.Capacity guests</small>
+                        </a>
+                    }
+                }
+            </div>
+        </div>
+    </section>
+}
