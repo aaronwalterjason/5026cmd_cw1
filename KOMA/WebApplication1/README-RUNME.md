@@ -127,3 +127,44 @@ The temporary-database checks can be run from the SE workspace with:
     dotnet run --project Project/KOMA.AccountChecks/KOMA.AccountChecks.csproj
 
 These checks create a uniquely named KOMA_AccountChecks database, verify migration and account behaviour, then remove that test database. They do not use KOMADb.
+
+## Reservation pre-orders
+
+The optional checkbox on the shared reservation form continues to /Reservations/PreOrder/{id}
+after the booking is saved. The reservation details page also links to the saved pre-order.
+Customers can access only their own reservations; staff and administrators can assist guests.
+
+One order is linked to each reservation. Available dishes and quantities are checked on the
+server, and current menu prices are copied into order lines when the selection is saved.
+Pre-orders use OnlinePreOrder and AwaitingArrival. They cannot advance through the existing
+preparation action. Staff arrival confirmation and kitchen dispatch are future work.
+
+Unpaid waiting pre-orders can be replaced before the reservation starts. Reservation changes
+update the waiting order's table and customer name; reservation cancellation cancels it.
+The LinkReservationPreOrders migration adds the optional unique reservation link on Orders
+and is applied by the existing startup migration process.
+
+Manual checks: book with and without the optional checkbox; save dishes and verify totals;
+repeat the save and verify only one linked order exists; try another customer's reservation;
+reject unavailable dishes and invalid quantities; edit/cancel the reservation; verify the
+admin order detail says Awaiting arrival and has no Start preparing action.
+### Pre-order menu and cart
+
+The pre-order screen uses menu photos, active categories, search and quantity controls.
+The cart shows a live food total and a review dialog before confirmation; it collects
+no payment. Missing photos use a placeholder. Inactive categories and unavailable dishes
+are excluded. Server prices remain authoritative; a changed total requires another review.
+
+Check adding/removing dishes, category/search filtering without losing the cart, quantity
+limits, empty carts, editing an existing selection, mobile layout and keyboard navigation.
+Confirm that review can be dismissed without saving and confirmation retains AwaitingArrival.
+### Japanese demo menu
+
+In Development, DemoOrderSeeder.SeedAsync calls SeedMenuAsync before checking for existing
+orders. Restarting the app adds missing entries from a 48-item, 12-category Japanese menu,
+including descriptions, sample RM prices, recommended dishes and seasonal flags.
+Matching uses trimmed, case-insensitive names. Existing dishes and categories retain their
+prices, descriptions, availability, images and other admin edits. Deleted seed dishes are
+recreated on the next development startup; mark them unavailable to hide them instead.
+New dishes have no photo and use the menu gallery placeholder until images are uploaded.
+No database migration is required for this menu data.

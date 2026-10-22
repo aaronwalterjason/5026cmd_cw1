@@ -42,7 +42,11 @@ else
             </div>
         </header>
 
-        @if (cancelled)
+        @if (sel.Status == OrderStatus.AwaitingArrival)
+        {
+            <div class="alert alert-info" role="status">Awaiting arrival — this pre-order has not been sent to the kitchen.</div>
+        }
+        else if (cancelled)
         {
             <div class="ord-cancelled" role="status">This order was cancelled@(sel.PaymentStatus == PaymentStatus.Refunded ? " and refunded" : "").</div>
         }

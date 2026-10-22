@@ -6,6 +6,10 @@
 <form method="post" class="card card-body">
     <div asp-validation-summary="All" class="text-danger" role="alert"></div>
     <input asp-for="Input.RowVersion" type="hidden" />
+    <div class="form-check mb-3">
+        <input asp-for="AddPreOrder" class="form-check-input" />
+        <label asp-for="AddPreOrder" class="form-check-label">Choose dishes after saving my reservation (optional)</label>
+    </div>
     <div class="row g-3">
         @if (Model.IsStaff)
         {

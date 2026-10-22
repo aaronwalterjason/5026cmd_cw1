@@ -86,6 +86,10 @@ namespace KOMA.Data
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Orders keep their history even if the customer account or table is removed later.
+            builder.Entity<Order>().HasOne(o => o.Reservation).WithMany()
+                .HasForeignKey(o => o.ReservationId).OnDelete(DeleteBehavior.Restrict);
+            builder.Entity<Order>().HasIndex(o => o.ReservationId).IsUnique()
+                .HasFilter("[ReservationId] IS NOT NULL");
             builder.Entity<Order>()
                 .HasOne(o => o.Customer).WithMany()
                 .HasForeignKey(o => o.CustomerId)

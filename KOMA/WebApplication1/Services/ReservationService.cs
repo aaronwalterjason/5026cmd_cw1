@@ -130,6 +130,15 @@ public class ReservationService(ApplicationDbContext context)
         booking.SpecialRequests = input.SpecialRequests?.Trim();
         booking.StartTime = start;
         booking.EndTime = end;
+        if (id.HasValue)
+        {
+            var preOrder = await _context.Orders.SingleOrDefaultAsync(o => o.ReservationId == id.Value);
+            if (preOrder != null && preOrder.Status == OrderStatus.AwaitingArrival)
+            {
+                preOrder.RestaurantTableId = table.Id;
+                preOrder.CustomerName = booking.CustomerName;
+            }
+        }
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
         return new(booking.Id, null);
@@ -150,6 +159,12 @@ public class ReservationService(ApplicationDbContext context)
         if (booking.Status == ReservationStatus.Cancelled) return "This reservation is already cancelled.";
         if (confirm && booking.Status != ReservationStatus.Pending) return "Only pending reservations can be confirmed.";
         booking.Status = confirm ? ReservationStatus.Confirmed : ReservationStatus.Cancelled;
+        if (!confirm)
+        {
+            var preOrder = await _context.Orders.SingleOrDefaultAsync(o => o.ReservationId == id);
+            if (preOrder != null && preOrder.Status == OrderStatus.AwaitingArrival)
+                preOrder.Status = OrderStatus.Cancelled;
+        }
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
         return null;

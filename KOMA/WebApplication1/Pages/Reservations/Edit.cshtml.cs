@@ -14,6 +14,7 @@ public class EditModel(ApplicationDbContext context, ReservationService reservat
 {
     [BindProperty(SupportsGet = true)] public int? Id { get; set; }
     [BindProperty] public ReservationInput Input { get; set; } = new();
+    [BindProperty] public bool AddPreOrder { get; set; }
     public bool IsStaff => User.IsInRole("Staff") || User.IsInRole("Administrator");
     public string BackPage => IsStaff ? "/Staff/Reservation/Index" : "/Reservations/Index";
     public List<SelectListItem> Tables { get; set; } = [];
@@ -81,7 +82,7 @@ public class EditModel(ApplicationDbContext context, ReservationService reservat
             }
             if (result.Error != null) { ModelState.AddModelError("", result.Error); return Page(); }
             TempData["SuccessMessage"] = Id.HasValue ? "Reservation updated successfully." : "Reservation confirmed. Your table is reserved.";
-            return RedirectToPage("Details", new { id = result.Id });
+            return RedirectToPage(AddPreOrder ? "PreOrder" : "Details", new { id = result.Id });
         }
         catch (Microsoft.Data.SqlClient.SqlException) { ModelState.AddModelError("", "The database is busy or unavailable. Please retry; check the reservation list before submitting again."); return Page(); }
         catch (DbUpdateException) { ModelState.AddModelError("", "The reservation could not be saved. Reload the page and check table availability."); return Page(); }
