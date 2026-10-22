@@ -406,3 +406,45 @@ body:has(.staff-reservations) {
         padding: 0.75rem;
     }
 }
+
+.reservation-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+    .reservation-summary .card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .reservation-summary strong {
+        font-size: 2rem;
+        line-height: 1.2;
+    }
+
+    .reservation-summary small {
+        color: #6c757d;
+    }
+
+.reservation-list td,
+.reservation-list th {
+    padding: 16px;
+    vertical-align: middle;
+}
+
+@media (max-width: 575px) {
+    .reservation-summary {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+        .reservation-summary .card-body {
+            padding: 12px;
+        }
+
+        .reservation-summary strong {
+            font-size: 1.5rem;
+        }
+}

@@ -17,7 +17,17 @@
     </dl>
 </div></div>
 <div class="d-flex flex-wrap gap-2 mb-3">
-    <a asp-page="Index" asp-route-date="@booking.StartTime.ToString("yyyy-MM-dd")" asp-route-time="@booking.StartTime.ToString("HH:mm")" class="btn btn-outline-secondary">Back to layout</a>
+    <a asp-page="Manage" class="btn btn-outline-secondary">
+        Manage reservations
+    </a>
+
+    <a asp-page="Index"
+       asp-route-date="@booking.StartTime.ToString("yyyy-MM-dd")"
+       asp-route-time="@booking.StartTime.ToString("HH:mm")"
+       class="btn btn-outline-secondary">
+        Back to layout
+    </a>
+
     @if (Model.CanChange)
     {
         <a asp-page="Edit" asp-route-id="@booking.Id" class="btn btn-primary">Edit reservation</a>
