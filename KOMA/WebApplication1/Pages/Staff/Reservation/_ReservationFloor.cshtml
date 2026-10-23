@@ -77,13 +77,13 @@
                         if (booking != null)
                         {
                             url = Url.Page(
-                                "/Staff/Reservation/Details",
+                                "/Reservations/Details",
                                 new { id = booking.Id });
                         }
                         else if (!closed && Model.FutureSlot)
                         {
                             url = Url.Page(
-                                "/Staff/Reservation/Edit",
+                                "/Reservations/Edit",
                                 new
                                 {
                                     tableId = table.Id,

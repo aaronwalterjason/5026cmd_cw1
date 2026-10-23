@@ -42,10 +42,17 @@
             {
                 var catRoute = Model.Route(cat: c.Id, keepSearch: false);
                 var on = Model.Cat == c.Id;
-                <a asp-page="./Index" asp-all-route-data="catRoute" class="mn-cat @(on ? "is-on" : "") @(c.IsActive ? "" : "is-hidden")"
-                   aria-current="@(on ? "true" : null)">
-                    <span>@c.Name @if (!c.IsActive) { <em>hidden</em> }</span><span class="mn-count">@c.Count</span>
-                </a>
+                <div class="mn-cat-row @(on ? "is-on" : "")">
+                    <a asp-page="./Index" asp-all-route-data="catRoute" class="mn-cat @(on ? "is-on" : "") @(c.IsActive ? "" : "is-hidden")"
+                       aria-current="@(on ? "true" : null)">
+                        <span>@c.Name @if (!c.IsActive) { <em>hidden</em> }</span><span class="mn-count">@c.Count</span>
+                    </a>
+                    @* Bin appears on hover/focus; opens the "Delete category" popup below. *@
+                    <button type="button" class="mn-cat-del js-cat-delete" data-id="@c.Id" data-name="@c.Name" data-count="@c.Count"
+                            title="Delete category" aria-label="Delete category @c.Name">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                    </button>
+                </div>
             }
         </nav>
         <a asp-page="./Index" asp-all-route-data="newCatRoute" class="mn-add-cat">+ Add category</a>
@@ -231,7 +238,7 @@
                 @if (!isNew)
                 {
                     var count = Model.Categories.FirstOrDefault(c => c.Id == Model.Category.Id)?.Count ?? 0;
-                    <p class="mn-muted small mb-0">@count dish@(count == 1 ? "" : "es") in this category.@(count > 0 ? " A category can only be deleted once it is empty." : "")</p>
+                    <p class="mn-muted small mb-0">@count dish@(count == 1 ? "" : "es") in this category.@(count > 0 ? " If you delete it, you can move them to another category first." : "")</p>
                 }
             </form>
             <div class="mn-actions">
@@ -239,11 +246,9 @@
                 <a asp-page="./Index" asp-all-route-data="panelRoute" class="btn btn-outline-primary">Cancel</a>
                 @if (!isNew)
                 {
-                    <form method="post" asp-page-handler="DeleteCategory" class="ms-auto"
-                          data-confirm-title="Delete @(Model.Category.Name)?" data-confirm-text="This can't be undone. A category can only be deleted once it has no dishes." data-confirm-ok="Delete category">
-                        <input type="hidden" name="categoryId" value="@Model.Category.Id" />
-                        <button type="submit" class="btn mn-btn-danger">Delete</button>
-                    </form>
+                    var catCount = Model.Categories.FirstOrDefault(c => c.Id == Model.Category.Id)?.Count ?? 0;
+                    <button type="button" class="btn mn-btn-danger ms-auto js-cat-delete"
+                            data-id="@Model.Category.Id" data-name="@Model.Category.Name" data-count="@catCount">Delete</button>
                 }
             </div>
         }
@@ -269,6 +274,43 @@
         <button type="button" class="btn btn-outline-primary" id="mn-confirm-cancel">Cancel</button>
         <button type="button" class="btn btn-primary" id="mn-confirm-ok">Confirm</button>
     </div>
+</dialog>
+
+@* "Delete category" popup (design A). Filled in by the script below from the bin that was clicked. *@
+<dialog class="mn-dialog" id="mn-cat-delete" aria-labelledby="mn-cd-title">
+    <form method="post" asp-page-handler="DeleteCategory">
+        <input type="hidden" name="categoryId" id="mn-cd-id" />
+        <div class="mn-dialog-body">
+            <span class="mn-cd-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></span>
+            <h2 id="mn-cd-title">Delete category?</h2>
+            <p class="mn-muted mb-0" id="mn-cd-text"></p>
+            <div class="mn-cd-choices" id="mn-cd-choices">
+                <label class="mn-choice" id="mn-cd-move-choice">
+                    <input type="radio" name="dishes" value="move" checked />
+                    <span>
+                        <strong>Move them to another category</strong>
+                        <select name="moveTo" id="mn-cd-move" class="form-select" aria-label="Move the dishes to">
+                            @foreach (var c in Model.Categories)
+                            {
+                                <option value="@c.Id">@c.Name</option>
+                            }
+                        </select>
+                    </span>
+                </label>
+                <label class="mn-choice is-danger">
+                    <input type="radio" name="dishes" value="delete" />
+                    <span>
+                        <strong id="mn-cd-del-label">Delete the dishes too</strong>
+                        <span class="mn-muted">Past orders keep the dish names and prices.</span>
+                    </span>
+                </label>
+            </div>
+        </div>
+        <div class="mn-dialog-actions">
+            <button type="button" class="btn btn-outline-primary" id="mn-cd-cancel">Cancel</button>
+            <button type="submit" class="btn mn-btn-danger-solid" id="mn-cd-ok">Delete category</button>
+        </div>
+    </form>
 </dialog>
 
 @section Scripts {
@@ -346,6 +388,57 @@
                            ok: form.dataset.confirmOk, danger: true, onOk: () => HTMLFormElement.prototype.submit.call(form) });
                 });
             });
+        })();
+
+        // ---------- Delete category popup ----------
+        (() => {
+            const dlg = document.getElementById('mn-cat-delete');
+            if (!dlg) return;
+            const $ = id => document.getElementById(id);
+            const form = dlg.querySelector('form');
+            const select = $('mn-cd-move');
+            const radios = [...form.querySelectorAll('input[name="dishes"]')];
+            let count = 0;
+            const plural = n => n === 1 ? '1 dish' : n + ' dishes';
+            const refreshButton = () => {
+                const del = form.querySelector('input[name="dishes"]:checked')?.value === 'delete';
+                $('mn-cd-ok').textContent = count === 0 ? 'Delete category'
+                    : del ? 'Delete category & ' + plural(count) : 'Move ' + plural(count) + ' & delete';
+            };
+
+            document.querySelectorAll('.js-cat-delete').forEach(btn => btn.addEventListener('click', () => {
+                const id = btn.dataset.id, name = btn.dataset.name;
+                count = parseInt(btn.dataset.count, 10) || 0;
+                $('mn-cd-id').value = id;
+                $('mn-cd-title').textContent = `Delete “${name}”?`;
+
+                // The category being deleted can't be where its own dishes go.
+                let firstOther = null;
+                [...select.options].forEach(o => {
+                    const self = o.value === id;
+                    o.disabled = self; o.hidden = self;
+                    if (!self && firstOther === null) firstOther = o.value;
+                });
+                const canMove = firstOther !== null;
+                if (canMove) select.value = firstOther;
+                $('mn-cd-move-choice').classList.toggle('is-disabled', !canMove);
+                radios[0].disabled = !canMove; select.disabled = !canMove;
+                radios[canMove ? 0 : 1].checked = true;
+
+                $('mn-cd-choices').hidden = count === 0;
+                $('mn-cd-text').innerHTML = count === 0
+                    ? 'It has no dishes, so nothing else is affected. This can\u2019t be undone.'
+                    : `This category still has <strong>${plural(count)}</strong>. What should happen to ${count === 1 ? 'it' : 'them'}?`;
+                $('mn-cd-del-label').textContent = count === 1 ? 'Delete the dish too' : `Delete the ${count} dishes too`;
+                refreshButton();
+                dlg.showModal();
+                $('mn-cd-cancel').focus();
+            }));
+
+            radios.forEach(r => r.addEventListener('change', refreshButton));
+            select.addEventListener('focus', () => { radios[0].checked = true; refreshButton(); });
+            $('mn-cd-cancel').addEventListener('click', () => dlg.close());
+            dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
         })();
 
         // ---------- Green "saved" popup ----------

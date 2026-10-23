@@ -1,0 +1,264 @@
+@page
+@model KOMA.Pages.Admin.Activity.IndexModel
+@using KOMA.Pages.Admin.Activity
+@{
+    ViewData["Title"] = "Activity";
+    var sel = Model.Selected;
+    var refreshRoute = Model.Route(id: sel?.Id);
+    var olderRoute = Model.Route(take: Model.Take + 60, id: sel?.Id);
+    string Initial(string? role) => role == "Admin" ? "A" : role == "Staff" ? "S" : "?";
+    string OpenLink(ActivityLog log)
+    {
+        var snaps = log.Snapshots();
+        var first = snaps.FirstOrDefault();
+        return log.Area switch
+        {
+            ActivityLog.Areas.Menu => Url.Page("/Admin/MenuItems/Index")!,
+            ActivityLog.Areas.Floors => Url.Page("/Admin/Layouts/Index")!,
+            ActivityLog.Areas.Bookings when first?.Key.TryGetValue("Id", out var rid) == true => Url.Page("/Reservations/Details", new { id = rid.GetInt32() })!,
+            ActivityLog.Areas.Bookings => Url.Page("/Staff/Reservation/Index")!,
+            ActivityLog.Areas.Settings when first?.Type == "Role" => Url.Page("/Admin/Accounts/Index")!,
+            ActivityLog.Areas.Settings when first?.Type.EndsWith("LandingPageContent") == true => Url.Page("/Admin/LandingPage/Index")!,
+            ActivityLog.Areas.Settings => Url.Page("/Admin/Settings/Index")!,
+            _ => Url.Page("/Admin/Accounts/Index")!
+        };
+    }
+}
+
+@if (TempData["StatusMessage"] is string status)
+{
+    <div class="mn-toast" id="mn-toast" role="status" aria-live="polite">
+        <span class="mn-toast-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+        <span class="mn-toast-text"><strong>Done</strong><span>@status</span></span>
+        <button type="button" class="mn-toast-close" aria-label="Close">&times;</button>
+    </div>
+}
+@if (TempData["StatusError"] is string error)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+<div class="act-shell">
+
+    @* ================= LEFT: list ================= *@
+    <aside class="act-side">
+        <div class="act-head">
+            <h1 class="mb-0">Activity</h1>
+            <a asp-page="./Index" asp-all-route-data="refreshRoute" class="act-round ms-auto" title="Refresh" aria-label="Refresh">↻</a>
+        </div>
+
+        <nav class="act-tabs" aria-label="Area">
+            @foreach (var t in IndexModel.Tabs)
+            {
+                var tabRoute = Model.Route(tab: t.Key);
+                <a asp-page="./Index" asp-all-route-data="tabRoute" class="@(Model.TabKey == t.Key ? "is-on" : "")"
+                   aria-current="@(Model.TabKey == t.Key ? "page" : null)">@t.Label</a>
+            }
+        </nav>
+
+        <form method="get" class="act-filters" id="act-filters">
+            @if (Model.TabKey != "all") { <input type="hidden" name="tab" value="@Model.TabKey" /> }
+            @if (Model.WhoKey != "everyone") { <input type="hidden" name="who" value="@Model.WhoKey" /> }
+            <div class="act-seg" role="group" aria-label="Who">
+                @foreach (var (key, label) in new[] { ("everyone", "Everyone"), ("admins", "Admins"), ("staff", "Staff") })
+                {
+                    var whoRoute = Model.Route(who: key);
+                    <a asp-page="./Index" asp-all-route-data="whoRoute" class="@(Model.WhoKey == key ? "is-on" : "")">@label</a>
+                }
+            </div>
+            <label class="visually-hidden" for="act-days">Period</label>
+            <select id="act-days" name="days" class="act-days" onchange="this.form.submit()">
+                <option value="1" selected="@(Model.Days == 1)">Today</option>
+                <option value="7" selected="@(Model.Days == 7)">Last 7 days</option>
+                <option value="30" selected="@(Model.Days == 30)">Last 30 days</option>
+                <option value="0" selected="@(Model.Days == 0)">All time</option>
+            </select>
+            <label class="visually-hidden" for="act-q">Search</label>
+            <input id="act-q" type="search" name="q" value="@Model.Q" class="act-search" placeholder="Search item or person…" />
+        </form>
+
+        <div class="card act-list">
+            @if (!Model.Logs.Any())
+            {
+                <div class="act-empty">
+                    <span class="act-empty-icon">✓</span>
+                    <strong>No changes @(Model.Days == 1 ? "today" : "in this period")</strong>
+                    <span>Nothing has been changed here@(string.IsNullOrWhiteSpace(Model.Q) ? "" : " that matches your search").</span>
+                    @if (Model.Days is > 0 and < 30)
+                    {
+                        var widerRoute = Model.Route(days: 30);
+                        <a asp-page="./Index" asp-all-route-data="widerRoute" class="btn btn-outline-primary btn-sm">Show last 30 days</a>
+                    }
+                </div>
+            }
+            @{ string? lastDay = null; }
+            @foreach (var l in Model.Logs)
+            {
+                var day = IndexModel.DayLabel(l.At);
+                if (day != lastDay)
+                {
+                    <div class="act-day">@day</div>
+                    lastDay = day;
+                }
+                var isSel = sel?.Id == l.Id;
+                var rowRoute = Model.Route(id: l.Id);
+                <a asp-page="./Index" asp-all-route-data="rowRoute" class="act-row @(isSel ? "is-selected" : "")" aria-current="@(isSel ? "true" : null)">
+                    <span class="act-stripe" style="background:@IndexModel.ColorOf(l.Area)" title="@l.Area"></span>
+                    <span class="act-who @(l.UserRole == "Admin" ? "is-admin" : "")" title="@l.UserName (@l.UserRole)">@Initial(l.UserRole)</span>
+                    <span class="act-row-main">
+                        <span class="act-row-title">@l.Title</span>
+                        <span class="act-row-action @(IndexModel.IsWarning(l.Action) ? "is-warn" : "")">@l.Action@(l.RevertedById.HasValue ? " · reverted" : "")</span>
+                    </span>
+                    <span class="act-row-time">@l.At.ToString("h:mm tt")</span>
+                </a>
+            }
+            @if (Model.HasMore)
+            {
+                <a asp-page="./Index" asp-all-route-data="olderRoute" class="act-more">Load older ↓</a>
+            }
+        </div>
+
+        <div class="act-key" aria-hidden="true">
+            @foreach (var t in IndexModel.Tabs.Skip(1))
+            {
+                <span><i style="background:@t.Color"></i>@t.Label</span>
+            }
+            <span class="ms-auto"><b class="is-admin">A</b>Admin <b>S</b>Staff</span>
+        </div>
+    </aside>
+
+    @* ================= RIGHT: detail ================= *@
+    @if (sel is null)
+    {
+        <section class="card act-card act-card-empty">
+            <strong>Nothing selected</strong>
+            <span>Pick a change on the left to see what changed.</span>
+        </section>
+    }
+    else
+    {
+        var historyRoute = Model.Route(tab: IndexModel.Tabs.FirstOrDefault(t => t.Area == sel.Area)?.Key ?? "all", days: 0, keepSearch: false);
+        historyRoute["q"] = sel.Title;
+        <section class="card act-card" aria-labelledby="act-title">
+            <div class="act-card-top">
+                <span class="act-eyebrow" style="color:@IndexModel.ColorOf(sel.Area)">@sel.Area.ToUpperInvariant() · @sel.Action.ToUpperInvariant()</span>
+                @if (Model.HistoryCount > 0 && sel.Area != KOMA.Models.ActivityLog.Areas.SignIns)
+                {
+                    <a asp-page="./Index" asp-all-route-data="historyRoute" class="act-history">History (@Model.HistoryCount) ›</a>
+                }
+            </div>
+            <h2 id="act-title" class="act-title">@sel.Title</h2>
+            <div class="act-by">
+                <span class="act-who @(sel.UserRole == "Admin" ? "is-admin" : "")">@Initial(sel.UserRole)</span>
+                <span><strong>@sel.UserName</strong> · @sel.At.ToString("ddd d MMM, h:mm tt")</span>
+            </div>
+
+            @if (sel.Area == KOMA.Models.ActivityLog.Areas.SignIns)
+            {
+                <div class="act-table">
+                    <div class="act-tr act-th act-cols-3"><span>Time</span><span>Result</span><span>Device</span></div>
+                    @foreach (var s in Model.SignInHistory)
+                    {
+                        <div class="act-tr act-cols-3 @(s.Id == sel.Id ? "is-current" : "")">
+                            <span>@IndexModel.DayLabel(s.At), @s.At.ToString("h:mm tt")</span>
+                            <span class="@(s.Action == "Signed in" ? "is-good" : "is-bad")">@s.Action</span>
+                            <span class="act-muted">@s.Summary</span>
+                        </div>
+                    }
+                </div>
+                <div class="act-actions">
+                    <a asp-page="/Admin/Accounts/Index" class="btn btn-outline-primary">Open accounts</a>
+                </div>
+            }
+            else
+            {
+                <div class="act-table">
+                    <div class="act-tr act-th"><span>Field</span><span>Before</span><span>After</span></div>
+                    @foreach (var r in Model.Rows)
+                    {
+                        <div class="act-tr">
+                            <span class="act-field">@if (r.Item is not null) { <strong>@r.Item</strong><br /> }@r.Field</span>
+                            <span class="act-before">@r.Before</span>
+                            <span class="act-after">@r.After</span>
+                        </div>
+                    }
+                    @if (!Model.Rows.Any() && !string.IsNullOrEmpty(sel.Summary))
+                    {
+                        <div class="act-tr"><span class="act-field">Summary</span><span class="act-after" style="grid-column: span 2">@sel.Summary</span></div>
+                    }
+                </div>
+
+                <div class="act-actions">
+                    @if (Model.CanRevert)
+                    {
+                        <button type="button" class="btn act-btn-revert" id="act-revert-open">Revert</button>
+                    }
+                    <a href="@OpenLink(sel)" class="btn btn-outline-primary">Open</a>
+                    @if (sel.RevertedById.HasValue)
+                    {
+                        var revRoute = Model.Route(id: sel.RevertedById);
+                        <a asp-page="./Index" asp-all-route-data="revRoute" class="act-hint">Reverted - see the revert ›</a>
+                    }
+                    else if (!string.IsNullOrEmpty(Model.RevertNote))
+                    {
+                        <span class="act-hint @(Model.RevertNote.StartsWith("⚠") ? "is-warn" : "")">@Model.RevertNote</span>
+                    }
+                    else if (!Model.CanRevert)
+                    {
+                        <span class="act-hint">Record only</span>
+                    }
+                </div>
+            }
+        </section>
+
+        @if (Model.CanRevert)
+        {
+            var revertRoute = Model.Route(id: sel.Id);
+            <dialog class="mn-dialog" id="act-revert" aria-labelledby="act-revert-title">
+                <form method="post" asp-page-handler="Revert" asp-all-route-data="revertRoute">
+                    <input type="hidden" name="logId" value="@sel.Id" />
+                    <div class="mn-dialog-body">
+                        <div class="mn-eyebrow">Revert change</div>
+                        <h2 id="act-revert-title">Put @sel.Title back?</h2>
+                        <p class="mn-muted mb-0">This restores the values from before @sel.At.ToString("h:mm tt"). The revert is also added to Activity.</p>
+                        <ul class="mn-changes">
+                            @foreach (var r in Model.Rows)
+                            {
+                                <li><span>@(r.Item is null ? r.Field : $"{r.Item} · {r.Field}")</span><s>@r.After</s><b aria-hidden="true">→</b><strong>@r.Before</strong></li>
+                            }
+                        </ul>
+                    </div>
+                    <div class="mn-dialog-actions">
+                        <button type="button" class="btn btn-outline-primary" id="act-revert-cancel">Cancel</button>
+                        <button type="submit" class="btn mn-btn-danger-solid">Revert</button>
+                    </div>
+                </form>
+            </dialog>
+        }
+    }
+</div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const dlg = document.getElementById('act-revert');
+            document.getElementById('act-revert-open')?.addEventListener('click', () => dlg.showModal());
+            document.getElementById('act-revert-cancel')?.addEventListener('click', () => dlg.close());
+            dlg?.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+
+            // Search as you type (short pause).
+            const q = document.getElementById('act-q'); let t;
+            q?.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => q.form.submit(), 450); });
+            if (q?.value) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+
+            document.querySelector('.act-row.is-selected')?.scrollIntoView({ block: 'nearest' });
+
+            const toast = document.getElementById('mn-toast');
+            if (toast) {
+                const hide = () => { toast.classList.add('is-leaving'); setTimeout(() => toast.remove(), 300); };
+                toast.querySelector('.mn-toast-close').addEventListener('click', hide);
+                setTimeout(hide, 3200);
+            }
+        })();
+    </script>
+}

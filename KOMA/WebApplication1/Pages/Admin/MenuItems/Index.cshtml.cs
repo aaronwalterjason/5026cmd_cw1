@@ -168,20 +168,46 @@ public class IndexModel(ApplicationDbContext _db, MenuImageService images) : Pag
         return RedirectToPage("./Index", new RouteValueDictionary(Route(cat: existing.Id, keepSearch: false)));
     }
 
-    // A category can only be deleted when it has no dishes (dishes kept for order history count too).
-    public async Task<IActionResult> OnPostDeleteCategoryAsync(int categoryId)
+    // Delete a category (design A). If it still has dishes, the admin picks in the popup what happens to them:
+    //   dishes = "move"   -> they move to the category chosen in moveTo (the default), or
+    //   dishes = "delete" -> they are deleted too.
+    // Past orders are safe either way: each order line keeps the dish name and price it was ordered with.
+    public async Task<IActionResult> OnPostDeleteCategoryAsync(int categoryId, string? dishes, int? moveTo)
     {
         var category = await _db.MenuCategories.FindAsync(categoryId);
         if (category is null) return RedirectToPage("./Index");
-        if (await _db.MenuItems.AnyAsync(i => i.MenuCategoryId == category.Id))
+
+        var items = await _db.MenuItems.Where(i => i.MenuCategoryId == category.Id).ToListAsync();
+        var what = items.Count == 1 ? "1 dish" : $"{items.Count} dishes";
+        var message = $"'{category.Name}' was deleted.";
+        int? openAfter = null;
+
+        if (items.Count > 0 && dishes == "delete")
         {
-            TempData["StatusError"] = $"'{category.Name}' still has dishes. Move them to another category first, or switch the category off to hide it.";
-            return RedirectToPage("./Index", new RouteValueDictionary(Route(cat: category.Id, mode: "edit-cat", keepSearch: false)));
+            _db.MenuItems.RemoveRange(items);
+            message = $"'{category.Name}' and its {what} were deleted.";
         }
+        else if (items.Count > 0)
+        {
+            var target = moveTo.HasValue && moveTo.Value != category.Id
+                ? await _db.MenuCategories.FindAsync(moveTo.Value)
+                : null;
+            if (target is null)
+            {
+                TempData["StatusError"] = $"Choose a category to move the {what} in '{category.Name}' to, or choose to delete them.";
+                return RedirectToPage("./Index", new RouteValueDictionary(Route(cat: category.Id, mode: "edit-cat", keepSearch: false)));
+            }
+            foreach (var item in items) item.MenuCategoryId = target.Id;
+            message = $"'{category.Name}' was deleted. {what[0].ToString().ToUpper() + what[1..]} moved to '{target.Name}'.";
+            openAfter = target.Id;    // show the category the dishes went to
+        }
+
         _db.MenuCategories.Remove(category);
-        await _db.SaveChangesAsync();
-        TempData["StatusMessage"] = $"'{category.Name}' was deleted.";
-        return RedirectToPage("./Index");
+        await _db.SaveChangesAsync();   // one save: the dishes move (or go) and the category goes together
+        TempData["StatusMessage"] = message;
+        return openAfter.HasValue
+            ? RedirectToPage("./Index", new RouteValueDictionary(Route(cat: openAfter, keepSearch: false)))
+            : RedirectToPage("./Index");
     }
 
     // ---------- Helpers ----------
