@@ -114,7 +114,8 @@ public static class DemoOrderSeeder
     public static async Task SeedMenuAsync(ApplicationDbContext db)
     {
         var categories = await db.MenuCategories.ToListAsync();
-        var existingNames = (await db.MenuItems.Select(m => m.Name).ToListAsync())
+        var existingItems = await db.MenuItems.ToListAsync();
+        var existingNames = existingItems.Select(m => m.Name)
             .Select(n => n.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var menu = new (string Category, string Description, (string Name, decimal Price, string Description)[] Dishes)[]
         {
@@ -204,10 +205,25 @@ public static class DemoOrderSeeder
             }
             foreach (var dish in section.Dishes)
             {
+                // The original California Roll keeps its existing uploaded image.
+                var imageUrl = dish.Name == "California Roll" ? null
+                    : $"/images/menu/{dish.Name.ToLowerInvariant().Replace(' ', '_')}.png";
+                var previousImageUrl = dish.Name == "California Roll" ? null
+                    : $"/images/menu/generated/{dish.Name.ToLowerInvariant().Replace(' ', '_')}.png";
+                // Repair moved seed images without replacing photos uploaded by administrators.
+                // Agedashi Tofu's known duplicate upload also points back to its named asset.
+                foreach (var existing in existingItems.Where(m =>
+                    string.Equals(m.Name.Trim(), dish.Name, StringComparison.OrdinalIgnoreCase)
+                    && imageUrl != null
+                    && (string.IsNullOrWhiteSpace(m.ImageUrl)
+                        || string.Equals(m.ImageUrl, previousImageUrl, StringComparison.OrdinalIgnoreCase)
+                        || (dish.Name == "Agedashi Tofu" && string.Equals(m.ImageUrl,
+                            "/images/menu/067cdd2639004125a5a983313feda032.png", StringComparison.OrdinalIgnoreCase)))))
+                    existing.ImageUrl = imageUrl;
                 if (!existingNames.Add(dish.Name)) continue;
                 db.MenuItems.Add(new MenuItem
                 {
-                    Name = dish.Name, Description = dish.Description, Price = dish.Price,
+                    Name = dish.Name, Description = dish.Description, Price = dish.Price, ImageUrl = imageUrl,
                     MenuCategory = category, IsAvailable = true, IsRecommended = recommended.Contains(dish.Name),
                     IsSeasonal = dish.Name is "Vegetable Tempura" or "Zaru Soba" or "Mochi Ice Cream Trio"
                 });
