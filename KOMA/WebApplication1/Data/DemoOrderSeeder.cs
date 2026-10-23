@@ -84,7 +84,7 @@ public static class DemoOrderSeeder
             }
 
             foreach (var dish in menu.OrderBy(_ => rng.Next()).Take(rng.Next(1, Math.Min(4, menu.Count) + 1)))
-                order.Items.Add(new OrderItem { MenuItemId = dish.Id, Quantity = rng.Next(1, 4), UnitPrice = dish.Price });
+                order.Items.Add(new OrderItem { MenuItemId = dish.Id, ItemName = dish.Name, Quantity = rng.Next(1, 4), UnitPrice = dish.Price });
             order.TotalAmount = order.Items.Sum(x => x.UnitPrice * x.Quantity);
 
             if (today)
@@ -271,7 +271,7 @@ public static class DemoOrderSeeder
             if (type == OrderType.WalkIn) o.CustomerName = WalkInNames[rng.Next(WalkInNames.Length)];
             else { var c = customers[rng.Next(customers.Count)]; o.CustomerId = c.Id; o.CustomerName = c.Name; }
             foreach (var dish in menu.OrderBy(_ => rng.Next()).Take(rng.Next(1, Math.Min(4, menu.Count) + 1)))
-                o.Items.Add(new OrderItem { MenuItemId = dish.Id, Quantity = rng.Next(1, Math.Max(2, table.Capacity / 2) + 1), UnitPrice = dish.Price });
+                o.Items.Add(new OrderItem { MenuItemId = dish.Id, ItemName = dish.Name, Quantity = rng.Next(1, Math.Max(2, table.Capacity / 2) + 1), UnitPrice = dish.Price });
             o.TotalAmount = o.Items.Sum(x => x.UnitPrice * x.Quantity);
             return o;
         }
