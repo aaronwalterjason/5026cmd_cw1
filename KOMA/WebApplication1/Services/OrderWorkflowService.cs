@@ -43,7 +43,8 @@ public class OrderWorkflowService(ApplicationDbContext db)
 
     public async Task<string?> AdvanceAsync(
         int id,
-        OrderStatus expected)
+        OrderStatus expected,
+        int? expectedSessionId = null)
     {
         await using var transaction =
             await db.Database.BeginTransactionAsync(
@@ -68,6 +69,28 @@ public class OrderWorkflowService(ApplicationDbContext db)
         {
             return "A refunded order cannot be sent to the kitchen "
                 + "or advanced.";
+        }
+
+        if (expectedSessionId.HasValue &&
+            order.TableServiceSessionId != expectedSessionId.Value)
+        {
+            return "This order is no longer linked to the selected visit. " +
+                   "Refresh the table.";
+        }
+
+        if (order.TableServiceSessionId.HasValue)
+        {
+            var reservationCancelled = await db.TableServiceSessions
+                .AnyAsync(s =>
+                    s.Id == order.TableServiceSessionId.Value &&
+                    s.Reservation != null &&
+                    s.Reservation.Status == ReservationStatus.Cancelled);
+
+            if (reservationCancelled)
+            {
+                return "This order belongs to a cancelled reservation. " +
+                       "Review it before continuing.";
+            }
         }
 
         var next = Next(order);
