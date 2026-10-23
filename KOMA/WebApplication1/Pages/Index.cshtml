@@ -3,23 +3,32 @@
 @{
     Layout = "_PublicLayout";
     ViewData["Title"] = "Good food. Good company.";
+    var c = Model.Content;   // wording + photo edited in Admin > Website
+    var heroImage = string.IsNullOrWhiteSpace(c.HeroImageUrl) ? Url.Content("~/images/koma/japanese-table.jpg") : c.HeroImageUrl;
+}
+@functions {
+    // Text typed in the admin form: keep it safe (HTML-encoded) and turn each new line into <br />.
+    private Microsoft.AspNetCore.Html.IHtmlContent Lines(string? text) =>
+        new Microsoft.AspNetCore.Html.HtmlString(string.Join("<br />",
+            (text ?? "").Replace("\r", "").Split('\n').Select(l => System.Net.WebUtility.HtmlEncode(l))));
 }
 <section class="hero hero-wide" aria-labelledby="hero-title">
-    <img class="hero-background" src="~/images/koma/japanese-table.jpg" alt="" fetchpriority="high" />
+    <img class="hero-background" src="@heroImage" alt="" fetchpriority="high" />
     <div class="hero-copy">
-        <p class="eyebrow">A LITTLE TASTE OF JAPAN</p>
-        <h1 id="hero-title">Good food.<br /><em>Better together.</em></h1>
-        <p class="intro">Bring your appetite. Bring your favourite people.<br />There is always a little more to enjoy at KOMA.</p>
-        <a class="button light" href="#food">Find your favourite <span aria-hidden="true">↓</span></a>
+        @if (!string.IsNullOrWhiteSpace(c.HeroEyebrow)) { <p class="eyebrow">@c.HeroEyebrow</p> }
+        <h1 id="hero-title">@(c.HeroTitle)@if (!string.IsNullOrWhiteSpace(c.HeroTitleAccent)) { <br /><em>@c.HeroTitleAccent</em> }</h1>
+        @if (!string.IsNullOrWhiteSpace(c.HeroIntro)) { <p class="intro">@Lines(c.HeroIntro)</p> }
+        <a class="button light" href="#food">@c.HeroButtonText <span aria-hidden="true">↓</span></a>
     </div>
     <div class="hero-bottom"><span>JAPANESE-INSPIRED DINING</span><span>SCROLL TO SAVOUR ↓</span></div>
 </section>
 <section class="food-section wave-pattern" id="food" aria-labelledby="food-title">
-    <div class="food-heading reveal"><p class="eyebrow">SOMETHING GOOD IS ON THE TABLE</p><h2 id="food-title">What are you craving?</h2><p>A familiar favourite or something a little different.<br />Take a look around. Find your next good bite.</p></div>
-    @foreach (var category in new[] { "Recommended", "Seasonal Specials" })
+    <div class="food-heading reveal">@if (!string.IsNullOrWhiteSpace(c.FoodEyebrow)) { <p class="eyebrow">@c.FoodEyebrow</p> }<h2 id="food-title">@c.FoodTitle</h2>@if (!string.IsNullOrWhiteSpace(c.FoodIntro)) { <p>@Lines(c.FoodIntro)</p> }</div>
+    @foreach (var (isRecommended, category) in new[] { (true, c.RecommendedTitle), (false, c.SeasonalTitle) })
     {
-        var dishes = Model.Dishes.Where(dish => category == "Recommended" ? dish.IsRecommended : dish.IsSeasonal).ToList();
-        var galleryId = category == "Recommended" ? "recommended" : "seasonal";
+        if (isRecommended ? !c.ShowRecommended : !c.ShowSeasonal) { continue; }
+        var dishes = Model.Dishes.Where(dish => isRecommended ? dish.IsRecommended : dish.IsSeasonal).ToList();
+        var galleryId = isRecommended ? "recommended" : "seasonal";
         <section class="food-gallery" aria-labelledby="@(galleryId)-title" aria-roledescription="carousel">
             <div class="food-toolbar">
                 <h3 id="@(galleryId)-title">@category</h3>
@@ -59,36 +68,36 @@
     }
     <p class="order-status" role="status" aria-live="polite">@if (Request.Query.ContainsKey("dish") && User.Identity?.IsAuthenticated == true) { <text>@(User.IsInRole("Customer") ? "You are signed in. Online ordering is not available yet. Please check back soon." : "Ordering is available to customer accounts. Please sign in with a customer account.")</text> }</p>
 </section>
+@if (c.ShowStory)
+{
 <section class="story reveal" id="story">
-    <p class="eyebrow">THE KOMA WAY</p>
-    <h2>Good food brings us together.</h2>
-    <p>We believe the best meals are as much about the people as the food. Bring your favourite company, settle in, and enjoy a meal at your own pace.</p>
+    @if (!string.IsNullOrWhiteSpace(c.StoryEyebrow)) { <p class="eyebrow">@c.StoryEyebrow</p> }
+    <h2>@c.StoryTitle</h2>
+    @if (!string.IsNullOrWhiteSpace(c.StoryText)) { <p>@Lines(c.StoryText)</p> }
 </section>
+}
+@if (c.ShowExperience)
+{
 <section class="experience" id="experience">
     <div class="reveal">
-        <p class="eyebrow">MAKE YOURSELF AT HOME</p>
-        <h2>More than a meal.</h2>
+        @if (!string.IsNullOrWhiteSpace(c.ExperienceEyebrow)) { <p class="eyebrow">@c.ExperienceEyebrow</p> }
+        <h2>@c.ExperienceTitle</h2>
     </div>
     <div class="cards">
-        <article class="reveal">
-            <span class="eyebrow">01 / THE FOOD</span>
-            <h3>Find your next favourite.</h3>
-            <p>Explore Japanese-inspired flavours, from delicate bites to crisp, satisfying crunches.</p>
-        </article>
-        <article class="reveal">
-            <span class="eyebrow">02 / THE COMPANY</span>
-            <h3>There’s room for everyone.</h3>
-            <p>Bring friends, gather family, or enjoy a quiet meal on your own.</p>
-        </article>
-        <article class="reveal">
-            <span class="eyebrow">03 / THE MOMENT</span>
-            <h3>Stay a little longer.</h3>
-            <p>Catch up over a meal, celebrate an occasion, or simply enjoy being here.</p>
-        </article>
+        @foreach (var (label, title, text) in new[] { (c.Card1Eyebrow, c.Card1Title, c.Card1Text), (c.Card2Eyebrow, c.Card2Title, c.Card2Text), (c.Card3Eyebrow, c.Card3Title, c.Card3Text) })
+        {
+            if (string.IsNullOrWhiteSpace(title)) { continue; }
+            <article class="reveal">
+                @if (!string.IsNullOrWhiteSpace(label)) { <span class="eyebrow">@label</span> }
+                <h3>@title</h3>
+                @if (!string.IsNullOrWhiteSpace(text)) { <p>@Lines(text)</p> }
+            </article>
+        }
     </div>
 </section>
+}
 <section class="invitation reveal">
-    <h2>@KOMA.Models.KomaBrand.InvitationHeading</h2>
+    <h2>@c.InvitationHeading</h2>
     @if (User.Identity?.IsAuthenticated == true) { <a class="button light" asp-area="Identity" asp-page="/Account/Manage/Index">Your account <span aria-hidden="true">↗</span></a> }
     else { <a class="button light" asp-area="Identity" asp-page="/Account/Register">Join KOMA <span aria-hidden="true">↗</span></a> }
 </section>
