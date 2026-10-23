@@ -517,7 +517,14 @@ a.lvl-3:hover, a.lvl-4:hover { color: var(--paper); }
 .ord-pay-paid { background: #e4eedd; color: #3f6b3a; }
 .ord-pay-refunded { background: var(--paper-2); color: var(--muted); }
 
-.ord-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.ord-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+}
 .ord-steps li { display: flex; flex-direction: column; gap: 7px; }
 .ord-step-bar { height: 6px; border-radius: 99px; background: var(--paper-2); }
 .ord-steps .is-done .ord-step-bar, .ord-steps .is-current .ord-step-bar { background: var(--navy); }
@@ -578,3 +585,9 @@ a.lvl-3:hover, a.lvl-4:hover { color: var(--paper); }
   .ord-detail { min-height: 0; max-height: 100%; overflow-y: auto; }
 }
 .ord-detail-slot.is-loading { opacity: .55; pointer-events: none; }
+
+/* Orders confirmed and waiting for kitchen preparation */
+.ord-st-queuedforkitchen {
+    background: var(--paper-2);
+    color: var(--navy);
+}

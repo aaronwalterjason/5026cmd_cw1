@@ -300,7 +300,14 @@
             };
             var looks = { Occupied: 'is-seated', AwaitingPayment: 'is-payment', Free: 'is-free', Inactive: 'is-closed', Done: 'is-done', Cancelled: 'is-closed' };
             var orderPopupData = JSON.parse(document.getElementById('order-popup-data').textContent || '{}');
-            var steps = ['Pending', 'Preparing', 'Ready', 'Served'];
+            var steps = [
+                'Pending',
+                'Queued',
+                'Preparing',
+                'Ready',
+                'Served',
+                'Completed'
+            ];
 
             function showPopup(t) {
                     if (!t || !modal) return;

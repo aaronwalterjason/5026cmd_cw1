@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using KOMA.Data;
 using KOMA.Models;
+using KOMA.Services;
 
 namespace KOMA.Pages.Admin.Orders
 {
@@ -14,7 +15,15 @@ namespace KOMA.Pages.Admin.Orders
     public class IndexModel : PageModel
     {
         private readonly ApplicationDbContext _db;
-        public IndexModel(ApplicationDbContext db) => _db = db;
+        private readonly OrderWorkflowService _workflow;
+
+        public IndexModel(
+            ApplicationDbContext db,
+            OrderWorkflowService workflow)
+        {
+            _db = db;
+            _workflow = workflow;
+        }
 
         private const int MaxRows = 200;
 
@@ -45,7 +54,7 @@ namespace KOMA.Pages.Admin.Orders
 
         // Steps shown in the progress bar (Cancelled is shown separately).
         public static readonly OrderStatus[] Steps =
-            { OrderStatus.Pending, OrderStatus.Preparing, OrderStatus.ReadyToServe, OrderStatus.Served, OrderStatus.Completed };
+            OrderWorkflowService.Steps;
 
         public async Task OnGetAsync()
         {
@@ -134,50 +143,67 @@ namespace KOMA.Pages.Admin.Orders
         // ---------- Actions on the selected order ----------
 
         // Move the order to its next step (Pending -> Preparing -> Ready to serve -> Served -> Completed).
-        public async Task<IActionResult> OnPostAdvanceAsync(int orderId)
-        {
-            var o = await _db.Orders.FindAsync(orderId);
-            if (o is null) return NotFound();
-            var next = NextStatus(o);
-            if (next.HasValue)
-            {
-                o.Status = next.Value;
-                await _db.SaveChangesAsync();
-                TempData["StatusMessage"] = $"{o.OrderNumber} is now {o.Status.DisplayName()}.";
-            }
-            return RedirectToPage("./Index", new Microsoft.AspNetCore.Routing.RouteValueDictionary(Route(orderId)));
-        }
+        public Task<IActionResult> OnPostAdvanceAsync(
+            int orderId,
+            OrderStatus? expectedStatus) =>
+            RunActionAsync(
+                orderId,
+                () => expectedStatus.HasValue && ModelState.IsValid
+                    ? _workflow.AdvanceAsync(orderId, expectedStatus.Value)
+                    : Task.FromResult<string?>(
+                        "Reload this page before advancing the order."),
+                "Order advanced successfully.");
 
         // Record payment. A served order that is paid is finished, so it becomes Completed.
-        public async Task<IActionResult> OnPostPayAsync(int orderId, PaymentMethod method)
-        {
-            var o = await _db.Orders.FindAsync(orderId);
-            if (o is null) return NotFound();
-            if (o.PaymentStatus == PaymentStatus.Unpaid && o.Status != OrderStatus.Cancelled)
-            {
-                o.PaymentStatus = PaymentStatus.Paid;
-                o.PaymentMethod = method;
-                o.PaidAt = DateTime.Now;
-                if (o.Status == OrderStatus.Served) o.Status = OrderStatus.Completed;
-                await _db.SaveChangesAsync();
-                TempData["StatusMessage"] = $"{o.OrderNumber} paid by {method.DisplayName()} · RM {o.TotalAmount:N2}.";
-            }
-            return RedirectToPage("./Index", new Microsoft.AspNetCore.Routing.RouteValueDictionary(Route(orderId)));
-        }
+        public Task<IActionResult> OnPostPayAsync(
+            int orderId,
+            PaymentMethod method) =>
+            RunActionAsync(
+                orderId,
+                () => ModelState.IsValid
+                    ? _workflow.PayAsync(orderId, method)
+                    : Task.FromResult<string?>(
+                        "Choose a valid payment method."),
+                "Payment recorded.");
 
         // Cancel an order that is not finished. A paid order is marked Refunded so it leaves revenue.
-        public async Task<IActionResult> OnPostCancelAsync(int orderId)
+        public Task<IActionResult> OnPostCancelAsync(
+            int orderId,
+            OrderStatus? expectedStatus) =>
+            RunActionAsync(
+                orderId,
+                () => expectedStatus.HasValue && ModelState.IsValid
+                    ? _workflow.CancelAsync(orderId, expectedStatus.Value)
+                    : Task.FromResult<string?>(
+                        "Reload this page before cancelling the order."),
+                "Order cancelled.");
+
+        private async Task<IActionResult> RunActionAsync(
+            int orderId,
+            Func<Task<string?>> action,
+            string success)
         {
-            var o = await _db.Orders.FindAsync(orderId);
-            if (o is null) return NotFound();
-            if (o.Status != OrderStatus.Completed && o.Status != OrderStatus.Cancelled)
+            try
             {
-                o.Status = OrderStatus.Cancelled;
-                if (o.PaymentStatus == PaymentStatus.Paid) o.PaymentStatus = PaymentStatus.Refunded;
-                await _db.SaveChangesAsync();
-                TempData["StatusMessage"] = $"{o.OrderNumber} was cancelled.";
+                TempData["StatusMessage"] = await action() ?? success;
             }
-            return RedirectToPage("./Index", new Microsoft.AspNetCore.Routing.RouteValueDictionary(Route(orderId)));
+            catch (Microsoft.Data.SqlClient.SqlException)
+            {
+                TempData["StatusMessage"] =
+                    "The database was busy or unavailable. "
+                    + "Refresh and check the order before retrying.";
+            }
+            catch (DbUpdateException)
+            {
+                TempData["StatusMessage"] =
+                    "The order could not be updated. "
+                    + "Refresh and check its current status.";
+            }
+
+            return RedirectToPage(
+                "./Index",
+                new Microsoft.AspNetCore.Routing.RouteValueDictionary(
+                    (object)Route(orderId)));
         }
 
         // ---------- Helpers used by the page ----------
@@ -199,17 +225,12 @@ namespace KOMA.Pages.Admin.Orders
 
         public static bool IsActive(OrderStatus s) => s != OrderStatus.Completed && s != OrderStatus.Cancelled;
 
-        public static OrderStatus? NextStatus(Order o) => o.Status switch
-        {
-            OrderStatus.Pending => OrderStatus.Preparing,
-            OrderStatus.Preparing => OrderStatus.ReadyToServe,
-            OrderStatus.ReadyToServe => OrderStatus.Served,
-            OrderStatus.Served when o.PaymentStatus == PaymentStatus.Paid => OrderStatus.Completed,
-            _ => null   // served + unpaid: taking payment completes it
-        };
+        public static OrderStatus? NextStatus(Order o) =>
+            OrderWorkflowService.Next(o);
 
         public static string NextLabel(OrderStatus next) => next switch
         {
+            OrderStatus.QueuedForKitchen => "Confirm & send to kitchen",
             OrderStatus.Preparing => "Start preparing",
             OrderStatus.ReadyToServe => "Mark ready to serve",
             OrderStatus.Served => "Mark served",
@@ -246,6 +267,7 @@ namespace KOMA.Pages.Admin.Orders
             OrderStatus.Served => "bg-primary",
             OrderStatus.Completed => "bg-success",
             OrderStatus.Cancelled => "bg-danger",
+            OrderStatus.QueuedForKitchen => "bg-light text-dark",
             _ => "bg-light text-dark"
         };
 

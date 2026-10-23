@@ -23,6 +23,7 @@ builder.Services.AddDefaultIdentity<KOMA.Models.ApplicationUser>(options =>
 builder.Services.AddRazorPages();
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<ReservationService>();
+builder.Services.AddScoped<OrderWorkflowService>();
 builder.Services.AddScoped<MenuImageService>();
 // Check role changes on the next request, rather than retaining old role claims.
 builder.Services.Configure<SecurityStampValidatorOptions>(options =>

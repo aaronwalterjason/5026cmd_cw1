@@ -86,5 +86,47 @@
             </a>
         </section>
 
+        <section class="card p-3 staff-action-card"
+         aria-labelledby="orders-title">
+
+            <span class="h6 mb-0">Food orders</span>
+
+            <h2 id="orders-title" class="h4">
+                Customer orders
+            </h2>
+
+            <p class="text-muted">
+                Review items and notes, confirm orders for the kitchen,
+                and mark ready orders served.
+            </p>
+
+            <a asp-page="/Staff/Orders/Index"
+               class="btn btn-primary">
+                Customer orders
+                <span aria-hidden="true">↗</span>
+            </a>
+        </section>
+
+        <section class="card p-3 staff-action-card"
+                 aria-labelledby="kitchen-title">
+
+            <span class="h6 mb-0">Preparation</span>
+
+            <h2 id="kitchen-title" class="h4">
+                Kitchen queue
+            </h2>
+
+            <p class="text-muted">
+                View confirmed orders, start preparation
+                and mark dishes ready for serving.
+            </p>
+
+            <a asp-page="/Staff/Orders/Kitchen"
+               class="btn btn-primary">
+                Kitchen queue
+                <span aria-hidden="true">↗</span>
+            </a>
+        </section>
+
     </div>
 </div>

@@ -96,6 +96,9 @@ else
             {
                 <form method="post" asp-page-handler="Advance" asp-all-route-data="Model.Route(sel.Id)">
                     <input type="hidden" name="orderId" value="@sel.Id" />
+                    <input type="hidden"
+                       name="expectedStatus"
+                       value="@sel.Status" />
                     <button type="submit" class="btn @(sel.PaymentStatus == PaymentStatus.Unpaid && sel.Status == OrderStatus.Served ? "btn-outline-primary" : "btn-primary")">@IndexModel.NextLabel(next.Value)</button>
                 </form>
             }
@@ -103,6 +106,9 @@ else
             {
                 <form method="post" asp-page-handler="Pay" asp-all-route-data="Model.Route(sel.Id)" class="ord-payform">
                     <input type="hidden" name="orderId" value="@sel.Id" />
+                    <input type="hidden"
+                       name="expectedStatus"
+                       value="@sel.Status" />
                     <label class="visually-hidden" for="pay-method">Payment method</label>
                     <select id="pay-method" name="method" class="form-select">
                         @foreach (var m in payMethods) { <option value="@m">@m.DisplayName()</option> }
@@ -116,6 +122,9 @@ else
                 <form method="post" asp-page-handler="Cancel" asp-all-route-data="Model.Route(sel.Id)"
                       onsubmit="return confirm('Cancel @(sel.OrderNumber)?@(sel.PaymentStatus == PaymentStatus.Paid ? " It will be marked as refunded." : "")');" class="ms-auto">
                     <input type="hidden" name="orderId" value="@sel.Id" />
+                    <input type="hidden"
+                       name="expectedStatus"
+                       value="@sel.Status" />
                     <button type="submit" class="btn ord-btn-cancel">Cancel order</button>
                 </form>
             }

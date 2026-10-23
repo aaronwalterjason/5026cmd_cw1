@@ -65,12 +65,20 @@ namespace KOMA.Models
 
     public enum OrderStatus
     {
+        [Display(Name = "Pending confirmation")]
         Pending = 0,
+
         Preparing = 1,
-        [Display(Name = "Ready to Serve")] ReadyToServe = 2,
+
+        [Display(Name = "Ready to Serve")]
+        ReadyToServe = 2,
+
         Served = 3,
         Completed = 4,
-        Cancelled = 5
+        Cancelled = 5,
+
+        [Display(Name = "Queued for kitchen")]
+        QueuedForKitchen = 6
     }
 
     public enum PaymentStatus

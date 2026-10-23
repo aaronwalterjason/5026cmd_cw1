@@ -1,0 +1,233 @@
+﻿@model KOMA.Pages.Staff.Orders.OrderBoardModel
+@using KOMA.Models
+@using KOMA.Services
+
+<div class="staff-workspace">
+
+    <header class="staff-page-header">
+        <div>
+            <h1>@Model.Heading</h1>
+
+            <p class="text-muted">
+                @(Model.Kitchen
+                    ? "Only confirmed orders enter the kitchen queue. Start preparation, then mark orders ready."
+                    : "Review every item and note before confirming an order. Mark ready orders served after delivery.")
+            </p>
+        </div>
+
+        <a asp-route-Filter="@Model.Filter"
+           asp-route-PageNumber="@Model.PageNumber"
+           class="btn btn-outline-secondary">
+            Refresh orders
+        </a>
+    </header>
+
+    <nav class="staff-nav" aria-label="Staff navigation">
+        <a asp-page="/Staff/Index"
+           class="btn btn-outline-secondary btn-sm">
+            Dashboard
+        </a>
+
+        <a asp-page="/Staff/Orders/Index"
+           class="btn @(Model.Kitchen ? "btn-outline-secondary" : "btn-dark") btn-sm">
+            Customer orders
+        </a>
+
+        <a asp-page="/Staff/Orders/Kitchen"
+           class="btn @(Model.Kitchen ? "btn-dark" : "btn-outline-secondary") btn-sm">
+            Kitchen queue
+        </a>
+    </nav>
+
+    <p class="small text-muted">
+        Refresh to see changes from other users.
+        Orders are listed oldest placed first.
+    </p>
+
+    @if (TempData["OrderError"] is string error)
+    {
+        <div class="alert alert-danger" role="alert">
+            @error
+        </div>
+    }
+
+    @if (TempData["OrderSuccess"] is string message)
+    {
+        <div class="alert alert-success" role="status">
+            @message
+        </div>
+    }
+
+    <nav class="staff-nav" aria-label="Order status">
+        @foreach (var status in Model.VisibleStatuses)
+        {
+            <a asp-route-Filter="@status"
+               asp-route-PageNumber="1"
+               class="btn @(status == Model.SelectedStatus ? "btn-dark" : "btn-outline-secondary") btn-sm"
+               aria-current="@(status == Model.SelectedStatus ? "page" : null)">
+                @status.DisplayName()
+            </a>
+        }
+    </nav>
+
+    <p>
+        @Model.Total order(s) · @Model.SelectedStatus.DisplayName()
+    </p>
+
+    @if (Model.Orders.Count == 0)
+    {
+        <div class="card p-3">
+            <p class="mb-0">
+                No orders with this status.
+                Choose another status or refresh.
+            </p>
+        </div>
+    }
+
+    <div class="row g-3">
+        @foreach (var order in Model.Orders)
+        {
+            <div class="col-12 col-xl-6">
+                <article class="card p-3 h-100">
+
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                        <h2 class="h4 mb-0">
+                            @order.OrderNumber
+                        </h2>
+
+                        <span class="badge bg-light text-dark">
+                            @order.Status.DisplayName()
+                        </span>
+                    </div>
+
+                    <p class="mb-1">
+                        <strong>
+                            @(order.RestaurantTable == null
+                                ? "No table assigned"
+                                : $"Table {order.RestaurantTable.TableNumber}")
+                        </strong>
+                        · @order.OrderType.DisplayName()
+                    </p>
+
+                    <p class="text-muted small">
+                        @order.CustomerName
+                        · Placed @order.OrderedAt.ToString("dd MMM yyyy, HH:mm")
+                    </p>
+
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Item</th>
+                                    <th scope="col">Quantity</th>
+                                    <th scope="col">RM</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (var item in order.Items)
+                                {
+                                    <tr>
+                                        <td>
+                                            @(item.MenuItem?.Name ?? "Removed menu item")
+                                        </td>
+                                        <td>@item.Quantity</td>
+                                        <td>@item.LineTotal.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (!order.Items.Any())
+                    {
+                        <p class="text-danger">
+                            No items. This order cannot be confirmed.
+                        </p>
+                    }
+
+                    <p>
+                        <strong>Total:</strong>
+                        RM @order.TotalAmount.ToString("N2")
+                    </p>
+
+                    @if (!string.IsNullOrWhiteSpace(order.Notes))
+                    {
+                        <div class="alert alert-warning">
+                            <strong>Customer notes:</strong>
+                            <span style="white-space:pre-wrap">@order.Notes</span>
+                        </div>
+                    }
+
+                    @if (Model.CanAdvance(order.Status))
+                    {
+                        <form method="post"
+                              asp-page-handler="Advance"
+                              asp-route-Filter="@Model.Filter"
+                              asp-route-PageNumber="@Model.PageNumber"
+                              class="mt-auto">
+
+                            <input type="hidden"
+                                   name="orderId"
+                                   value="@order.Id" />
+
+                            <input type="hidden"
+                                   name="expectedStatus"
+                                   value="@order.Status" />
+
+                            @if (order.Status == OrderStatus.Pending)
+                            {
+                                <label class="d-block small mb-2">
+                                    <input type="checkbox" required />
+                                    I have reviewed the items and customer notes.
+                                </label>
+                            }
+
+                            <button type="submit"
+                                    class="btn btn-primary"
+                                    disabled="@(order.Status == OrderStatus.Pending && !order.Items.Any())">
+                                @OrderWorkflowService.ActionLabel(order.Status)
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <p class="small text-muted mb-0">
+                            @(order.Status == OrderStatus.ReadyToServe
+                                ? "Waiting for Staff to serve this order."
+                                : "Use the relevant queue to continue this order.")
+                        </p>
+                    }
+                </article>
+            </div>
+        }
+    </div>
+
+    <nav class="d-flex flex-wrap justify-content-between gap-2 mt-3"
+         aria-label="Order pages">
+
+        <span>
+            Page @Model.PageNumber of @Model.TotalPages
+        </span>
+
+        <div class="d-flex gap-2">
+            @if (Model.PageNumber > 1)
+            {
+                <a asp-route-Filter="@Model.Filter"
+                   asp-route-PageNumber="@(Model.PageNumber - 1)"
+                   class="btn btn-outline-secondary btn-sm">
+                    Previous
+                </a>
+            }
+
+            @if (Model.PageNumber < Model.TotalPages)
+            {
+                <a asp-route-Filter="@Model.Filter"
+                   asp-route-PageNumber="@(Model.PageNumber + 1)"
+                   class="btn btn-outline-secondary btn-sm">
+                    Next
+                </a>
+            }
+        </div>
+    </nav>
+</div>
