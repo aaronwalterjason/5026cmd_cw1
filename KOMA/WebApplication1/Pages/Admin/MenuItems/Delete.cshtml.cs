@@ -29,16 +29,8 @@ namespace KOMA.Pages.Admin.MenuItems
             var item = await _db.MenuItems.FindAsync(Item.Id);
             if (item is null) return RedirectToPage("./Index");
 
-            // A dish that appears on past orders must stay in the database so order history and
-            // revenue reports remain correct - hide it from customers instead of deleting it.
-            if (await _db.OrderItems.AnyAsync(oi => oi.MenuItemId == item.Id))
-            {
-                item.IsAvailable = false;
-                await _db.SaveChangesAsync();
-                TempData["StatusMessage"] = $"'{item.Name}' appears on past orders, so it was marked unavailable instead of deleted.";
-                return RedirectToPage("./Index");
-            }
-
+            // Past orders keep their own copy of the dish name and price (OrderItem.ItemName / UnitPrice),
+            // so the dish can be removed; their link to it is cleared by the database (SetNull).
             _db.MenuItems.Remove(item);
             await _db.SaveChangesAsync();
 

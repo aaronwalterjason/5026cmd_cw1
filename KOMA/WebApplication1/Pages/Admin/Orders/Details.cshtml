@@ -53,7 +53,7 @@
     @foreach (var i in o.Items)
     {
         <tr>
-            <td>@(i.MenuItem?.Name ?? "(removed item)")</td>
+            <td>@i.DishName</td>
             <td class="text-end">@i.Quantity</td>
             <td class="text-end">RM @i.UnitPrice.ToString("N2")</td>
             <td class="text-end">RM @i.LineTotal.ToString("N2")</td>

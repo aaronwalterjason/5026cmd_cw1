@@ -1,84 +1,102 @@
-@* Admin icon rail (Option 4). Rendered by Pages/Shared/_Layout.cshtml on every page under /Admin.
-   Each icon is a group; hovering, focusing or tapping it opens a flyout with that group's pages.
-   To add a page: add a link to the right group below (and its path prefix to the group's "Match" list). *@
+@* Admin icon rail (design A - one icon per page). Rendered by Pages/Shared/_Layout.cshtml on every page under /Admin.
+   Every icon is a direct link (one click, no flyout menus). Hovering or focusing an icon shows its name tag.
+   To add a page: copy one <li> below, set its path prefixes in Under(...), its page, icon and label. *@
 @{
     var path = Context.Request.Path.Value ?? "";
     bool Under(params string[] prefixes) => prefixes.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase));
-    string Here(string prefix) => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    bool atAdminRoot = path.TrimEnd('/').Equals("/Admin", StringComparison.OrdinalIgnoreCase);
+    string Current(bool on) => on ? "is-current" : "";
+    string? Aria(bool on) => on ? "page" : null;
+    var today = Under("/Admin/Dashboard") || atAdminRoot;
+    var orders = Under("/Admin/Orders");
+    var revenue = Under("/Admin/Revenue");
+    var floors = Under("/Admin/Layouts", "/Admin/DiningAreas", "/Admin/Tables");
+    var menu = Under("/Admin/MenuItems", "/Admin/MenuCategories");
+    var website = Under("/Admin/LandingPage");
+    var reports = Under("/Admin/Reports");
+    var accounts = Under("/Admin/Accounts");
+    var settings = Under("/Admin/Settings");
 }
 
-<nav class="admin-rail" id="admin-rail" aria-label="Admin">
+<nav class="admin-rail admin-rail-direct" id="admin-rail" aria-label="Admin">
     <ul class="admin-rail-list">
 
-        @* ---- Today (admin home) ---- *@
-        <li class="admin-rail-group @(Under("/Admin/Dashboard") || path.TrimEnd('/').Equals("/Admin", StringComparison.OrdinalIgnoreCase) ? "is-current" : "")">
-            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Dashboard" aria-label="Today dashboard">
+        <li class="admin-rail-group @Current(today)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Dashboard" aria-current="@Aria(today)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                 <span class="admin-rail-label">Today</span>
             </a>
-            <div class="admin-flyout admin-flyout-tip" role="presentation">Today's dashboard</div>
+            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Today's dashboard</div>
         </li>
+
+        <li class="admin-rail-divider" aria-hidden="true"></li>
 
         @* ---- Sales ---- *@
-        <li class="admin-rail-group @(Under("/Admin/Orders", "/Admin/Revenue") ? "is-current" : "")">
-            <button type="button" class="admin-rail-btn" aria-haspopup="true" aria-expanded="false">
+        <li class="admin-rail-group @Current(orders)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Orders/Index" aria-current="@Aria(orders)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                <span class="admin-rail-label">Sales</span>
-            </button>
-            <div class="admin-flyout">
-                <div class="admin-flyout-title">Sales</div>
-                <a class="@Here("/Admin/Orders")" asp-area="" asp-page="/Admin/Orders/Index">Orders</a>
-                <a class="@Here("/Admin/Revenue")" asp-area="" asp-page="/Admin/Revenue/Index">Revenue</a>
-            </div>
+                <span class="admin-rail-label">Orders</span>
+            </a>
+            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Orders</div>
+        </li>
+        <li class="admin-rail-group @Current(revenue)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Revenue/Index" aria-current="@Aria(revenue)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <span class="admin-rail-label">Revenue</span>
+            </a>
+            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Revenue</div>
         </li>
 
-        @* ---- Restaurant (floors, areas, tables) ---- *@
-        <li class="admin-rail-group @(Under("/Admin/Layouts", "/Admin/DiningAreas", "/Admin/Tables") ? "is-current" : "")">
-            <button type="button" class="admin-rail-btn" aria-haspopup="true" aria-expanded="false">
+        <li class="admin-rail-divider" aria-hidden="true"></li>
+
+        @* ---- Restaurant ---- *@
+        <li class="admin-rail-group @Current(floors)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Layouts/Index" aria-current="@Aria(floors)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
                 <span class="admin-rail-label">Floors</span>
-            </button>
-            <div class="admin-flyout">
-                <div class="admin-flyout-title">Restaurant</div>
-                <a class="@Here("/Admin/Layouts")" asp-area="" asp-page="/Admin/Layouts/Index">Floor Layouts</a>
-                <a class="@Here("/Admin/DiningAreas")" asp-area="" asp-page="/Admin/DiningAreas/Index">Dining Areas</a>
-                <a class="@Here("/Admin/Tables")" asp-area="" asp-page="/Admin/Tables/Index">Tables</a>
-            </div>
+            </a>
+            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Floor layouts</div>
         </li>
-
-        @* ---- Menu ---- *@
-        <li class="admin-rail-group @(Under("/Admin/MenuCategories", "/Admin/MenuItems") ? "is-current" : "")">
-            <button type="button" class="admin-rail-btn" aria-haspopup="true" aria-expanded="false">
+        <li class="admin-rail-group @Current(menu)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/MenuItems/Index" aria-current="@Aria(menu)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
                 <span class="admin-rail-label">Menu</span>
-            </button>
-            <div class="admin-flyout">
-                <div class="admin-flyout-title">Menu</div>
-                <a class="@Here("/Admin/MenuItems")" asp-area="" asp-page="/Admin/MenuItems/Index">Menu Items</a>
-                <a class="@Here("/Admin/MenuCategories")" asp-area="" asp-page="/Admin/MenuCategories/Index">Menu Categories</a>
-            </div>
+            </a>
+            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Dishes &amp; categories</div>
         </li>
 
-        @* ---- Reports ---- *@
-        <li class="admin-rail-group @(Under("/Admin/Reports") ? "is-current" : "")">
-            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Reports/Index" aria-label="Reports">
+        <li class="admin-rail-group @Current(website)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/LandingPage/Index" aria-current="@Aria(website)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                <span class="admin-rail-label">Website</span>
+            </a>
+            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Customer landing page</div>
+        </li>
+
+        <li class="admin-rail-divider" aria-hidden="true"></li>
+
+        <li class="admin-rail-group @Current(reports)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Reports/Index" aria-current="@Aria(reports)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                 <span class="admin-rail-label">Reports</span>
             </a>
-            <div class="admin-flyout admin-flyout-tip" role="presentation">Reports</div>
+            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Reports</div>
         </li>
 
-        @* ---- Admin settings (pushed to the bottom) ---- *@
-        <li class="admin-rail-group admin-rail-bottom @(Under("/Admin/Accounts", "/Admin/Settings") ? "is-current" : "")">
-            <button type="button" class="admin-rail-btn" aria-haspopup="true" aria-expanded="false">
+        @* ---- Administration (pushed to the bottom) ---- *@
+        <li class="admin-rail-group admin-rail-bottom @Current(accounts)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Accounts/Index" aria-current="@Aria(accounts)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span class="admin-rail-label">Accounts</span>
+            </a>
+            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Accounts &amp; roles</div>
+        </li>
+        <li class="admin-rail-group @Current(settings)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Settings/Index" aria-current="@Aria(settings)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-                <span class="admin-rail-label">Admin</span>
-            </button>
-            <div class="admin-flyout">
-                <div class="admin-flyout-title">Administration</div>
-                <a class="@Here("/Admin/Accounts")" asp-area="" asp-page="/Admin/Accounts/Index">Accounts &amp; Roles</a>
-                <a class="@Here("/Admin/Settings")" asp-area="" asp-page="/Admin/Settings/Index">Settings</a>
-            </div>
+                <span class="admin-rail-label">Settings</span>
+            </a>
+            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Settings</div>
         </li>
     </ul>
 </nav>

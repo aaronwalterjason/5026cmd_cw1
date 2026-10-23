@@ -1,36 +1,379 @@
 @page
 @model KOMA.Pages.Admin.MenuItems.IndexModel
+@using KOMA.Pages.Admin.MenuItems
 @{
-    ViewData["Title"] = "Menu Items";
+    ViewData["Title"] = "Menu";
+    var inv = System.Globalization.CultureInfo.InvariantCulture;
+    var allRoute = Model.Route(cat: null, keepSearch: false);
+    var newCatRoute = Model.Route(mode: "new-cat", keepSearch: false);
+    var newItemRoute = Model.Route(mode: "new-item");
+    var editCatRoute = Model.Route(mode: "edit-cat", keepSearch: false);
+    var panelRoute = Model.Route(id: Model.Id);
 }
-
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1>Menu Items</h1>
-    <a class="btn btn-primary" asp-page="./Create">+ New menu item</a>
-</div>
 
 @if (TempData["StatusMessage"] is string status)
 {
-    <div class="alert alert-success">@status</div>
+    @* Green check popup - shown after a change was saved, fades out on its own. *@
+    <div class="mn-toast" id="mn-toast" role="status" aria-live="polite">
+        <span class="mn-toast-check" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        </span>
+        <span class="mn-toast-text"><strong>Changes saved</strong><span>@status</span></span>
+        <button type="button" class="mn-toast-close" aria-label="Close">&times;</button>
+    </div>
+}
+@if (TempData["StatusError"] is string error)
+{
+    <div class="alert alert-danger mn-flash" role="alert">@error</div>
 }
 
-<table class="table table-striped">
-    <thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Available</th><th>Homepage</th><th></th></tr></thead>
-    <tbody>
-    @foreach (var i in Model.Items)
-    {
-        <tr>
-            <td>@i.Name</td>
-            <td>@i.MenuCategory?.Name</td>
-            <td>RM @i.Price.ToString("N2")</td>
-            <td>@(i.IsAvailable ? "Yes" : "No")</td>
-            <td>@(i.IsRecommended ? "Recommended" : "") @(i.IsSeasonal ? "Seasonal" : "")</td>
-            <td>
-                <a class="btn btn-sm btn-outline-secondary" asp-page="./Edit" asp-route-id="@i.Id">Edit</a>
-                <a class="btn btn-sm btn-outline-danger" asp-page="./Delete" asp-route-id="@i.Id">Delete</a>
-            </td>
-        </tr>
-    }
-    </tbody>
-</table>
+<div class="mn-shell">
 
+    @* =============== LEFT: categories =============== *@
+    <aside class="mn-cats">
+        <h1 class="mb-0">Menu</h1>
+        <div class="mn-eyebrow">Categories</div>
+        <nav class="mn-cat-list" aria-label="Menu categories">
+            <a asp-page="./Index" asp-all-route-data="allRoute" class="mn-cat @(Model.Cat is null ? "is-on" : "")"
+               aria-current="@(Model.Cat is null ? "true" : null)">
+                <span>All dishes</span><span class="mn-count">@Model.AllCount</span>
+            </a>
+            @foreach (var c in Model.Categories)
+            {
+                var catRoute = Model.Route(cat: c.Id, keepSearch: false);
+                var on = Model.Cat == c.Id;
+                <a asp-page="./Index" asp-all-route-data="catRoute" class="mn-cat @(on ? "is-on" : "") @(c.IsActive ? "" : "is-hidden")"
+                   aria-current="@(on ? "true" : null)">
+                    <span>@c.Name @if (!c.IsActive) { <em>hidden</em> }</span><span class="mn-count">@c.Count</span>
+                </a>
+            }
+        </nav>
+        <a asp-page="./Index" asp-all-route-data="newCatRoute" class="mn-add-cat">+ Add category</a>
+    </aside>
+
+    @* =============== MIDDLE: dishes =============== *@
+    <section class="card mn-list" aria-labelledby="mn-list-title">
+        <div class="mn-list-head">
+            <h2 id="mn-list-title">@(Model.CurrentCategory?.Name ?? "All dishes")</h2>
+            @if (Model.CurrentCategory is not null)
+            {
+                <a asp-page="./Index" asp-all-route-data="editCatRoute" class="icon-btn" title="Edit category" aria-label="Edit category @Model.CurrentCategory.Name">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                </a>
+            }
+            <span class="mn-muted">@Model.Items.Count dish@(Model.Items.Count == 1 ? "" : "es")</span>
+            <a asp-page="./Index" asp-all-route-data="newItemRoute" class="btn btn-outline-primary btn-sm ms-auto">+ Add dish</a>
+        </div>
+
+        <form method="get" class="mn-search">
+            @if (Model.Cat.HasValue) { <input type="hidden" name="cat" value="@Model.Cat" /> }
+            <label class="visually-hidden" for="mn-q">Search dishes</label>
+            <input id="mn-q" type="search" name="q" value="@Model.Q" class="form-control"
+                   placeholder="@(Model.CurrentCategory is null ? "Search all dishes" : "Search in this category")" />
+        </form>
+
+        <div class="mn-items">
+            @foreach (var i in Model.Items)
+            {
+                var sel = Model.Panel == "item" && Model.Id == i.Id;
+                var itemRoute = Model.Route(id: i.Id);
+                var tags = new List<string>();
+                if (i.IsRecommended) tags.Add("★ Recommended");
+                if (i.IsSeasonal) tags.Add("Seasonal");
+                if (Model.Cat is null && i.MenuCategory is not null) tags.Add(i.MenuCategory.Name);
+                <div class="mn-item @(sel ? "is-selected" : "") @(i.IsAvailable ? "" : "is-off")">
+                    <a asp-page="./Index" asp-all-route-data="itemRoute" class="mn-item-link" aria-current="@(sel ? "true" : null)">
+                        @if (!string.IsNullOrEmpty(i.ImageUrl))
+                        {
+                            <img src="@i.ImageUrl" alt="" class="mn-thumb" />
+                        }
+                        else
+                        {
+                            <span class="mn-thumb" style="background:@IndexModel.Tint(i.MenuCategoryId)">@i.Name.Substring(0, 1)</span>
+                        }
+                        <span class="mn-item-main">
+                            <span class="mn-item-name">@i.Name</span>
+                            <span class="mn-item-sub">@(tags.Any() ? string.Join(" · ", tags) : i.Description)</span>
+                        </span>
+                        <span class="mn-price">RM @i.Price.ToString("N2")</span>
+                    </a>
+                    <form method="post" asp-page-handler="Toggle" asp-all-route-data="panelRoute" class="mn-toggle-form">
+                        <input type="hidden" name="itemId" value="@i.Id" />
+                        <button type="submit" class="mn-switch @(i.IsAvailable ? "is-on" : "")" role="switch" aria-checked="@(i.IsAvailable ? "true" : "false")"
+                                title="@(i.IsAvailable ? "Available - click to mark unavailable" : "Unavailable - click to make available")"
+                                aria-label="@i.Name available"><span></span></button>
+                    </form>
+                </div>
+            }
+            @if (!Model.Items.Any())
+            {
+                <p class="mn-muted m-3">@(string.IsNullOrWhiteSpace(Model.Q) ? "No dishes here yet." : "No dishes match your search.")</p>
+            }
+        </div>
+    </section>
+
+    @* =============== RIGHT: quick edit panel =============== *@
+    <section class="card mn-panel" aria-label="Edit">
+        @if (Model.Panel is "item" or "new-item")
+        {
+            var isNew = Model.Panel == "new-item";
+            var deleteRoute = Model.Route(id: Model.Item.Id);
+            <form method="post" asp-page-handler="SaveItem" asp-all-route-data="panelRoute" enctype="multipart/form-data" class="mn-form js-confirm-save" id="mn-item-form" data-kind="dish" data-new="@(isNew ? "1" : "0")" data-name="@Model.Item.Name">
+                <input type="hidden" asp-for="Item.Id" />
+                <div class="mn-photo">
+                    @if (!string.IsNullOrEmpty(Model.Item.ImageUrl))
+                    {
+                        <img src="@Model.Item.ImageUrl" alt="@Model.Item.Name" id="mn-photo-img" />
+                    }
+                    else
+                    {
+                        <span class="mn-photo-ph" id="mn-photo-ph" style="background:@IndexModel.Tint(Model.Item.MenuCategoryId)">@(string.IsNullOrEmpty(Model.Item.Name) ? "+" : Model.Item.Name.Substring(0, 1))</span>
+                        <img alt="" id="mn-photo-img" hidden />
+                    }
+                    <label class="mn-photo-btn" for="mn-photo-input">@(string.IsNullOrEmpty(Model.Item.ImageUrl) ? "Add photo" : "Change photo")</label>
+                    <input asp-for="Photo" id="mn-photo-input" data-label="Photo" type="file" accept="image/jpeg,image/png,image/webp" class="visually-hidden" />
+                </div>
+                <span asp-validation-for="Photo" class="text-danger small"></span>
+
+                <div class="mn-eyebrow">@(isNew ? "New dish" : "Quick edit")</div>
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="alert alert-danger py-2 small mb-0" role="alert">
+                        <strong>Not saved.</strong> Please fix the following:
+                        <div asp-validation-summary="All" class="mt-1"></div>
+                    </div>
+                }
+
+                <div>
+                    <label asp-for="Item.Name" class="form-label">Name</label>
+                    <input asp-for="Item.Name" class="form-control" data-label="Name" />
+                    <span asp-validation-for="Item.Name" class="text-danger small"></span>
+                </div>
+                <div class="mn-two">
+                    <div>
+                        <label asp-for="Item.Price" class="form-label">Price (RM)</label>
+                        <input asp-for="Item.Price" data-label="Price" data-money="1" type="number" step="any" min="0" inputmode="decimal" class="form-control" placeholder="e.g. 12.90"
+                               value="@(Model.Item.Price > 0 ? Model.Item.Price.ToString("0.00", inv) : "")" />
+                        <span asp-validation-for="Item.Price" class="text-danger small"></span>
+                    </div>
+                    <div>
+                        <label asp-for="Item.MenuCategoryId" class="form-label">Category</label>
+                        <select asp-for="Item.MenuCategoryId" asp-items="Model.CategoryOptions" class="form-select" data-label="Category"></select>
+                        <span asp-validation-for="Item.MenuCategoryId" class="text-danger small"></span>
+                    </div>
+                </div>
+                <div>
+                    <label asp-for="Item.Description" class="form-label">Description</label>
+                    <textarea asp-for="Item.Description" class="form-control" rows="2" data-label="Description"></textarea>
+                </div>
+
+                <div class="mn-switches">
+                    <div class="form-check form-switch">
+                        <input asp-for="Item.IsAvailable" class="form-check-input" role="switch" data-label="Available" />
+                        <label asp-for="Item.IsAvailable" class="form-check-label">Available to order</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input asp-for="Item.IsRecommended" class="form-check-input" role="switch" data-label="Recommended" />
+                        <label asp-for="Item.IsRecommended" class="form-check-label">★ Recommended on homepage</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input asp-for="Item.IsSeasonal" class="form-check-input" role="switch" data-label="Seasonal" />
+                        <label asp-for="Item.IsSeasonal" class="form-check-label">Seasonal</label>
+                    </div>
+                </div>
+            </form>
+            <div class="mn-actions">
+                <button type="submit" form="mn-item-form" class="btn btn-primary">@(isNew ? "Add dish" : "Save changes")</button>
+                @if (isNew)
+                {
+                    <a asp-page="./Index" asp-all-route-data="panelRoute" class="btn btn-outline-primary">Cancel</a>
+                }
+                else
+                {
+                    <form method="post" asp-page-handler="DeleteItem" asp-all-route-data="deleteRoute" class="ms-auto"
+                          data-confirm-title="Delete @(Model.Item.Name)?" data-confirm-text="It will be removed from the menu. This can't be undone. Past orders keep the dish's name and price." data-confirm-ok="Delete dish">
+                        <input type="hidden" name="itemId" value="@Model.Item.Id" />
+                        <button type="submit" class="btn mn-btn-danger">Delete</button>
+                    </form>
+                }
+            </div>
+        }
+        else if (Model.Panel is "edit-cat" or "new-cat")
+        {
+            var isNew = Model.Panel == "new-cat";
+            var catSaveRoute = Model.Route(keepSearch: false);
+            <form method="post" asp-page-handler="SaveCategory" asp-all-route-data="catSaveRoute" class="mn-form js-confirm-save" id="mn-cat-form" data-kind="category" data-new="@(isNew ? "1" : "0")" data-name="@Model.Category.Name">
+                <input type="hidden" asp-for="Category.Id" />
+                <div class="mn-eyebrow">@(isNew ? "New category" : "Edit category")</div>
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="alert alert-danger py-2 small mb-0" role="alert">
+                        <strong>Not saved.</strong> Please fix the following:
+                        <div asp-validation-summary="All" class="mt-1"></div>
+                    </div>
+                }
+                <div>
+                    <label asp-for="Category.Name" class="form-label">Name</label>
+                    <input asp-for="Category.Name" class="form-control" placeholder="e.g. Desserts" data-label="Name" />
+                    <span asp-validation-for="Category.Name" class="text-danger small"></span>
+                </div>
+                <div>
+                    <label asp-for="Category.Description" class="form-label">Description</label>
+                    <textarea asp-for="Category.Description" class="form-control" rows="3" data-label="Description"></textarea>
+                    <span asp-validation-for="Category.Description" class="text-danger small"></span>
+                </div>
+                <div class="mn-switches">
+                    <div class="form-check form-switch">
+                        <input asp-for="Category.IsActive" class="form-check-input" role="switch" data-label="Shown to customers" />
+                        <label asp-for="Category.IsActive" class="form-check-label">Show this category to customers</label>
+                    </div>
+                </div>
+                @if (!isNew)
+                {
+                    var count = Model.Categories.FirstOrDefault(c => c.Id == Model.Category.Id)?.Count ?? 0;
+                    <p class="mn-muted small mb-0">@count dish@(count == 1 ? "" : "es") in this category.@(count > 0 ? " A category can only be deleted once it is empty." : "")</p>
+                }
+            </form>
+            <div class="mn-actions">
+                <button type="submit" form="mn-cat-form" class="btn btn-primary">@(isNew ? "Create category" : "Save category")</button>
+                <a asp-page="./Index" asp-all-route-data="panelRoute" class="btn btn-outline-primary">Cancel</a>
+                @if (!isNew)
+                {
+                    <form method="post" asp-page-handler="DeleteCategory" class="ms-auto"
+                          data-confirm-title="Delete @(Model.Category.Name)?" data-confirm-text="This can't be undone. A category can only be deleted once it has no dishes." data-confirm-ok="Delete category">
+                        <input type="hidden" name="categoryId" value="@Model.Category.Id" />
+                        <button type="submit" class="btn mn-btn-danger">Delete</button>
+                    </form>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="mn-empty">
+                <p class="mb-2">No dishes here yet.</p>
+                <a asp-page="./Index" asp-all-route-data="newItemRoute" class="btn btn-primary">+ Add a dish</a>
+            </div>
+        }
+    </section>
+</div>
+
+@* Confirmation popup (native <dialog>: Esc or Cancel closes it). Filled in by the script below. *@
+<dialog class="mn-dialog" id="mn-confirm" aria-labelledby="mn-confirm-title">
+    <div class="mn-dialog-body">
+        <div class="mn-eyebrow" id="mn-confirm-eyebrow">Confirm changes</div>
+        <h2 id="mn-confirm-title">Save changes?</h2>
+        <p id="mn-confirm-text" class="mn-muted mb-0"></p>
+        <ul id="mn-confirm-list" class="mn-changes"></ul>
+    </div>
+    <div class="mn-dialog-actions">
+        <button type="button" class="btn btn-outline-primary" id="mn-confirm-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="mn-confirm-ok">Confirm</button>
+    </div>
+</dialog>
+
+@section Scripts {
+    <script>
+        // ---------- Confirmation popup ----------
+        (() => {
+            const dlg = document.getElementById('mn-confirm');
+            if (!dlg) return;
+            const $ = id => document.getElementById(id);
+            const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            let pending = null;
+
+            // Readable value of one field ("On"/"Off", "RM 12.90", the chosen category name, ...).
+            const valueOf = el => {
+                if (el.type === 'checkbox') return el.checked ? 'On' : 'Off';
+                if (el.type === 'file') return el.files && el.files[0] ? el.files[0].name : '';
+                if (el.tagName === 'SELECT') return el.options[el.selectedIndex]?.text ?? '';
+                if (el.dataset.money) { const n = parseFloat(String(el.value).replace(',', '.')); return isNaN(n) ? '' : 'RM ' + n.toFixed(2); }
+                return el.value.trim();
+            };
+            const fields = form => [...form.querySelectorAll('[data-label]')];
+            const snapshot = form => new Map(fields(form).map(el => [el, valueOf(el)]));
+
+            const open = ({ eyebrow, title, text, rows, ok, danger, onOk }) => {
+                $('mn-confirm-eyebrow').textContent = eyebrow;
+                $('mn-confirm-title').textContent = title;
+                $('mn-confirm-text').textContent = text || '';
+                $('mn-confirm-list').innerHTML = (rows || []).join('');
+                $('mn-confirm-list').hidden = !rows || !rows.length;
+                const okBtn = $('mn-confirm-ok');
+                okBtn.hidden = !onOk;
+                okBtn.textContent = ok || 'Confirm';
+                okBtn.className = 'btn ' + (danger ? 'mn-btn-danger-solid' : 'btn-primary');
+                $('mn-confirm-cancel').textContent = onOk ? 'Cancel' : 'OK';
+                pending = onOk;
+                dlg.showModal();
+                (onOk ? okBtn : $('mn-confirm-cancel')).focus();
+            };
+            $('mn-confirm-cancel').addEventListener('click', () => dlg.close());
+            $('mn-confirm-ok').addEventListener('click', () => { const go = pending; pending = null; dlg.close(); go && go(); });
+            dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });   // click outside closes
+
+            // Save forms: list exactly what changed before saving.
+            document.querySelectorAll('form.js-confirm-save').forEach(form => {
+                const before = snapshot(form);
+                form.addEventListener('submit', e => {
+                    e.preventDefault();
+                    const isNew = form.dataset.new === '1', kind = form.dataset.kind;
+                    const rows = [];
+                    fields(form).forEach(el => {
+                        const was = before.get(el), now = valueOf(el);
+                        if (isNew) { if (now && now !== 'Off') rows.push(`<li><span>${esc(el.dataset.label)}</span><strong>${esc(now)}</strong></li>`); }
+                        else if (was !== now) rows.push(`<li><span>${esc(el.dataset.label)}</span><s>${esc(was || '(empty)')}</s><b aria-hidden="true">→</b><strong>${esc(now || '(empty)')}</strong></li>`);
+                    });
+                    const name = valueOf(form.querySelector('[data-label="Name"]')) || form.dataset.name;
+                    if (!isNew && !rows.length) {
+                        open({ eyebrow: 'Nothing to save', title: 'No changes yet', text: `You haven't changed anything on ${form.dataset.name}.` });
+                        return;
+                    }
+                    open({
+                        eyebrow: isNew ? `New ${kind}` : 'Confirm changes',
+                        title: isNew ? `Add ${name || 'this ' + kind}?` : `Save ${rows.length} change${rows.length === 1 ? '' : 's'} to ${form.dataset.name}?`,
+                        rows,
+                        ok: isNew ? `Add ${kind}` : 'Save changes',
+                        onOk: () => HTMLFormElement.prototype.submit.call(form)   // real submit, skips this check
+                    });
+                });
+            });
+
+            // Delete forms: same popup, red button.
+            document.querySelectorAll('form[data-confirm-title]').forEach(form => {
+                form.addEventListener('submit', e => {
+                    e.preventDefault();
+                    open({ eyebrow: 'Please confirm', title: form.dataset.confirmTitle, text: form.dataset.confirmText,
+                           ok: form.dataset.confirmOk, danger: true, onOk: () => HTMLFormElement.prototype.submit.call(form) });
+                });
+            });
+        })();
+
+        // ---------- Green "saved" popup ----------
+        (() => {
+            const toast = document.getElementById('mn-toast');
+            if (!toast) return;
+            const hide = () => { toast.classList.add('is-leaving'); setTimeout(() => toast.remove(), 300); };
+            toast.querySelector('.mn-toast-close').addEventListener('click', hide);
+            setTimeout(hide, 3200);
+        })();
+
+        // Show the chosen photo straight away, before saving.
+        document.getElementById('mn-photo-input')?.addEventListener('change', e => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const img = document.getElementById('mn-photo-img');
+            img.src = URL.createObjectURL(file);
+            img.hidden = false;
+            document.getElementById('mn-photo-ph')?.remove();
+        });
+        // Search as you type (after a short pause).
+        (() => {
+            const q = document.getElementById('mn-q');
+            if (!q) return;
+            let t;
+            q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => q.form.submit(), 450); });
+            if (q.value) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+        })();
+        document.querySelector('.mn-item.is-selected')?.scrollIntoView({ block: 'nearest' });
+    </script>
+}
