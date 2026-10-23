@@ -41,7 +41,7 @@ public class PreOrderModel(ApplicationDbContext context) : PageModel
     {
         if (await LoadAsync() == null) return NotFound();
         if (ExistingOrder != null)
-            Quantities = ExistingOrder.Items.ToDictionary(i => i.MenuItemId, i => i.Quantity);
+            Quantities = ExistingOrder.Items.Where(i => i.MenuItemId.HasValue).ToDictionary(i => i.MenuItemId!.Value, i => i.Quantity);
         return Page();
     }
 
@@ -85,7 +85,7 @@ public class PreOrderModel(ApplicationDbContext context) : PageModel
             foreach (var choice in selected)
             {
                 var item = Menu.Single(m => m.Id == choice.Key);
-                order.Items.Add(new OrderItem { MenuItemId = item.Id, Quantity = choice.Value, UnitPrice = item.Price });
+                order.Items.Add(new OrderItem { MenuItemId = item.Id, ItemName = item.Name, Quantity = choice.Value, UnitPrice = item.Price });
             }
             order.TotalAmount = order.Items.Sum(i => i.UnitPrice * i.Quantity);
             await context.SaveChangesAsync();

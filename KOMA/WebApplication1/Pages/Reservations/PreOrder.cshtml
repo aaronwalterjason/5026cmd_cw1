@@ -15,7 +15,7 @@
     {
         <details class="po-saved" open="@(!Model.CanEdit)">
             <summary>Saved pre-order · @Model.ExistingOrder.Status.DisplayName() · RM @Model.ExistingOrder.TotalAmount.ToString("N2")</summary>
-            <ul>@foreach (var item in Model.ExistingOrder.Items) { <li>@item.Quantity × @item.MenuItem?.Name <strong>RM @item.LineTotal.ToString("N2")</strong></li> }</ul>
+            <ul>@foreach (var item in Model.ExistingOrder.Items) { <li>@item.Quantity × @item.DishName <strong>RM @item.LineTotal.ToString("N2")</strong></li> }</ul>
             @if (Model.CanEdit) { <p>Your saved order stays unchanged until you confirm your new selection.</p> }
         </details>
     }

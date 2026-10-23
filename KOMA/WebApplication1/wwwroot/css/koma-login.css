@@ -363,3 +363,8 @@ body:has(.koma-login) {
         margin-bottom: 24px;
     }
 }
+
+/* Keep login and registration banner headings cream. */
+.koma-login .koma-login-brand h1 {
+    color: #f4f1e9;
+}

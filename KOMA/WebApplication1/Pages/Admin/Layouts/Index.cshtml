@@ -32,10 +32,24 @@
 {
     var tables = f.DiningAreas.SelectMany(a => a.Tables).ToList();
     <div class="col-md-6">
-        <div class="card h-100">
+        <div class="card h-100 lay-card">
+            @* Three-dot options menu (top-left of the card) - Bootstrap dropdown. *@
+            <div class="dropdown lay-card-menu">
+                <button type="button" class="lay-dots" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Options for @f.Name">
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" asp-page="./Designer" asp-route-id="@f.Id">Open layout</a></li>
+                    <li><a class="dropdown-item" asp-page="./Edit" asp-route-id="@f.Id">Edit floor</a></li>
+                    <li><hr class="dropdown-divider" /></li>
+                    <li><a class="dropdown-item lay-menu-danger" asp-page="./Delete" asp-route-id="@f.Id">Delete</a></li>
+                </ul>
+            </div>
             <a asp-page="./Designer" asp-route-id="@f.Id" class="d-block p-3 pb-0" title="Open the @f.Name layout">
-                @* Small read-only preview of the floor, drawn with percentages so it scales to the card. *@
-                <div class="lay-preview" style="aspect-ratio:@f.Width / @f.Height" data-floor-w="@f.Width" data-floor-h="@f.Height">
+                @* Small read-only preview of the floor, drawn with percentages so it scales to the card.
+                   Its width is limited so that, when the 260px height cap applies, it keeps the floor's real
+                   proportions (narrower and centred) instead of being stretched to the full card width. *@
+                <div class="lay-preview lay-preview-true" style="aspect-ratio:@f.Width / @f.Height;width:min(100%, calc(260px * @f.Width / @f.Height))" data-floor-w="@f.Width" data-floor-h="@f.Height">
                     @foreach (var a in f.DiningAreas)
                     {
                         <div class="lay-preview-area @IndexModel.ZoneClass(a.Zone)"
@@ -59,9 +73,6 @@
                     @f.DiningAreas.Count dining area(s) · @tables.Count table(s) · @tables.Sum(t => t.Capacity) seats
                     @if (!string.IsNullOrWhiteSpace(f.Description)) { <br />@f.Description }
                 </p>
-                <a class="btn btn-sm btn-primary" asp-page="./Designer" asp-route-id="@f.Id">Open layout</a>
-                <a class="btn btn-sm btn-outline-secondary" asp-page="./Edit" asp-route-id="@f.Id">Edit floor</a>
-                <a class="btn btn-sm btn-outline-danger" asp-page="./Delete" asp-route-id="@f.Id">Delete</a>
             </div>
         </div>
     </div>

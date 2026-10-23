@@ -15,6 +15,7 @@ public class IndexModel(ApplicationDbContext context) : PageModel
     [BindProperty(SupportsGet = true)] public TimeOnly? Time { get; set; }
     public IReadOnlyList<TimeOnly> Slots { get; set; } = [];
     public List<RestaurantTable> Tables { get; set; } = [];
+    public List<FloorLayout> Floors { get; set; } = [];
     public List<KOMA.Models.Reservation> Bookings { get; set; } = [];
     public bool ValidSlot { get; set; }
     public bool FutureSlot { get; set; }
@@ -31,6 +32,13 @@ public class IndexModel(ApplicationDbContext context) : PageModel
         var start = Date.Value.ToDateTime(Time!.Value);
         var end = start.AddMinutes(ReservationRules.SlotMinutes);
         FutureSlot = start > ReservationRules.MalaysiaNow;
+        Floors = await context.FloorLayouts
+            .AsNoTracking()
+            .Include(f => f.DiningAreas)
+                .ThenInclude(a => a.Tables)
+            .OrderBy(f => f.Level)
+            .ThenBy(f => f.Name)
+            .ToListAsync();
         Tables = await context.RestaurantTables.AsNoTracking().Include(t => t.DiningArea).ThenInclude(a => a!.FloorLayout)
             .Where(t => t.IsActive && t.DiningArea!.IsActive).OrderBy(t => t.DiningAreaId).ThenBy(t => t.TableNumber).ToListAsync();
         // Include inactive tables' reservations in the list to preserve access to their bookings.

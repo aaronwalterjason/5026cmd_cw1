@@ -74,7 +74,7 @@ else
             {
                 <div class="ord-item">
                     <span class="ord-qty">×@i.Quantity</span>
-                    <span>@(i.MenuItem?.Name ?? "(removed item)")</span>
+                    <span>@i.DishName</span>
                     <span class="ord-unit">RM @i.UnitPrice.ToString("N2")</span>
                     <span class="ord-line">RM @i.LineTotal.ToString("N2")</span>
                 </div>

@@ -1,22 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using KOMA.Data;
-using KOMA.Models;
 
 namespace KOMA.Pages.Admin.MenuCategories
 {
+    // Categories are now managed on the Menu page (/Admin/MenuItems) - left column + "Edit category" panel.
     [Authorize(Roles = "Administrator")]
     public class IndexModel : PageModel
     {
-        private readonly ApplicationDbContext _db;
-        public IndexModel(ApplicationDbContext db) => _db = db;
-
-        public IList<MenuCategory> Categories { get; set; } = new List<MenuCategory>();
-
-        public async Task OnGetAsync()
-        {
-            Categories = await _db.MenuCategories.OrderBy(c => c.Name).ToListAsync();
-        }
+        public IActionResult OnGet() => RedirectToPage("/Admin/MenuItems/Index");
     }
 }
