@@ -29,6 +29,10 @@ namespace KOMA.Models
 
         public int? RestaurantTableId { get; set; }
         public RestaurantTable? RestaurantTable { get; set; }
+        // Links this order to a specific customer visit at the table.
+        public int? TableServiceSessionId { get; set; }
+
+        public TableServiceSession? TableServiceSession { get; set; }
 
         [Display(Name = "Ordered at")]
         public DateTime OrderedAt { get; set; } = DateTime.Now;
