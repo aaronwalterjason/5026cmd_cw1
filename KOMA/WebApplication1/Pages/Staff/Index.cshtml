@@ -10,12 +10,11 @@
       asp-append-version="true" />
 
 <div class="staff-workspace">
-
     <header class="staff-page-header">
         <div>
             <h1>Staff Dashboard</h1>
             <p class="text-muted">
-                Manage reservations and help guests prepare for their visit.
+                Manage table service and kitchen preparation.
             </p>
         </div>
 
@@ -33,76 +32,34 @@
 
         <a asp-page="/Staff/Reservation/Index"
            class="btn btn-outline-secondary btn-sm">
-            Table availability
+            Table service
         </a>
 
-        <a asp-page="/Staff/Reservation/Manage"
+        <a asp-page="/Staff/Orders/Kitchen"
            class="btn btn-outline-secondary btn-sm">
-            Manage bookings
+            Kitchen queue
         </a>
     </nav>
 
     <div class="staff-action-grid">
-
         <section class="card p-3 staff-action-card"
-                 aria-labelledby="availability-title">
+                 aria-labelledby="table-service-title">
 
-            <span class="h6 mb-0">Restaurant floor</span>
+            <span class="h6 mb-0">Floor staff</span>
 
-            <h2 id="availability-title" class="h4">
-                Tables &amp; availability
+            <h2 id="table-service-title" class="h4">
+                Table service
             </h2>
 
             <p class="text-muted">
-                View the restaurant layout, check availability for a date
-                and time, and select a table to create a reservation.
+                Check table availability, manage bookings and walk-ins,
+                review customer orders, confirm orders for the kitchen,
+                and mark ready orders served.
             </p>
 
             <a asp-page="/Staff/Reservation/Index"
                class="btn btn-primary">
-                View tables &amp; availability
-                <span aria-hidden="true">↗</span>
-            </a>
-        </section>
-
-        <section class="card p-3 staff-action-card"
-                 aria-labelledby="bookings-title">
-
-            <span class="h6 mb-0">Guest bookings</span>
-
-            <h2 id="bookings-title" class="h4">
-                Manage bookings
-            </h2>
-
-            <p class="text-muted">
-                Search guest reservations, review booking details,
-                and edit, confirm or cancel upcoming bookings.
-            </p>
-
-            <a asp-page="/Staff/Reservation/Manage"
-               class="btn btn-primary">
-                Manage bookings
-                <span aria-hidden="true">↗</span>
-            </a>
-        </section>
-
-        <section class="card p-3 staff-action-card"
-         aria-labelledby="orders-title">
-
-            <span class="h6 mb-0">Food orders</span>
-
-            <h2 id="orders-title" class="h4">
-                Customer orders
-            </h2>
-
-            <p class="text-muted">
-                Review items and notes, confirm orders for the kitchen,
-                and mark ready orders served.
-            </p>
-
-            <a asp-page="/Staff/Orders/Index"
-               class="btn btn-primary">
-                Customer orders
+                Open table service
                 <span aria-hidden="true">↗</span>
             </a>
         </section>
@@ -110,23 +67,22 @@
         <section class="card p-3 staff-action-card"
                  aria-labelledby="kitchen-title">
 
-            <span class="h6 mb-0">Preparation</span>
+            <span class="h6 mb-0">Kitchen staff</span>
 
             <h2 id="kitchen-title" class="h4">
                 Kitchen queue
             </h2>
 
             <p class="text-muted">
-                View confirmed orders, start preparation
-                and mark dishes ready for serving.
+                View confirmed customer orders, start preparation,
+                and mark orders ready for serving.
             </p>
 
             <a asp-page="/Staff/Orders/Kitchen"
                class="btn btn-primary">
-                Kitchen queue
+                Open kitchen queue
                 <span aria-hidden="true">↗</span>
             </a>
         </section>
-
     </div>
 </div>
