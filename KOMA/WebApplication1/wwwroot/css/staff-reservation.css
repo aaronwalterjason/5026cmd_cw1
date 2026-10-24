@@ -448,3 +448,127 @@ body:has(.staff-reservations) {
             font-size: 1.5rem;
         }
 }
+
+/* Table-service popup and clickable floor tables */
+
+.staff-reservations .reservation-map-table {
+    cursor: pointer;
+}
+
+    .staff-reservations .reservation-map-table:hover,
+    .staff-reservations .reservation-map-table:focus-visible {
+        outline: 3px solid #263b49;
+        outline-offset: 2px;
+        z-index: 4;
+    }
+
+#table-modal .modal-content {
+    color: #263b49;
+    background: #fffdf8;
+    border: 1px solid #d5d5c9;
+    border-radius: 18px;
+}
+
+#table-modal .modal-header {
+    border-bottom: 1px solid #d5d5c9;
+}
+
+#table-modal .modal-title {
+    margin: 0;
+    font-family: Georgia, serif;
+}
+
+#table-modal .table-panel-context {
+    position: sticky;
+    top: -1rem;
+    z-index: 3;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #f4f1e9;
+    border-bottom: 1px solid #d5d5c9;
+    overflow-wrap: anywhere;
+}
+
+    #table-modal .table-panel-context strong {
+        display: block;
+        font-size: 1.1rem;
+    }
+
+    #table-modal .table-panel-context div {
+        margin-top: 0.3rem;
+    }
+
+#table-modal .panel-message:empty {
+    display: none;
+}
+
+#table-modal details summary {
+    cursor: pointer;
+    font-weight: 600;
+    padding: 0.5rem 0;
+}
+
+#table-modal .nav-tabs {
+    flex-wrap: nowrap;
+    border-bottom-color: #d5d5c9;
+}
+
+    #table-modal .nav-tabs .nav-link {
+        color: #263b49;
+        white-space: normal;
+    }
+
+        #table-modal .nav-tabs .nav-link.active {
+            color: #263b49;
+            background: #f4f1e9;
+            border-color: #d5d5c9 #d5d5c9 #f4f1e9;
+            font-weight: 700;
+        }
+
+#table-modal .table-panel-context + .panel-message {
+    margin-top: 0.5rem;
+}
+
+#table-modal input[type="checkbox"] {
+    accent-color: #263b49;
+}
+
+#table-modal .card {
+    box-shadow: none;
+}
+
+/* Tablet */
+@media (min-width: 576px) and (max-width: 991px) {
+    #table-modal .modal-dialog {
+        max-width: calc(100% - 2rem);
+        margin: 1rem auto;
+    }
+}
+
+/* Mobile */
+@media (max-width: 575px) {
+    #table-modal .modal-content {
+        border-radius: 0;
+    }
+
+    #table-modal .modal-body {
+        padding: 0.75rem;
+    }
+
+    #table-modal .table-panel-context {
+        top: -0.75rem;
+        padding: 0.75rem;
+    }
+
+    #table-modal .btn {
+        white-space: normal;
+    }
+
+    #table-modal .nav-item {
+        flex: 1;
+    }
+
+    #table-modal .nav-link {
+        width: 100%;
+    }
+}

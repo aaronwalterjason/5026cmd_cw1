@@ -9,40 +9,134 @@ using Microsoft.EntityFrameworkCore;
 namespace KOMA.Pages.Staff.Reservations;
 
 [Authorize(Roles = "Staff,Administrator")]
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class IndexModel(ApplicationDbContext context) : PageModel
 {
-    [BindProperty(SupportsGet = true)] public DateOnly? Date { get; set; }
-    [BindProperty(SupportsGet = true)] public TimeOnly? Time { get; set; }
-    public IReadOnlyList<TimeOnly> Slots { get; set; } = [];
-    public List<RestaurantTable> Tables { get; set; } = [];
-    public List<FloorLayout> Floors { get; set; } = [];
-    public List<KOMA.Models.Reservation> Bookings { get; set; } = [];
-    public bool ValidSlot { get; set; }
-    public bool FutureSlot { get; set; }
+    [BindProperty(SupportsGet = true)]
+    public DateOnly? Date { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public TimeOnly? Time { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public bool Now { get; set; }
+
+    public TableSelection? Selection { get; private set; }
+
+    public IReadOnlyList<TimeOnly> Slots { get; private set; } = [];
+
+    public List<FloorLayout> Floors { get; private set; } = [];
+
+    public List<KOMA.Models.Reservation> Bookings { get; private set; } = [];
+
+    public List<TableServiceSession> WalkIns { get; private set; } = [];
+
+    public bool ValidSlot => Selection != null;
+
+    public bool FutureSlot => Selection?.CanCreate == true;
+
+    public object PanelContext => new
+    {
+        Date = Date?.ToString("yyyy-MM-dd"),
+        Time = Time?.ToString("HH:mm"),
+        At = Now ? Selection?.Start.ToString("s") : null
+    };
 
     public async Task OnGetAsync()
     {
-        Date ??= DateOnly.FromDateTime(ReservationRules.MalaysiaNow);
-        var settings = await context.RestaurantSettings.AsNoTracking().FirstOrDefaultAsync();
-        if (settings != null) Slots = ReservationRules.Slots(settings);
-        Time ??= Slots.Cast<TimeOnly?>().FirstOrDefault(t => Date.Value.ToDateTime(t!.Value) > ReservationRules.MalaysiaNow)
-            ?? Slots.Cast<TimeOnly?>().FirstOrDefault();
-        ValidSlot = ModelState.IsValid && Date != DateOnly.MaxValue && Time.HasValue && Slots.Contains(Time.Value);
-        if (!ValidSlot) { ModelState.AddModelError("", "Choose a valid date and an available opening-hours slot."); return; }
-        var start = Date.Value.ToDateTime(Time!.Value);
-        var end = start.AddMinutes(ReservationRules.SlotMinutes);
-        FutureSlot = start > ReservationRules.MalaysiaNow;
+        if (!ModelState.IsValid)
+            return;
+
+        var now = ReservationRules.MalaysiaNow;
+
+        var settings = await context.RestaurantSettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
+
+        Slots = settings == null
+            ? []
+            : ReservationRules.Slots(settings);
+
+        if (Now)
+        {
+            Date = DateOnly.FromDateTime(now);
+
+            Time = Slots
+                .Select(slot => (TimeOnly?)slot)
+                .FirstOrDefault(slot =>
+                    Date.Value.ToDateTime(slot!.Value) <= now &&
+                    Date.Value.ToDateTime(slot.Value)
+                        .AddMinutes(ReservationRules.SlotMinutes) > now);
+
+            // Let the controls display the current selection.
+            ModelState.Remove(nameof(Date));
+            ModelState.Remove(nameof(Time));
+        }
+
+        Date ??= DateOnly.FromDateTime(now);
+
+        Time ??= Slots
+            .Select(slot => (TimeOnly?)slot)
+            .FirstOrDefault(slot =>
+                Date.Value.ToDateTime(slot!.Value) > now)
+            ?? Slots.Select(slot => (TimeOnly?)slot).FirstOrDefault();
+
+        Selection = TableSelection.Resolve(
+            settings,
+            Date,
+            Time,
+            Now ? now : null);
+
+        if (Selection == null)
+        {
+            ModelState.AddModelError(
+                "",
+                "Choose a valid date and opening-hours slot.");
+
+            return;
+        }
+
         Floors = await context.FloorLayouts
             .AsNoTracking()
             .Include(f => f.DiningAreas)
-                .ThenInclude(a => a.Tables)
+            .ThenInclude(a => a.Tables)
             .OrderBy(f => f.Level)
             .ThenBy(f => f.Name)
             .ToListAsync();
-        Tables = await context.RestaurantTables.AsNoTracking().Include(t => t.DiningArea).ThenInclude(a => a!.FloorLayout)
-            .Where(t => t.IsActive && t.DiningArea!.IsActive).OrderBy(t => t.DiningAreaId).ThenBy(t => t.TableNumber).ToListAsync();
-        // Include inactive tables' reservations in the list to preserve access to their bookings.
-        Bookings = await context.Reservations.AsNoTracking().Include(r => r.RestaurantTable)
-            .Where(r => r.StartTime < end && r.EndTime > start).OrderBy(r => r.StartTime).ThenBy(r => r.Id).ToListAsync();
+
+        var start = Selection.Start;
+        var end = Selection.End;
+
+        Bookings = await context.Reservations
+            .AsNoTracking()
+            .Where(r =>
+                r.Status != ReservationStatus.Cancelled &&
+                (Now
+                    ? r.StartTime <= start && r.EndTime > start
+                    : r.StartTime < end && r.EndTime > start))
+            .OrderBy(r => r.StartTime)
+            .ToListAsync();
+
+        WalkIns = await context.TableServiceSessions
+            .AsNoTracking()
+            .Where(s =>
+                s.ReservationId == null &&
+                (Now
+                    ? s.StartTime <= start && s.EndTime > start
+                    : s.StartTime < end && s.EndTime > start))
+            .ToListAsync();
+    }
+
+    public async Task<IActionResult> OnGetFloorAsync()
+    {
+        await OnGetAsync();
+
+        if (!ValidSlot)
+        {
+            return BadRequest(
+                "The selected time is no longer valid. Choose a slot again.");
+        }
+
+        return Partial("_ReservationFloor", this);
     }
 }

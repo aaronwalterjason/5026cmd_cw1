@@ -1,102 +1,111 @@
 ﻿@page
 @model KOMA.Pages.Staff.Reservations.IndexModel
-@using KOMA.Models
-@{ ViewData["Title"] = "Reservations"; }
-<link rel="stylesheet" href="~/css/staff-reservation.css" asp-append-version="true" />
 
-<div class="staff-reservations">
-<!-- Reservation Header -->
-<div class="d-flex justify-content-between flex-wrap gap-2 align-items-center mb-4">
-    <div><h1>Reservations</h1><p class="text-muted mb-0">Select a date and one-hour slot. All times are Malaysia time.</p></div>
-    <div class="d-flex gap-2">
-    <a asp-page="Manage" class="btn btn-primary">
-        Manage reservations
-    </a>
-
-    <a asp-page="/Staff/Index" class="btn btn-outline-secondary">
-        Staff Dashboard
-    </a>
-</div>
-</div>
-<form method="get" class="card card-body mb-4">
-    <div class="row g-3 align-items-end">
-        <div class="col-sm-4"><label asp-for="Date" class="form-label"></label><input asp-for="Date" type="date" class="form-control" required /></div>
-        <div class="col-sm-4"><label asp-for="Time" class="form-label">Time slot</label><select asp-for="Time" class="form-select">
-            @foreach (var slot in Model.Slots) { <option value="@slot.ToString("HH:mm")">@slot.ToString("HH:mm") – @slot.AddHours(1).ToString("HH:mm")</option> }
-        </select></div>
-        <div class="col-sm-4"><button class="btn btn-primary" type="submit">Show availability</button></div>
-    </div>
-</form>
-<div asp-validation-summary="All" class="text-danger" role="alert"></div>
-@if (Model.ValidSlot)
-{
-    <p><span class="text-success fw-bold">✓ Available</span> · <span class="text-danger fw-bold">− Booked</span> · Pending bookings also hold a table.</p>
-    <p class="text-muted">
-        Layout saved by the administrator.
-        Availability is for the selected date and time.
-        Refresh availability before taking a booking.
-        Grey tables are closed.
-    </p>
-    @if (!Model.FutureSlot) { <div class="alert alert-info">You are viewing a past or started slot. New reservations are disabled.</div> }
-    @if (!Model.Tables.Any()) { <div class="alert alert-info">No active tables are available. Ask the administrator to configure dining areas and tables.</div> }
-    <partial name="_ReservationFloor" model="Model" />
-    <!-- Reservation List -->
-    <h2 class="h4 mt-4">Bookings for this slot</h2>
-    @if (!Model.Bookings.Any()) { <p class="text-muted">No reservations for the selected slot.</p> }
-    else
-    {
-        <div class="table-responsive"><table class="table table-bordered table-hover align-middle">
-            <thead class="table-light"><tr><th>Reference</th><th>Table</th><th>Customer</th><th>Guests</th><th>Status</th><th>Action</th></tr></thead>
-            <tbody>@foreach (var booking in Model.Bookings) { <tr><td>R-@booking.Id.ToString("D5")</td><td>@booking.RestaurantTable.TableNumber</td><td>@booking.CustomerName</td><td>@booking.GuestCount</td><td>@booking.Status</td><td><a asp-page="Details" asp-route-id="@booking.Id">View details</a></td></tr> }</tbody>
-        </table></div>
-    }
+@{
+    ViewData["Title"] = "Table service";
 }
+
+<link rel="stylesheet"
+      href="~/css/staff-reservation.css"
+      asp-append-version="true" />
+
+<div class="staff-reservations" id="table-workspace">
+    <header class="d-flex justify-content-between flex-wrap gap-2 align-items-center mb-4">
+        <div>
+            <h1>Table service</h1>
+            <p class="text-muted">
+                Select a table to manage its booking and food orders.
+                All times are Malaysia time.
+            </p>
+        </div>
+
+        <a asp-page="/Staff/Index" class="btn btn-outline-secondary">
+            Staff Dashboard
+        </a>
+    </header>
+
+    <form method="get"
+          id="slot-form"
+          class="card card-body mb-4">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label asp-for="Date" class="form-label"></label>
+                <input asp-for="Date"
+                       type="date"
+                       class="form-control"
+                       required />
+            </div>
+
+            <div class="col-md-4">
+                <label asp-for="Time" class="form-label">Time slot</label>
+                <select asp-for="Time" class="form-select">
+                    @foreach (var slot in Model.Slots)
+                    {
+                        <option value="@slot.ToString("HH:mm")">
+                            @slot.ToString("HH:mm") –
+                            @slot.AddHours(1).ToString("HH:mm")
+                        </option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-md-4 d-flex flex-wrap gap-2">
+                <button class="btn btn-primary" type="submit">
+                    Show availability
+                </button>
+
+                <a asp-page="Index"
+                   asp-route-Now="true"
+                   class="btn btn-outline-secondary">
+                    Now
+                </a>
+            </div>
+        </div>
+    </form>
+
+    <div asp-validation-summary="All"
+         class="text-danger"
+         role="alert"></div>
+
+    <p id="workspace-error"
+       class="text-danger"
+       role="alert"></p>
+
+    <div id="floor-host">
+        @if (Model.ValidSlot)
+        {
+            <partial name="_ReservationFloor" model="Model" />
+        }
+    </div>
+
+    <div class="modal fade"
+         id="table-modal"
+         tabindex="-1"
+         aria-labelledby="table-modal-title"
+         aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h4" id="table-modal-title">
+                        Table details
+                    </h2>
+
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body" id="table-modal-body"></div>
+            </div>
+        </div>
+    </div>
 </div>
 
 @section Scripts {
     <script src="~/js/layout-chairs.js"
             asp-append-version="true"></script>
 
-    <script>
-        (() => {
-            document.querySelectorAll('.reservation-map').forEach(box => {
-                const floorWidth = Number(box.dataset.floorW);
-                const floorHeight = Number(box.dataset.floorH);
-
-                box.querySelectorAll('.reservation-map-table').forEach(table => {
-                    const dimensions = {
-                        x: Number(table.dataset.x),
-                        y: Number(table.dataset.y),
-                        w: Number(table.dataset.w),
-                        h: Number(table.dataset.h),
-                        shape: table.dataset.shape,
-                        capacity: Number(table.dataset.capacity)
-                    };
-
-                    KomaChairs.positions(dimensions).forEach(chair => {
-                        const element = document.createElement('div');
-
-                        element.className = 'lay-preview-chair' +
-                            (chair.kind === 'bench' ? ' is-bench' : '');
-
-                        element.setAttribute('aria-hidden', 'true');
-
-                        element.style.left =
-                            (chair.x / floorWidth * 100) + '%';
-
-                        element.style.top =
-                            (chair.y / floorHeight * 100) + '%';
-
-                        element.style.width =
-                            (chair.w / floorWidth * 100) + '%';
-
-                        element.style.height =
-                            (chair.h / floorHeight * 100) + '%';
-
-                        box.insertBefore(element, table);
-                    });
-                });
-            });
-        })();
-    </script>
+    <script src="~/js/staff-table-popup.js"
+            asp-append-version="true"></script>
 }
