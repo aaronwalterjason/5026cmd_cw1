@@ -371,7 +371,7 @@
                                 @foreach (var item in order.Items)
                                 {
                                     <tr>
-                                        <td>@(item.MenuItem?.Name ?? "Removed item")</td>
+                                        <td>@item.DishName</td>
                                         <td>@item.Quantity</td>
                                         <td>@item.LineTotal.ToString("N2")</td>
                                     </tr>
@@ -387,7 +387,9 @@
                         <p style="white-space:pre-wrap"><strong>Notes:</strong> @order.Notes</p>
                     }
 
-                    @if (order.Status is OrderStatus.Pending or OrderStatus.ReadyToServe)
+                    @if (order.Status is OrderStatus.Pending
+                        or OrderStatus.AwaitingArrival
+                        or OrderStatus.ReadyToServe)
                     {
                         <form method="post"
                               action="@Url.Page("TablePanel", "Order", Model.Route)">
@@ -396,11 +398,33 @@
                             <input type="hidden"
                                    name="orderId"
                                    value="@order.Id" />
+
                             <input type="hidden"
                                    name="expectedStatus"
                                    value="@order.Status" />
 
-                            <button class="btn btn-primary">
+                            <input type="hidden"
+                                   name="reviewToken"
+                                   value="@OrderWorkflowService.ReviewToken(order)" />
+
+                            @if (order.Status == OrderStatus.AwaitingArrival)
+                            {
+                                <p class="small text-muted">
+                                    The customer's pre-order is saved.
+                                    No staff approval is required.
+                                    Send it to the kitchen after the customer arrives.
+                                </p>
+
+                                <label class="d-block mb-3">
+                                    <input type="checkbox"
+                                           name="arrivalConfirmed"
+                                           value="true"
+                                           required />
+                                    The customer has arrived and is ready for food preparation.
+                                </label>
+                            }
+
+                            <button type="submit" class="btn btn-primary">
                                 @OrderWorkflowService.ActionLabel(order.Status)
                             </button>
                         </form>

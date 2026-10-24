@@ -2,6 +2,8 @@
 using KOMA.Data;
 using KOMA.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace KOMA.Services;
 
@@ -19,6 +21,7 @@ public class OrderWorkflowService(ApplicationDbContext db)
 
     public static OrderStatus? Next(Order order) => order.Status switch
     {
+        OrderStatus.AwaitingArrival => OrderStatus.QueuedForKitchen,
         OrderStatus.Pending => OrderStatus.QueuedForKitchen,
         OrderStatus.QueuedForKitchen => OrderStatus.Preparing,
         OrderStatus.Preparing => OrderStatus.ReadyToServe,
@@ -33,7 +36,8 @@ public class OrderWorkflowService(ApplicationDbContext db)
 
     public static string ActionLabel(OrderStatus status) => status switch
     {
-        OrderStatus.Pending => "Confirm & send to kitchen",
+        OrderStatus.AwaitingArrival => "Send to kitchen",
+        OrderStatus.Pending => "Send to kitchen",
         OrderStatus.QueuedForKitchen => "Start preparing",
         OrderStatus.Preparing => "Mark ready",
         OrderStatus.ReadyToServe => "Mark served",
@@ -41,74 +45,197 @@ public class OrderWorkflowService(ApplicationDbContext db)
         _ => "Update order"
     };
 
+    public static string ReviewToken(Order order)
+    {
+        var snapshot = new
+        {
+            order.Id,
+            order.ReservationId,
+            order.TableServiceSessionId,
+            order.RestaurantTableId,
+            order.CustomerId,
+            order.CustomerName,
+            order.Status,
+            order.PaymentStatus,
+            order.TotalAmount,
+            order.Notes,
+            Items = order.Items
+                .OrderBy(i => i.Id)
+                .Select(i => new
+                {
+                    i.Id,
+                    i.MenuItemId,
+                    i.ItemName,
+                    i.Quantity,
+                    i.UnitPrice
+                })
+                .ToArray()
+        };
+
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(snapshot);
+
+        return Convert.ToHexString(SHA256.HashData(bytes));
+    }
+
     public async Task<string?> AdvanceAsync(
         int id,
         OrderStatus expected,
-        int? expectedSessionId = null)
+        int? expectedSessionId = null,
+        int? expectedBookingId = null,
+        int? expectedTableId = null,
+        string? expectedReview = null,
+        bool arrivalConfirmed = false)
     {
         await using var transaction =
             await db.Database.BeginTransactionAsync(
                 IsolationLevel.Serializable);
 
+        // Coordinate with customer pre-order edits and reservation changes.
+        await db.Database.ExecuteSqlRawAsync("""
+            DECLARE @result int;
+            EXEC @result = sys.sp_getapplock
+                @Resource = 'KOMA.ReservationWrites',
+                @LockMode = 'Exclusive',
+                @LockOwner = 'Transaction',
+                @LockTimeout = 10000;
+
+            IF @result < 0
+                THROW 51000, 'Order service is busy. Please retry.', 1;
+            """);
+
         var order = await db.Orders
             .Include(o => o.Items)
             .SingleOrDefaultAsync(o => o.Id == id);
 
-        if (order is null)
-        {
+        if (order == null)
             return "This order no longer exists.";
-        }
 
         if (order.Status != expected)
         {
-            return "Another user already updated this order. "
-                + "Review its current status.";
+            return "Another user already updated this order. " +
+                   "Close and reopen the table to review its current status.";
         }
 
         if (order.PaymentStatus == PaymentStatus.Refunded)
+            return "A refunded order cannot be sent to the kitchen or advanced.";
+
+        if (expectedTableId.HasValue &&
+            order.RestaurantTableId != expectedTableId.Value)
         {
-            return "A refunded order cannot be sent to the kitchen "
-                + "or advanced.";
+            return "This order belongs to another table. Refresh the table.";
         }
 
-        if (expectedSessionId.HasValue &&
-            order.TableServiceSessionId != expectedSessionId.Value)
+        if (expectedBookingId.HasValue)
         {
-            return "This order is no longer linked to the selected visit. " +
-                   "Refresh the table.";
+            // A pre-order can use its direct reservation link.
+            var belongsToBooking =
+                order.ReservationId == expectedBookingId.Value;
+
+            // Older manually linked orders may use the visit link instead.
+            if (!order.ReservationId.HasValue &&
+                order.TableServiceSessionId.HasValue)
+            {
+                belongsToBooking = await db.TableServiceSessions.AnyAsync(s =>
+                    s.Id == order.TableServiceSessionId.Value &&
+                    s.ReservationId == expectedBookingId.Value &&
+                    s.RestaurantTableId == order.RestaurantTableId);
+            }
+
+            if (!belongsToBooking)
+                return "This order does not belong to the selected booking.";
+        }
+        else if (expectedSessionId.HasValue)
+        {
+            if (order.TableServiceSessionId != expectedSessionId.Value ||
+                order.ReservationId.HasValue)
+            {
+                return "This order does not belong to the selected walk-in visit.";
+            }
         }
 
+        // Validate direct reservation links.
+        if (order.ReservationId.HasValue)
+        {
+            var booking = await db.Reservations
+                .SingleOrDefaultAsync(r => r.Id == order.ReservationId.Value);
+
+            if (booking == null ||
+                booking.Status == ReservationStatus.Cancelled)
+            {
+                return "This order belongs to a missing or cancelled reservation.";
+            }
+
+            if (booking.RestaurantTableId != order.RestaurantTableId)
+                return "The booking's table has changed. Refresh before continuing.";
+
+            if (expected == OrderStatus.AwaitingArrival &&
+                booking.Status != ReservationStatus.Confirmed)
+            {
+                return "The reservation must be confirmed before sending its food.";
+            }
+        }
+
+        // Also validate orders using a visit link.
         if (order.TableServiceSessionId.HasValue)
         {
-            var reservationCancelled = await db.TableServiceSessions
-                .AnyAsync(s =>
-                    s.Id == order.TableServiceSessionId.Value &&
-                    s.Reservation != null &&
-                    s.Reservation.Status == ReservationStatus.Cancelled);
+            var session = await db.TableServiceSessions
+                .Include(s => s.Reservation)
+                .SingleOrDefaultAsync(s =>
+                    s.Id == order.TableServiceSessionId.Value);
 
-            if (reservationCancelled)
+            if (session == null ||
+                session.RestaurantTableId != order.RestaurantTableId)
             {
-                return "This order belongs to a cancelled reservation. " +
-                       "Review it before continuing.";
+                return "The order's table visit has changed. Refresh the table.";
             }
+
+            if (session.Reservation?.Status == ReservationStatus.Cancelled)
+                return "This order belongs to a cancelled reservation.";
+
+            if (order.ReservationId.HasValue &&
+                session.ReservationId != order.ReservationId)
+            {
+                return "The order has inconsistent booking links. " +
+                       "Ask the administrator to review it.";
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(expectedReview) &&
+            expectedReview != ReviewToken(order))
+        {
+            return "The customer or another user changed this order. " +
+                   "Close and reopen the table, review the latest dishes, " +
+                   "then try again.";
+        }
+
+        if (expected == OrderStatus.AwaitingArrival)
+        {
+            if (!order.ReservationId.HasValue)
+                return "This pre-order has no reservation link.";
+
+            if (string.IsNullOrWhiteSpace(expectedReview))
+                return "Open this pre-order from Table service before sending it.";
+
+            if (!arrivalConfirmed)
+                return "Confirm that the customer has arrived before sending food.";
         }
 
         var next = Next(order);
 
-        if (next is null)
-        {
+        if (next == null)
             return "This order cannot advance from its current status.";
-        }
 
-        if (expected == OrderStatus.Pending &&
+        var sendingToKitchen =
+            expected is OrderStatus.Pending or OrderStatus.AwaitingArrival;
+
+        if (sendingToKitchen &&
             (order.Items.Count == 0 ||
              order.Items.Any(i =>
                  i.Quantity < 1 ||
                  i.Quantity > 99 ||
                  i.UnitPrice < 0)))
         {
-            return "Check the order items before confirming. "
-                + "An order must contain valid quantities and prices.";
+            return "The order must contain valid dishes, quantities and prices.";
         }
 
         order.Status = next.Value;

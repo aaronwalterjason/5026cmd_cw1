@@ -155,27 +155,38 @@ public class TablePanelModel(
                     s.RestaurantTableId == TableId);
         }
 
-        // Only show orders belonging to this specific visit.
-        if (Session != null)
+        var selectedBookingId = Booking?.Id;
+        var selectedSessionId = Session?.Id;
+
+        if (selectedBookingId.HasValue || selectedSessionId.HasValue)
         {
             Orders = await db.Orders
                 .AsNoTracking()
                 .Include(o => o.Items)
                 .ThenInclude(i => i.MenuItem)
+                .Where(o => o.RestaurantTableId == TableId)
                 .Where(o =>
-                    o.TableServiceSessionId == Session.Id &&
-                    o.RestaurantTableId == TableId)
+                    // Customer pre-orders linked directly to this reservation.
+                    (selectedBookingId.HasValue &&
+                     o.ReservationId == selectedBookingId.Value &&
+                     (o.TableServiceSessionId == null ||
+                      (selectedSessionId.HasValue &&
+                       o.TableServiceSessionId == selectedSessionId.Value)))
+                    ||
+                    // Walk-in orders and older visit-linked orders.
+                    (selectedSessionId.HasValue &&
+                     o.TableServiceSessionId == selectedSessionId.Value &&
+                     o.ReservationId == null))
                 .OrderBy(o => o.Id)
                 .ToListAsync();
-        }
 
-        // These are candidates for manual assignment only.
-        if (Booking != null || Session != null)
-        {
+            // Only genuinely unassigned orders belong in this section.
+            // Pre-orders already linked to a reservation must not appear here.
             Unlinked = await db.Orders
                 .AsNoTracking()
                 .Where(o =>
                     o.RestaurantTableId == TableId &&
+                    o.ReservationId == null &&
                     o.TableServiceSessionId == null &&
                     o.Status != OrderStatus.Cancelled &&
                     o.Status != OrderStatus.Completed)
@@ -252,23 +263,34 @@ public class TablePanelModel(
 
     public async Task<IActionResult> OnPostOrderAsync(
         int orderId,
-        OrderStatus? expectedStatus)
+        OrderStatus? expectedStatus,
+        string? reviewToken,
+        bool arrivalConfirmed)
     {
         if (!ModelState.IsValid ||
             !await LoadAsync() ||
-            Session == null ||
+            (Booking == null && Session == null) ||
             expectedStatus is not
-                (OrderStatus.Pending or OrderStatus.ReadyToServe) ||
-            !Orders.Any(o => o.Id == orderId))
+                (OrderStatus.Pending or
+                 OrderStatus.AwaitingArrival or
+                 OrderStatus.ReadyToServe) ||
+            !Orders.Any(o => o.Id == orderId) ||
+            string.IsNullOrWhiteSpace(reviewToken))
         {
             return Error(
-                "The order does not match this visit, or this action " +
-                "is not allowed. Refresh the table.");
+                "The order does not match this booking or visit. " +
+                "Close and reopen the table.");
         }
 
         return await RunAsync(() =>
             workflow.AdvanceAsync(
-                orderId, expectedStatus.Value, Session.Id));
+                id: orderId,
+                expected: expectedStatus.Value,
+                expectedSessionId: Booking == null ? Session?.Id : null,
+                expectedBookingId: Booking?.Id,
+                expectedTableId: TableId,
+                expectedReview: reviewToken,
+                arrivalConfirmed: arrivalConfirmed));
     }
 
     public async Task<IActionResult> OnPostLinkAsync(
