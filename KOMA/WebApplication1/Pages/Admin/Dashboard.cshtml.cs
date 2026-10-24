@@ -217,7 +217,7 @@ namespace KOMA.Pages.Admin
             notes = o.Notes,
             items = o.Items.Select(i => new
             {
-                name = i.MenuItem?.Name ?? "(removed item)",
+                name = i.DishName,
                 qty = i.Quantity,
                 line = i.LineTotal.ToString("N2")
             })

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using KOMA.Data;
 using KOMA.Models;
 using KOMA.Services;
@@ -6,17 +7,19 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 
-namespace KOMA.Pages.Staff.Reservations;
+namespace KOMA.Pages.Reservations;
 
-[Authorize(Roles = "Staff,Administrator")]
+[Authorize(Roles = "Customer,Staff,Administrator")]
 public class DetailsModel(ApplicationDbContext context, ReservationService reservations) : PageModel
 {
     public KOMA.Models.Reservation Booking { get; set; } = null!;
+    public bool IsStaff => User.IsInRole("Staff") || User.IsInRole("Administrator");
+    public string BackPage => IsStaff ? "/Staff/Reservation/Index" : "/Reservations/Index";
     public bool CanChange => Booking.Status != ReservationStatus.Cancelled && Booking.StartTime > ReservationRules.MalaysiaNow;
     public async Task<IActionResult> OnGetAsync(int id)
     {
         var booking = await context.Reservations.AsNoTracking().Include(r => r.RestaurantTable).ThenInclude(t => t.DiningArea).SingleOrDefaultAsync(r => r.Id == id);
-        if (booking == null) return NotFound();
+        if (booking == null || (!IsStaff && booking.CustomerUserId != User.FindFirstValue(ClaimTypes.NameIdentifier))) return NotFound();
         Booking = booking;
         return Page();
     }

@@ -35,6 +35,12 @@
                                 <a class="nav-link text-dark" asp-area="" asp-page="/Admin/Dashboard">Admin</a>
                             </li>
                         }
+                        @if (User.IsInRole("Customer"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-page="/Reservations/Index">My Reservations</a>
+                            </li>
+                        }
                         <!-- Staff Dashboard Link -->
                         @if (User.IsInRole("Staff"))
                         {

@@ -4,9 +4,7 @@ using KOMA.Models;
 namespace KOMA.Data;
 
 // Creates sample orders so the Order List and Revenue Dashboard have data to show
-// before the customer ordering pages exist. Runs only in Development, and only if
-// some menu items have been added. To start again with fresh demo data: delete all
-// rows from Orders and restart the app.
+// Runs in Development. Adds missing Japanese menu categories/items before seeding orders.
 public static class DemoOrderSeeder
 {
     // Demo customer accounts (password Customer#12345), created by SeedData in Development.
@@ -29,6 +27,7 @@ public static class DemoOrderSeeder
 
     public static async Task SeedAsync(ApplicationDbContext db)
     {
+        await SeedMenuAsync(db);
         // Demo orders made before CustomerName/OrderType existed have a blank name - replace them once.
         if (await db.Orders.AnyAsync(o => o.CustomerName == ""))
         {
@@ -39,7 +38,7 @@ public static class DemoOrderSeeder
         if (await db.Orders.AnyAsync()) return;
 
         var menu = await db.MenuItems.Where(m => m.Price > 0).ToListAsync();
-        if (menu.Count == 0) return;   // add menu items in the admin pages first, then restart
+        if (menu.Count == 0) return;
 
         var tables = await db.RestaurantTables.Where(t => t.IsActive).Select(t => t.Id).ToListAsync();
         var emails = DemoCustomers.Select(c => c.Email).Append("customer@koma.local").ToList();
@@ -85,7 +84,7 @@ public static class DemoOrderSeeder
             }
 
             foreach (var dish in menu.OrderBy(_ => rng.Next()).Take(rng.Next(1, Math.Min(4, menu.Count) + 1)))
-                order.Items.Add(new OrderItem { MenuItemId = dish.Id, Quantity = rng.Next(1, 4), UnitPrice = dish.Price });
+                order.Items.Add(new OrderItem { MenuItemId = dish.Id, ItemName = dish.Name, Quantity = rng.Next(1, 4), UnitPrice = dish.Price });
             order.TotalAmount = order.Items.Sum(x => x.UnitPrice * x.Quantity);
 
             if (today)
@@ -107,6 +106,129 @@ public static class DemoOrderSeeder
         }
 
         db.Orders.AddRange(orders);
+        await db.SaveChangesAsync();
+    }
+
+    // Sample coursework prices in RM, not a live restaurant price list.
+    // Match names case-insensitively and preserve all existing admin changes, including availability.
+    public static async Task SeedMenuAsync(ApplicationDbContext db)
+    {
+        var categories = await db.MenuCategories.ToListAsync();
+        var existingItems = await db.MenuItems.ToListAsync();
+        var existingNames = existingItems.Select(m => m.Name)
+            .Select(n => n.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var menu = new (string Category, string Description, (string Name, decimal Price, string Description)[] Dishes)[]
+        {
+            ("Starters", "Small plates to begin your meal.", [
+                ("Edamame", 8.90m, "Steamed young soybeans with sea salt."),
+                ("Chuka Wakame", 9.90m, "Chilled seaweed salad with sesame dressing."),
+                ("Agedashi Tofu", 12.90m, "Lightly fried tofu in warm dashi broth with grated daikon."),
+                ("Chicken Gyoza", 14.90m, "Six pan-fried chicken and cabbage dumplings with dipping sauce.")
+            ]),
+            ("Salads & Soup", "Fresh salads and comforting bowls.", [
+                ("Miso Soup", 5.90m, "Miso broth with tofu, wakame and spring onion."),
+                ("Mushroom Clear Soup", 8.90m, "Light broth with shimeji mushrooms and spring onion."),
+                ("Goma Green Salad", 12.90m, "Mixed greens, cucumber and tomato with sesame dressing."),
+                ("Salmon Avocado Salad", 23.90m, "Salmon sashimi and avocado over crisp greens with citrus dressing.")
+            ]),
+            ("Sashimi", "Sliced seafood served with wasabi and pickled ginger.", [
+                ("Salmon Sashimi", 26.90m, "Five slices of salmon sashimi."),
+                ("Tuna Sashimi", 29.90m, "Five slices of tuna sashimi."),
+                ("Octopus Sashimi", 24.90m, "Five slices of cooked octopus, served chilled."),
+                ("Sashimi Trio", 49.90m, "Nine pieces featuring salmon, tuna and cooked octopus.")
+            ]),
+            ("Nigiri Sushi", "Hand-pressed sushi rice topped with seafood or egg.", [
+                ("Salmon Nigiri", 10.90m, "Two pieces of salmon over seasoned sushi rice."),
+                ("Tuna Nigiri", 12.90m, "Two pieces of tuna over seasoned sushi rice."),
+                ("Ebi Nigiri", 9.90m, "Two pieces of cooked prawn over seasoned sushi rice."),
+                ("Tamago Nigiri", 7.90m, "Two pieces of sweet Japanese omelette over sushi rice.")
+            ]),
+            ("Maki & Rolls", "Rolled favourites for sharing.", [
+                ("Kappa Maki", 8.90m, "Six cucumber rolls wrapped in nori."),
+                ("Salmon Maki", 12.90m, "Six salmon and sushi rice rolls wrapped in nori."),
+                ("California Roll", 19.90m, "Eight pieces with crab stick, avocado, cucumber and fish roe."),
+                ("Prawn Tempura Roll", 24.90m, "Eight pieces with crisp prawn tempura, cucumber and mayonnaise.")
+            ]),
+            ("Tempura & Fried Dishes", "Crisp, golden dishes served fresh.", [
+                ("Ebi Tempura", 24.90m, "Four prawns in a light batter with tempura dipping sauce."),
+                ("Vegetable Tempura", 16.90m, "Assorted seasonal vegetables in a light batter."),
+                ("Chicken Karaage", 18.90m, "Japanese-style fried chicken with lemon and mayonnaise."),
+                ("Takoyaki", 13.90m, "Six octopus balls with takoyaki sauce, mayonnaise and bonito flakes.")
+            ]),
+            ("Grilled Dishes", "Japanese grill favourites.", [
+                ("Chicken Teriyaki", 22.90m, "Grilled chicken glazed with teriyaki sauce."),
+                ("Salmon Teriyaki", 32.90m, "Grilled salmon fillet glazed with teriyaki sauce."),
+                ("Saba Shioyaki", 23.90m, "Salt-grilled mackerel with grated daikon and lemon."),
+                ("Chicken Yakitori", 16.90m, "Three chicken and spring onion skewers with tare glaze.")
+            ]),
+            ("Rice Bowls", "A satisfying meal over steamed Japanese rice.", [
+                ("Chicken Katsudon", 24.90m, "Breaded chicken, egg and onion simmered over rice."),
+                ("Gyudon", 27.90m, "Thinly sliced beef and onion in a savoury sauce over rice."),
+                ("Unagi Don", 42.90m, "Grilled eel with sweet soy glaze over rice."),
+                ("Chicken Katsu Curry", 28.90m, "Crisp chicken cutlet, Japanese curry and steamed rice.")
+            ]),
+            ("Noodles", "Warming bowls and refreshing cold noodles.", [
+                ("Chicken Shoyu Ramen", 26.90m, "Ramen in soy-seasoned chicken broth with chicken, egg and nori."),
+                ("Spicy Miso Ramen", 28.90m, "Ramen in spicy miso broth with chicken, corn and egg."),
+                ("Ebi Tempura Udon", 27.90m, "Thick udon noodles in dashi broth with two tempura prawns."),
+                ("Zaru Soba", 19.90m, "Chilled buckwheat noodles with dipping sauce and spring onion.")
+            ]),
+            ("Bento Sets", "Complete meals with rice, sides and miso soup.", [
+                ("Chicken Teriyaki Bento", 32.90m, "Teriyaki chicken, rice, salad, tamago and miso soup."),
+                ("Salmon Shioyaki Bento", 39.90m, "Salt-grilled salmon, rice, salad, tamago and miso soup."),
+                ("Tempura Bento", 34.90m, "Prawn and vegetable tempura, rice, salad and miso soup."),
+                ("Tofu Teriyaki Bento", 27.90m, "Teriyaki tofu, rice, vegetable sides, salad and miso soup.")
+            ]),
+            ("Desserts", "A sweet finish to your visit.", [
+                ("Matcha Ice Cream", 9.90m, "Two scoops of green tea ice cream."),
+                ("Black Sesame Ice Cream", 9.90m, "Two scoops of roasted black sesame ice cream."),
+                ("Mochi Ice Cream Trio", 14.90m, "Three rice-cake-wrapped ice creams in assorted flavours."),
+                ("Japanese Cheesecake", 15.90m, "A slice of light Japanese-style cheesecake.")
+            ]),
+            ("Drinks", "Tea, citrus refreshments and Japanese soft drinks.", [
+                ("Hot Green Tea", 4.90m, "A cup of freshly brewed Japanese green tea."),
+                ("Iced Matcha Latte", 12.90m, "Matcha green tea with milk over ice."),
+                ("Yuzu Soda", 11.90m, "Sparkling citrus drink with yuzu flavour."),
+                ("Ramune Original", 9.90m, "Japanese-style original ramune soda, served chilled.")
+            ])
+        };
+        var recommended = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        { "Salmon Sashimi", "Prawn Tempura Roll", "Chicken Karaage", "Chicken Katsu Curry", "Chicken Shoyu Ramen", "Chicken Teriyaki Bento", "Matcha Ice Cream", "Yuzu Soda" };
+        foreach (var section in menu)
+        {
+            var category = categories.FirstOrDefault(c => string.Equals(c.Name.Trim(), section.Category, StringComparison.OrdinalIgnoreCase));
+            if (category == null)
+            {
+                category = new MenuCategory { Name = section.Category, Description = section.Description, IsActive = true };
+                categories.Add(category);
+                db.MenuCategories.Add(category);
+            }
+            foreach (var dish in section.Dishes)
+            {
+                // The original California Roll keeps its existing uploaded image.
+                var imageUrl = dish.Name == "California Roll" ? null
+                    : $"/images/menu/{dish.Name.ToLowerInvariant().Replace(' ', '_')}.png";
+                var previousImageUrl = dish.Name == "California Roll" ? null
+                    : $"/images/menu/generated/{dish.Name.ToLowerInvariant().Replace(' ', '_')}.png";
+                // Repair moved seed images without replacing photos uploaded by administrators.
+                // Agedashi Tofu's known duplicate upload also points back to its named asset.
+                foreach (var existing in existingItems.Where(m =>
+                    string.Equals(m.Name.Trim(), dish.Name, StringComparison.OrdinalIgnoreCase)
+                    && imageUrl != null
+                    && (string.IsNullOrWhiteSpace(m.ImageUrl)
+                        || string.Equals(m.ImageUrl, previousImageUrl, StringComparison.OrdinalIgnoreCase)
+                        || (dish.Name == "Agedashi Tofu" && string.Equals(m.ImageUrl,
+                            "/images/menu/067cdd2639004125a5a983313feda032.png", StringComparison.OrdinalIgnoreCase)))))
+                    existing.ImageUrl = imageUrl;
+                if (!existingNames.Add(dish.Name)) continue;
+                db.MenuItems.Add(new MenuItem
+                {
+                    Name = dish.Name, Description = dish.Description, Price = dish.Price, ImageUrl = imageUrl,
+                    MenuCategory = category, IsAvailable = true, IsRecommended = recommended.Contains(dish.Name),
+                    IsSeasonal = dish.Name is "Vegetable Tempura" or "Zaru Soba" or "Mochi Ice Cream Trio"
+                });
+            }
+        }
         await db.SaveChangesAsync();
     }
 
@@ -165,7 +287,7 @@ public static class DemoOrderSeeder
             if (type == OrderType.WalkIn) o.CustomerName = WalkInNames[rng.Next(WalkInNames.Length)];
             else { var c = customers[rng.Next(customers.Count)]; o.CustomerId = c.Id; o.CustomerName = c.Name; }
             foreach (var dish in menu.OrderBy(_ => rng.Next()).Take(rng.Next(1, Math.Min(4, menu.Count) + 1)))
-                o.Items.Add(new OrderItem { MenuItemId = dish.Id, Quantity = rng.Next(1, Math.Max(2, table.Capacity / 2) + 1), UnitPrice = dish.Price });
+                o.Items.Add(new OrderItem { MenuItemId = dish.Id, ItemName = dish.Name, Quantity = rng.Next(1, Math.Max(2, table.Capacity / 2) + 1), UnitPrice = dish.Price });
             o.TotalAmount = o.Items.Sum(x => x.UnitPrice * x.Quantity);
             return o;
         }

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using KOMA.Data;
 using KOMA.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -6,14 +7,20 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
-namespace KOMA.Pages.Staff.Reservations;
+namespace KOMA.Pages.Reservations;
 
-[Authorize(Roles = "Staff,Administrator")]
+[Authorize(Roles = "Customer,Staff,Administrator")]
 public class EditModel(ApplicationDbContext context, ReservationService reservations) : PageModel
 {
     [BindProperty(SupportsGet = true)] public int? Id { get; set; }
     [BindProperty] public ReservationInput Input { get; set; } = new();
+    [BindProperty] public bool AddPreOrder { get; set; }
+    public bool IsStaff => User.IsInRole("Staff") || User.IsInRole("Administrator");
+    public string BackPage => IsStaff ? "/Staff/Reservation/Index" : "/Reservations/Index";
     public List<SelectListItem> Tables { get; set; } = [];
+    public List<SelectListItem> Zones { get; set; } = [];
+    public string? SuggestedZone { get; set; }
+    public string? SuggestionMessage { get; set; }
     public IReadOnlyList<TimeOnly> Slots { get; set; } = [];
 
     public async Task<IActionResult> OnGetAsync(int? tableId, DateOnly? date, TimeOnly? time)
@@ -21,11 +28,12 @@ public class EditModel(ApplicationDbContext context, ReservationService reservat
         await LoadChoicesAsync();
         if (Id.HasValue)
         {
-            var booking = await context.Reservations.AsNoTracking().SingleOrDefaultAsync(r => r.Id == Id.Value);
-            if (booking == null) return NotFound();
+            var booking = await context.Reservations.AsNoTracking().Include(r => r.RestaurantTable).ThenInclude(t => t.DiningArea).SingleOrDefaultAsync(r => r.Id == Id.Value);
+            if (booking == null || (!IsStaff && booking.CustomerUserId != User.FindFirstValue(ClaimTypes.NameIdentifier))) return NotFound();
             Input = new ReservationInput
             {
                 RestaurantTableId = booking.RestaurantTableId,
+                PreferredZone = booking.RestaurantTable.DiningArea?.Zone,
                 CustomerName = booking.CustomerName,
                 ContactNumber = booking.ContactNumber,
                 Email = booking.Email,
@@ -41,20 +49,40 @@ public class EditModel(ApplicationDbContext context, ReservationService reservat
             Input.RestaurantTableId = tableId ?? 0;
             Input.Date = date ?? DateOnly.FromDateTime(ReservationRules.MalaysiaNow);
             Input.Time = time ?? Slots.FirstOrDefault();
+            if (!IsStaff)
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var customer = await context.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId);
+                if (customer == null) return Challenge();
+                Input.CustomerName = customer.FullName ?? "";
+                Input.ContactNumber = customer.PhoneNumber ?? "";
+                Input.Email = customer.Email;
+            }
         }
         return Page();
     }
 
-    public async Task<IActionResult> OnPostAsync()
+    public async Task<IActionResult> OnPostAsync(string? acceptedZone)
     {
         await LoadChoicesAsync();
         if (!ModelState.IsValid) return Page();
+        if (!IsStaff && !string.IsNullOrWhiteSpace(acceptedZone))
+        {
+            Input.PreferredZone = acceptedZone;
+            ModelState.Remove("Input.PreferredZone");
+        }
         try
         {
             var result = await reservations.SaveAsync(Input, Id, User);
+            if (result.SuggestedZone != null)
+            {
+                SuggestedZone = result.SuggestedZone;
+                SuggestionMessage = result.Error;
+                return Page();
+            }
             if (result.Error != null) { ModelState.AddModelError("", result.Error); return Page(); }
-            TempData["SuccessMessage"] = Id.HasValue ? "Reservation updated successfully." : "Reservation created. It is pending confirmation.";
-            return RedirectToPage("Details", new { id = result.Id });
+            TempData["SuccessMessage"] = Id.HasValue ? "Reservation updated successfully." : "Reservation confirmed. Your table is reserved.";
+            return RedirectToPage(AddPreOrder ? "PreOrder" : "Details", new { id = result.Id });
         }
         catch (Microsoft.Data.SqlClient.SqlException) { ModelState.AddModelError("", "The database is busy or unavailable. Please retry; check the reservation list before submitting again."); return Page(); }
         catch (DbUpdateException) { ModelState.AddModelError("", "The reservation could not be saved. Reload the page and check table availability."); return Page(); }
@@ -62,6 +90,9 @@ public class EditModel(ApplicationDbContext context, ReservationService reservat
 
     private async Task LoadChoicesAsync()
     {
+        Zones = await context.DiningAreas.AsNoTracking().Where(a => a.IsActive)
+            .Select(a => a.Zone).Distinct().OrderBy(z => z)
+            .Select(z => new SelectListItem(z, z)).ToListAsync();
         Tables = await context.RestaurantTables.AsNoTracking().Where(t => t.IsActive && t.DiningArea!.IsActive)
             .OrderBy(t => t.DiningAreaId).ThenBy(t => t.TableNumber)
             .Select(t => new SelectListItem($"{t.DiningArea!.Name} / {t.TableNumber} — capacity {t.Capacity}", t.Id.ToString())).ToListAsync();

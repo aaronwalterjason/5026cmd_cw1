@@ -19,7 +19,7 @@ public class Reservation
     public DateTime EndTime { get; set; }
     [Range(1, 20)] public int GuestCount { get; set; }
     [StringLength(500)] public string? SpecialRequests { get; set; }
-    public ReservationStatus Status { get; set; } = ReservationStatus.Pending;
+    public ReservationStatus Status { get; set; } = ReservationStatus.Confirmed;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public string CreatedByUserId { get; set; } = "";
     [Timestamp] public byte[] RowVersion { get; set; } = [];

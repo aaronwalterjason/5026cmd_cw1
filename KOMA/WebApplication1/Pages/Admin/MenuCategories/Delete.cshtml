@@ -11,6 +11,7 @@
 </div>
 
 <form method="post">
+    <div asp-validation-summary="All" class="text-danger" role="alert"></div>
     <input type="hidden" asp-for="Category.Id" />
     <button type="submit" class="btn btn-danger">Delete</button>
     <a asp-page="./Index" class="btn btn-link">Cancel</a>

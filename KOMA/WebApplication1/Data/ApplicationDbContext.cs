@@ -30,6 +30,9 @@ namespace KOMA.Data
             => Set<TableServiceSession>();
         public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 
+        // Engineer B: editable text/photo of the customer landing page (one row).
+        public DbSet<LandingPageContent> LandingPageContents => Set<LandingPageContent>();
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -125,6 +128,10 @@ namespace KOMA.Data
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Orders keep their history even if the customer account or table is removed later.
+            builder.Entity<Order>().HasOne(o => o.Reservation).WithMany()
+                .HasForeignKey(o => o.ReservationId).OnDelete(DeleteBehavior.Restrict);
+            builder.Entity<Order>().HasIndex(o => o.ReservationId).IsUnique()
+                .HasFilter("[ReservationId] IS NOT NULL");
             builder.Entity<Order>()
                 .HasOne(o => o.Customer).WithMany()
                 .HasForeignKey(o => o.CustomerId)
@@ -141,10 +148,11 @@ namespace KOMA.Data
                 .HasOne(i => i.Order).WithMany(o => o.Items)
                 .HasForeignKey(i => i.OrderId)
                 .OnDelete(DeleteBehavior.Cascade);
+            // Deleting a dish keeps past orders: the line's link is cleared, its saved ItemName/UnitPrice stay.
             builder.Entity<OrderItem>()
                 .HasOne(i => i.MenuItem).WithMany()
                 .HasForeignKey(i => i.MenuItemId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

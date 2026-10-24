@@ -8,6 +8,8 @@ namespace KOMA.Models
     public class Order
     {
         public int Id { get; set; }
+        public int? ReservationId { get; set; }
+        public Reservation? Reservation { get; set; }
 
         // Shown to staff/customers as e.g. "KOMA-000042".
         [NotMapped]
@@ -82,7 +84,10 @@ namespace KOMA.Models
         Cancelled = 5,
 
         [Display(Name = "Queued for kitchen")]
-        QueuedForKitchen = 6
+        QueuedForKitchen = 6,
+
+        [Display(Name = "Awaiting arrival")]
+        AwaitingArrival = 7
     }
 
     public enum PaymentStatus
