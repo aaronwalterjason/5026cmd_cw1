@@ -21,7 +21,7 @@
             <td>@account.Email</td>
             <td>@account.Role</td>
             <td>
-                <form method="post" class="d-flex gap-2">
+                <form method="post" class="d-flex gap-2 js-role-form" data-email="@account.Email" data-current="@account.Role">
                     <input type="hidden" name="userId" value="@account.UserId" />
                     <select name="role" class="form-select form-select-sm">
                         @foreach (var role in Model.AvailableRoles)
@@ -43,3 +43,22 @@
     }
     </tbody>
 </table>
+
+@section Scripts {
+    <script>
+        // Ask before changing someone's role (shared KOMA pop-up, js/koma-confirm.js). Only when the role really changes.
+        document.querySelectorAll('form.js-role-form').forEach(form => form.addEventListener('submit', e => {
+            const role = form.querySelector('select[name="role"]').value;
+            const current = form.dataset.current, who = form.dataset.email;
+            if (role === current || !window.KomaConfirm) return;
+            e.preventDefault();
+            const toAdmin = role === 'Administrator', fromAdmin = current === 'Administrator';
+            KomaConfirm.open({
+                tone: 'warn', icon: 'shield',
+                title: toAdmin ? `Make ${who} an Administrator?` : `Change ${who} to ${role}?`,
+                ok: 'Confirm', no: 'Cancel',
+                onOk: () => HTMLFormElement.prototype.submit.call(form)
+            });
+        }));
+    </script>
+}

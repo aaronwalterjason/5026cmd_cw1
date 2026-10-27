@@ -117,8 +117,12 @@ else
             <button type="button" class="btn btn-outline-primary" onclick="window.print()">Print bill</button>
             @if (!finished)
             {
-                <form method="post" asp-page-handler="Cancel" asp-all-route-data="Model.Route(sel.Id)"
-                      onsubmit="return confirm('Cancel @(sel.OrderNumber)?@(sel.PaymentStatus == PaymentStatus.Paid ? " It will be marked as refunded." : "")');" class="ms-auto">
+                var cancelText = sel.PaymentStatus == PaymentStatus.Paid
+                    ? "It was already paid, so it will be marked as refunded."
+                    : "It moves to Cancelled and stays in the order history.";
+                <form method="post" asp-page-handler="Cancel" asp-all-route-data="Model.Route(sel.Id)" class="ms-auto"
+                      data-confirm-title="Cancel order @sel.OrderNumber?" data-confirm-text="@cancelText"
+                      data-confirm-ok="Confirm" data-confirm-no="Back" data-confirm-icon="x">
                     <input type="hidden" name="orderId" value="@sel.Id" />
                     <button type="submit" class="btn ord-btn-cancel">Cancel order</button>
                 </form>

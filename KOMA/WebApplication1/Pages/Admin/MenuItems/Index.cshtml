@@ -198,7 +198,7 @@
                 else
                 {
                     <form method="post" asp-page-handler="DeleteItem" asp-all-route-data="deleteRoute" class="ms-auto"
-                          data-confirm-title="Delete @(Model.Item.Name)?" data-confirm-text="It will be removed from the menu. This can't be undone. Past orders keep the dish's name and price." data-confirm-ok="Delete dish">
+                          data-confirm-title="Delete @(Model.Item.Name)?" data-confirm-text="It will be removed from the menu. This can't be undone. Past orders keep the dish's name and price." data-confirm-ok="Delete">
                         <input type="hidden" name="itemId" value="@Model.Item.Id" />
                         <button type="submit" class="btn mn-btn-danger">Delete</button>
                     </form>
@@ -262,28 +262,14 @@
     </section>
 </div>
 
-@* Confirmation popup (native <dialog>: Esc or Cancel closes it). Filled in by the script below. *@
-<dialog class="mn-dialog" id="mn-confirm" aria-labelledby="mn-confirm-title">
-    <div class="mn-dialog-body">
-        <div class="mn-eyebrow" id="mn-confirm-eyebrow">Confirm changes</div>
-        <h2 id="mn-confirm-title">Save changes?</h2>
-        <p id="mn-confirm-text" class="mn-muted mb-0"></p>
-        <ul id="mn-confirm-list" class="mn-changes"></ul>
-    </div>
-    <div class="mn-dialog-actions">
-        <button type="button" class="btn btn-outline-primary" id="mn-confirm-cancel">Cancel</button>
-        <button type="button" class="btn btn-primary" id="mn-confirm-ok">Confirm</button>
-    </div>
-</dialog>
-
-@* "Delete category" popup (design A). Filled in by the script below from the bin that was clicked. *@
-<dialog class="mn-dialog" id="mn-cat-delete" aria-labelledby="mn-cd-title">
-    <form method="post" asp-page-handler="DeleteCategory">
+@* "Delete category" popup (design A), in the shared pop-up style (.kc). Filled in by the script below. *@
+<dialog class="kc" id="mn-cat-delete" aria-labelledby="mn-cd-title" data-tone="danger">
+    <form method="post" asp-page-handler="DeleteCategory" class="kc-form">
         <input type="hidden" name="categoryId" id="mn-cd-id" />
-        <div class="mn-dialog-body">
-            <span class="mn-cd-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></span>
-            <h2 id="mn-cd-title">Delete category?</h2>
-            <p class="mn-muted mb-0" id="mn-cd-text"></p>
+        <div class="kc-band" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div>
+        <div class="kc-body">
+            <h2 class="kc-title" id="mn-cd-title">Delete category?</h2>
+            <p class="kc-text" id="mn-cd-text"></p>
             <div class="mn-cd-choices" id="mn-cd-choices">
                 <label class="mn-choice" id="mn-cd-move-choice">
                     <input type="radio" name="dishes" value="move" checked />
@@ -305,23 +291,20 @@
                     </span>
                 </label>
             </div>
-        </div>
-        <div class="mn-dialog-actions">
-            <button type="button" class="btn btn-outline-primary" id="mn-cd-cancel">Cancel</button>
-            <button type="submit" class="btn mn-btn-danger-solid" id="mn-cd-ok">Delete category</button>
+            <div class="kc-actions">
+                <button type="button" class="btn btn-outline-primary" id="mn-cd-cancel">Cancel</button>
+                <button type="submit" class="btn mn-btn-danger-solid" id="mn-cd-ok">Delete</button>
+            </div>
         </div>
     </form>
 </dialog>
 
 @section Scripts {
     <script>
-        // ---------- Confirmation popup ----------
+        // ---------- Confirmation popup for saves (shared KOMA pop-up, js/koma-confirm.js) ----------
+        // Delete forms (data-confirm-title) are handled by koma-confirm.js itself.
         (() => {
-            const dlg = document.getElementById('mn-confirm');
-            if (!dlg) return;
-            const $ = id => document.getElementById(id);
             const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-            let pending = null;
 
             // Readable value of one field ("On"/"Off", "RM 12.90", the chosen category name, ...).
             const valueOf = el => {
@@ -334,25 +317,6 @@
             const fields = form => [...form.querySelectorAll('[data-label]')];
             const snapshot = form => new Map(fields(form).map(el => [el, valueOf(el)]));
 
-            const open = ({ eyebrow, title, text, rows, ok, danger, onOk }) => {
-                $('mn-confirm-eyebrow').textContent = eyebrow;
-                $('mn-confirm-title').textContent = title;
-                $('mn-confirm-text').textContent = text || '';
-                $('mn-confirm-list').innerHTML = (rows || []).join('');
-                $('mn-confirm-list').hidden = !rows || !rows.length;
-                const okBtn = $('mn-confirm-ok');
-                okBtn.hidden = !onOk;
-                okBtn.textContent = ok || 'Confirm';
-                okBtn.className = 'btn ' + (danger ? 'mn-btn-danger-solid' : 'btn-primary');
-                $('mn-confirm-cancel').textContent = onOk ? 'Cancel' : 'OK';
-                pending = onOk;
-                dlg.showModal();
-                (onOk ? okBtn : $('mn-confirm-cancel')).focus();
-            };
-            $('mn-confirm-cancel').addEventListener('click', () => dlg.close());
-            $('mn-confirm-ok').addEventListener('click', () => { const go = pending; pending = null; dlg.close(); go && go(); });
-            dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });   // click outside closes
-
             // Save forms: list exactly what changed before saving.
             document.querySelectorAll('form.js-confirm-save').forEach(form => {
                 const before = snapshot(form);
@@ -363,29 +327,19 @@
                     fields(form).forEach(el => {
                         const was = before.get(el), now = valueOf(el);
                         if (isNew) { if (now && now !== 'Off') rows.push(`<li><span>${esc(el.dataset.label)}</span><strong>${esc(now)}</strong></li>`); }
-                        else if (was !== now) rows.push(`<li><span>${esc(el.dataset.label)}</span><s>${esc(was || '(empty)')}</s><b aria-hidden="true">→</b><strong>${esc(now || '(empty)')}</strong></li>`);
+                        else if (was !== now) rows.push({ label: el.dataset.label, from: was || '(empty)', to: now || '(empty)' });
                     });
                     const name = valueOf(form.querySelector('[data-label="Name"]')) || form.dataset.name;
                     if (!isNew && !rows.length) {
-                        open({ eyebrow: 'Nothing to save', title: 'No changes yet', text: `You haven't changed anything on ${form.dataset.name}.` });
+                        KomaConfirm.open({ tone: 'navy', icon: 'info', title: 'No changes yet', text: `You haven't changed anything on ${form.dataset.name}.` });
                         return;
                     }
-                    open({
-                        eyebrow: isNew ? `New ${kind}` : 'Confirm changes',
+                    KomaConfirm.open({
+                        tone: 'navy', icon: isNew ? 'plus' : 'check',
                         title: isNew ? `Add ${name || 'this ' + kind}?` : `Save ${rows.length} change${rows.length === 1 ? '' : 's'} to ${form.dataset.name}?`,
-                        rows,
-                        ok: isNew ? `Add ${kind}` : 'Save changes',
+                        rows, ok: isNew ? 'Add' : 'Save', no: 'Cancel',
                         onOk: () => HTMLFormElement.prototype.submit.call(form)   // real submit, skips this check
                     });
-                });
-            });
-
-            // Delete forms: same popup, red button.
-            document.querySelectorAll('form[data-confirm-title]').forEach(form => {
-                form.addEventListener('submit', e => {
-                    e.preventDefault();
-                    open({ eyebrow: 'Please confirm', title: form.dataset.confirmTitle, text: form.dataset.confirmText,
-                           ok: form.dataset.confirmOk, danger: true, onOk: () => HTMLFormElement.prototype.submit.call(form) });
                 });
             });
         })();
@@ -402,8 +356,8 @@
             const plural = n => n === 1 ? '1 dish' : n + ' dishes';
             const refreshButton = () => {
                 const del = form.querySelector('input[name="dishes"]:checked')?.value === 'delete';
-                $('mn-cd-ok').textContent = count === 0 ? 'Delete category'
-                    : del ? 'Delete category & ' + plural(count) : 'Move ' + plural(count) + ' & delete';
+                $('mn-cd-ok').textContent = 'Delete';   // one-word buttons everywhere
+                $('mn-cd-ok').title = count === 0 ? '' : del ? 'Delete the category and ' + plural(count) : 'Move ' + plural(count) + ', then delete the category';
             };
 
             document.querySelectorAll('.js-cat-delete').forEach(btn => btn.addEventListener('click', () => {

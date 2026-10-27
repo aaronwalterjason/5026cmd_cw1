@@ -417,10 +417,25 @@
         if (selected.kind === 'area') {
             const a = findArea(selected.id);
             const count = tablesIn(a).length;
-            if (count && !confirm(`Delete '${a.name}' and its ${count} table(s)?`)) return;
-            for (let i = tables.length - 1; i >= 0; i--) if (tables[i].areaId === a.id) tables.splice(i, 1);
-            areas.splice(areas.indexOf(a), 1);
-            say(`'${a.name}' removed. Click Save layout to keep this change.`, 'info');
+            const removeArea = () => {
+                for (let i = tables.length - 1; i >= 0; i--) if (tables[i].areaId === a.id) tables.splice(i, 1);
+                areas.splice(areas.indexOf(a), 1);
+                say(`'${a.name}' removed. Click Save layout to keep this change.`, 'info');
+                selected = null;
+                markDirty();
+                renderAll();
+            };
+            if (!count) { removeArea(); return; }
+            // Area still has tables: ask first, using the shared KOMA pop-up (js/koma-confirm.js).
+            if (window.KomaConfirm) {
+                KomaConfirm.open({
+                    tone: 'danger', icon: 'trash', title: `Delete \u2018${a.name}\u2019 and its ${count} table${count === 1 ? '' : 's'}?`,
+                    ok: 'Delete', no: 'Cancel', onOk: removeArea
+                });
+            } else if (confirm(`Delete '${a.name}' and its ${count} table(s)?`)) {
+                removeArea();
+            }
+            return;
         } else {
             const t = findTable(selected.id);
             tables.splice(tables.indexOf(t), 1);

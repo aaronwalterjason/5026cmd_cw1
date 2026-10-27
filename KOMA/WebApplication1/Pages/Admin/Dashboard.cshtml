@@ -6,156 +6,151 @@
     var inv = CultureInfo.InvariantCulture;
     string Pct(double v, double total) => (total <= 0 ? 0 : v / total * 100).ToString("0.###", inv) + "%";
     string Num(double v) => v.ToString("0.###", inv);
-    var maxOrders = Model.OrdersByHour.Count == 0 ? 0 : Model.OrdersByHour.Max(b => b.Orders);
-}
-
-@* ---------- Header ---------- *@
-<div class="d-flex flex-wrap align-items-baseline gap-2 mb-3">
-    <h1 class="mb-0 me-2">Today</h1>
-    <span class="text-muted me-auto">@Model.Now.ToString("dddd, d MMMM yyyy")</span>
-    <span class="small text-muted" id="refresh-info">Updated @Model.Now.ToString("h:mm tt")</span>
-    <div class="form-check form-switch small mb-0">
-        <input class="form-check-input" type="checkbox" id="auto-refresh" checked />
-        <label class="form-check-label" for="auto-refresh">Auto-refresh</label>
-    </div>
-</div>
-
-@* ---------- Today's numbers (navy lead card + ring) ---------- *@
-@{
-    var salesLine = Model.CompareText(Model.SalesToday, Model.SalesSameDayLastWeek, true, "First sales this weekday", out var salesUp);
-    var ordersLine = Model.CompareText(Model.OrdersToday, Model.OrdersSameDayLastWeek, false, "First orders this weekday", out var ordersUp);
     const double Ring = 163.36;   // circumference of the r=26 ring
     var seatedDash = (Model.SeatedShare * Ring).ToString("0.##", inv);
     var payDash = (Model.PaymentShare * Ring).ToString("0.##", inv);
     var payOffset = (-Model.SeatedShare * Ring).ToString("0.##", inv);
+    var all = Model.OrderTypeStats.First();
 }
-<div class="kpi-row mb-3">
-    <a asp-page="/Admin/Revenue/Index" asp-route-period="day" class="kpi-card kpi-lead">
-        <span class="kpi-eyebrow">SALES SO FAR · @Model.Now.ToString("ddd d MMM").ToUpperInvariant()</span>
-        <span class="kpi-big"><span class="kpi-rm">RM</span>@Model.SalesToday.ToString("N2")</span>
-        <span class="kpi-foot">
-            <span>@salesLine</span>
-            <span class="kpi-pill">@Model.PaidOrdersToday paid</span>
-        </span>
-    </a>
 
-    <a asp-page="/Admin/Orders/Index" asp-route-from="@Model.Now.ToString("yyyy-MM-dd")" asp-route-to="@Model.Now.ToString("yyyy-MM-dd")" class="kpi-card">
-        <span class="kpi-label">Orders today</span>
-        <span class="kpi-num">@Model.OrdersToday</span>
-        <span class="kpi-sub @(Model.OrdersSameDayLastWeek == 0 ? "" : ordersUp ? "is-up" : "is-down")">@ordersLine</span>
-    </a>
-
-    <div class="kpi-card">
-        <span class="kpi-label">Average order</span>
-        <span class="kpi-num kpi-num-sm">RM @Model.AverageOrder.ToString("N2")</span>
-        <span class="kpi-sub">@Model.ItemsSoldToday items sold</span>
+@* ================= Header: date tile, open status, alerts chip, live time ================= *@
+<div class="dash-head">
+    <div class="dash-cal" aria-hidden="true">
+        <span class="dash-cal-m">@Model.Now.ToString("MMM").ToUpperInvariant()</span>
+        <span class="dash-cal-d">@Model.Now.Day</span>
+        <span class="dash-cal-w">@Model.Now.ToString("ddd").ToUpperInvariant()</span>
     </div>
-
-    <div class="kpi-card kpi-ring-card">
-        <svg class="kpi-ring" width="76" height="76" viewBox="0 0 64 64" role="img"
-             aria-label="@Model.OccupiedPercent percent of tables in use">
-            <circle class="ring-track" cx="32" cy="32" r="26" fill="none" stroke="#eee7db" stroke-width="7"></circle>
-            @if (Model.SeatedShare > 0)
+    <div>
+        <h1 class="mb-0">Today</h1>
+        <div class="dash-status @(Model.IsOpen ? "is-open" : "is-closed")">
+            ● @Model.OpenText
+            @if (Model.NextBooking is not null)
             {
-                <circle class="ring-seated" cx="32" cy="32" r="26" fill="none" stroke="#263b49" stroke-width="7" stroke-linecap="round"
-                        stroke-dasharray="@seatedDash @Ring.ToString(inv)" transform="rotate(-90 32 32)"></circle>
+                <span class="dash-muted">· next booking @Model.NextBooking.StartTime.ToString("h:mm tt")</span>
             }
-            @if (Model.PaymentShare > 0)
-            {
-                <circle class="ring-pay" cx="32" cy="32" r="26" fill="none" stroke="#974535" stroke-width="7" stroke-linecap="round"
-                        stroke-dasharray="@payDash @Ring.ToString(inv)" stroke-dashoffset="@payOffset" transform="rotate(-90 32 32)"></circle>
-            }
-            <text class="ring-text" x="32" y="37" text-anchor="middle" font-family="Georgia, serif" font-size="15" fill="#22343d">@Model.OccupiedPercent%</text>
-        </svg>
-        <span class="kpi-ring-text">
-            <span class="kpi-label">Tables in use</span>
-            <span class="kpi-num kpi-num-sm">@Model.TablesOccupied <span class="kpi-of">/ @Model.TablesTotal</span></span>
-            @if (Model.TablesAwaitingPayment > 0)
-            {
-                <span class="kpi-sub is-down">@Model.TablesAwaitingPayment awaiting payment</span>
-            }
-            else
-            {
-                <span class="kpi-sub">@Model.SeatsInUse of @Model.SeatsTotal seats</span>
-            }
-        </span>
+        </div>
     </div>
+    @if (Model.AlertCount > 0)
+    {
+        <a href="#dash-alerts" class="dash-alert-chip" title="Jump to Alerts">
+            <span>@Model.AlertCount alert@(Model.AlertCount == 1 ? "" : "s")</span>
+            <span class="dash-chip-parts">
+                @if (Model.SlowOrders.Any()) { <span title="Slow orders">⏱ @Model.SlowOrders.Count</span> }
+                @if (Model.UnpaidTables.Any()) { <span title="Tables waiting to pay">RM @Model.UnpaidTables.Count</span> }
+                @if (Model.SoldOut.Any()) { <span title="Sold-out dishes">☕ @Model.SoldOut.Count</span> }
+            </span>
+        </a>
+    }
+    <span class="dash-live @(Model.AlertCount > 0 ? "" : "ms-auto")" title="Refreshes every minute">
+        <span class="dash-live-dot"></span>@Model.Now.ToString("h:mm tt")
+    </span>
 </div>
 
-@*  Layout (Option B - "command centre"):
-      wide screens  : [ schedule + orders by hour | live floor map | alerts + latest orders ]
-      medium screens: map on top, the two side columns side by side below it
-      phones        : everything stacked, map first *@
-<div class="row g-3 mb-3 dash-columns">
+<div class="dash-grid">
+    <div class="dash-left">
+        <div class="dash-kpis">
+            @* ================= Sales (whole card opens Revenue › Day) ================= *@
+            <a asp-page="/Admin/Revenue/Index" asp-route-period="day" asp-route-date="@Model.Now.ToString("yyyy-MM-dd")"
+               class="dash-card dash-sales" title="Open Revenue by hour for @Model.Now.ToString("d MMM")">
+                <span class="dash-title-row"><span class="dash-title">Sales</span><span class="dash-title-sub">@Model.Now.ToString("ddd d MMM")</span></span>
+                <span class="dash-big"><small>RM</small>@Model.SalesToday.ToString("N2")</span>
+                @foreach (var c in Model.SalesComparisons)
+                {
+                    <span class="dash-cmp">
+                        <span class="dash-cmp-day">@c.Day.ToString("ddd d MMM")</span>
+                        <span class="dash-cmp-amt">RM @c.Amount.ToString("N2")</span>
+                        @if (c.ChangePercent is double pct)
+                        {
+                            <span class="dash-pill @(pct >= 0 ? "is-up" : "is-down")">@(pct >= 0 ? "↑" : "↓") @Math.Abs(Math.Round(pct))%</span>
+                        }
+                        else
+                        {
+                            <span class="dash-pill">—</span>
+                        }
+                    </span>
+                }
+                <span class="dash-foot-note">Compared up to @Model.Now.ToString("h:mm tt") on each day</span>
+            </a>
 
-    @* ================= LEFT: schedule, orders by hour ================= *@
-    <div class="col-12 col-lg-6 col-xl-3 order-2 order-xl-1 d-flex flex-column gap-3">
-        <div class="card p-3 border-dashed">
-            <h2 class="h6">📅 Reservation schedule</h2>
-            <p class="small text-muted mb-2">Today's bookings by time slot, with who has arrived, will appear here.</p>
-            <p class="small text-muted mb-0"><em>Coming with the reservations module.</em></p>
-            @* TODO (Engineer B): list today's Reservations ordered by time - time, name, party size, table, arrived yes/no. *@
-        </div>
-
-        <div class="card p-3">
-            <h2 class="h6">Orders by hour</h2>
-            @if (maxOrders == 0)
-            {
-                <p class="text-muted small mb-0">No orders yet today.</p>
-            }
-            else
-            {
-                <ul class="list-unstyled mb-0 hour-list" aria-label="Orders per hour today">
-                    @foreach (var b in Model.OrdersByHour)
+            @* ================= Total orders (tabs filter by order type) ================= *@
+            @* Whole card opens the Orders page for today (filtered by the chosen type); the tabs only filter the card. *@
+            <div class="dash-card dash-orders" id="dash-orders" role="link" tabindex="0" title="Open today's orders"
+                 data-href="@Url.Page("/Admin/Orders/Index", new { from = Model.Now.ToString("yyyy-MM-dd"), to = Model.Now.ToString("yyyy-MM-dd") })">
+                <div class="dash-orders-top">
+                    <span class="dash-title">Total orders</span>
+                    <span class="dash-pill" id="dash-ord-cmp"></span>
+                </div>
+                <div class="dash-orders-num"><b id="dash-ord-num">@all.Count</b><span class="dash-muted">avg <strong id="dash-ord-avg">RM @all.Average.ToString("N2")</strong></span></div>
+                <div class="dash-seg" role="tablist" aria-label="Order type">
+                    @foreach (var s in Model.OrderTypeStats)
                     {
-                        var pct = (double)b.Orders / maxOrders * 100;
-                        var label = DateTime.Today.AddHours(b.Hour).ToString("h tt");
-                        <li class="hour-row @(b.Hour == Model.Now.Hour ? "is-now" : "") @(b.Hour > Model.Now.Hour ? "is-future" : "")"
-                            title="@label: @b.Orders order(s), RM @b.Sales.ToString("N2") paid">
-                            <span class="hour-label">@label</span>
-                            <span class="hour-track"><span class="hour-bar" style="width:@pct.ToString("0.#", inv)%"></span></span>
-                            <span class="hour-value">@b.Orders</span>
-                        </li>
+                        <button type="button" role="tab" class="@(s.Key == "all" ? "is-on" : "")" aria-selected="@(s.Key == "all" ? "true" : "false")"
+                                data-type="@(s.Key == "all" ? "" : s.Key)" data-count="@s.Count" data-avg="@s.Average.ToString("N2")" data-last="@s.LastWeek">
+                            @s.Label <b>@s.Count</b>
+                        </button>
                     }
-                </ul>
-                <p class="small text-muted mt-2 mb-0">Current hour in amber · hover for sales.</p>
-            }
+                </div>
+                <span class="dash-hint">Tap a type to filter the number and average</span>
+                <div class="dash-orders-foot">
+                    @if (string.IsNullOrEmpty(Model.BusiestType))
+                    {
+                        <span>No orders yet today.</span>
+                    }
+                    else
+                    {
+                        <span>Busiest today: <strong>@Model.BusiestType · @Model.BusiestShare%</strong></span>
+                    }
+                </div>
+            </div>
         </div>
 
-    </div>
-
-    @* ================= CENTRE: live floor map ================= *@
-    <div class="col-12 col-xl-6 order-1 order-xl-2">
-        <div class="card p-3 h-100">
-            <div class="d-flex flex-wrap justify-content-between align-items-baseline mb-2">
-                <h2 class="h6 mb-0">Live seating</h2>
-                <div class="small d-flex flex-wrap gap-3 text-muted">
+        @* ================= Live seating ================= *@
+        <div class="dash-card dash-seat">
+            <div class="dash-seat-head">
+                <span class="dash-seat-sum">
+                    <span class="dash-title">Live seating</span>
+                    <svg class="kpi-ring" width="40" height="40" viewBox="0 0 64 64" role="img" aria-label="@Model.OccupiedPercent percent of tables in use">
+                        <circle cx="32" cy="32" r="26" fill="none" stroke="#eee7db" stroke-width="7"></circle>
+                        @if (Model.SeatedShare > 0)
+                        {
+                            <circle cx="32" cy="32" r="26" fill="none" stroke="#263b49" stroke-width="7" stroke-dasharray="@seatedDash @Ring.ToString(inv)" transform="rotate(-90 32 32)"></circle>
+                        }
+                        @if (Model.PaymentShare > 0)
+                        {
+                            <circle cx="32" cy="32" r="26" fill="none" stroke="#974535" stroke-width="7" stroke-dasharray="@payDash @Ring.ToString(inv)" stroke-dashoffset="@payOffset" transform="rotate(-90 32 32)"></circle>
+                        }
+                        <text x="32" y="37" text-anchor="middle" font-family="Georgia, serif" font-size="15" fill="#22343d">@Model.OccupiedPercent%</text>
+                    </svg>
+                    <span><strong>@Model.TablesOccupied / @Model.TablesTotal</strong> tables · @(Model.TablesOccupied - Model.TablesAwaitingPayment) eating · <span class="dash-rust">@Model.TablesAwaitingPayment paying</span></span>
+                </span>
+                <span class="dash-key">
                     <span><span class="live-key live-free"></span>Free</span>
                     <span><span class="live-key live-occupied"></span>Seated</span>
                     <span><span class="live-key live-payment"></span>Awaiting payment</span>
                     <span><span class="live-key live-inactive"></span>Closed</span>
-                </div>
+                </span>
             </div>
 
             @if (!Model.Floors.Any())
             {
-                <p class="text-muted mb-0">No floor layouts yet. <a asp-page="/Admin/Layouts/Create">Create a floor</a> to see live seating here.</p>
+                <p class="dash-muted mb-0">No floor layouts yet. <a asp-page="/Admin/Layouts/Create">Create a floor</a> to see live seating here.</p>
             }
             else
             {
-                <ul class="nav nav-tabs nav-sm mb-2" role="tablist">
+                @* Floor pills: seated count, and a rust dot per table waiting to pay on that floor. *@
+                <div class="dash-floors" role="tablist">
                     @for (int i = 0; i < Model.Floors.Count; i++)
                     {
                         var f = Model.Floors[i];
-                        var seated = f.DiningAreas.SelectMany(a => a.Tables).Count(t => Model.SeatedOrderByTable.ContainsKey(t.Id));
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link py-1 @(i == 0 ? "active" : "")" id="floor-tab-@f.Id" data-bs-toggle="tab"
-                                    data-bs-target="#floor-pane-@f.Id" type="button" role="tab" data-floor-id="@f.Id">
-                                @f.Name <span class="badge bg-light text-dark">@seated</span>
-                            </button>
-                        </li>
+                        var paying = Model.PayingOn(f);
+                        <button class="dash-floor @(i == 0 ? "active" : "")" id="floor-tab-@f.Id" data-bs-toggle="tab"
+                                data-bs-target="#floor-pane-@f.Id" type="button" role="tab" data-floor-id="@f.Id"
+                                title="@paying table@(paying == 1 ? "" : "s") waiting to pay">
+                            @f.Name <span class="dash-floor-n">@Model.SeatedOn(f)</span>
+                            @for (int d = 0; d < Math.Min(paying, 4); d++) { <span class="dash-dot"></span> }
+                        </button>
                     }
-                </ul>
+                </div>
                 <div class="tab-content">
                     @for (int i = 0; i < Model.Floors.Count; i++)
                     {
@@ -163,14 +158,14 @@
                         <div class="tab-pane fade @(i == 0 ? "show active" : "")" id="floor-pane-@f.Id" role="tabpanel">
                             @if (!f.DiningAreas.Any())
                             {
-                                <p class="text-muted small mb-0">Nothing drawn on this floor yet. <a asp-page="/Admin/Layouts/Designer" asp-route-id="@f.Id">Open the layout</a>.</p>
+                                <p class="dash-muted small mb-0">Nothing drawn on this floor yet. <a asp-page="/Admin/Layouts/Designer" asp-route-id="@f.Id">Open the layout</a>.</p>
                             }
-                            <div class="lay-preview live-map" style="aspect-ratio:@f.Width / @f.Height" data-floor-w="@f.Width" data-floor-h="@f.Height">
+                            <div class="lay-preview live-map" style="aspect-ratio:@f.Width / @f.Height;width:min(100%, calc(46vh * @f.Width / @f.Height));margin-inline:auto" data-floor-w="@f.Width" data-floor-h="@f.Height">
                                 @foreach (var a in f.DiningAreas)
                                 {
                                     <div class="lay-preview-area @KOMA.Pages.Admin.Layouts.IndexModel.ZoneClass(a.Zone) @(a.IsActive ? "" : "is-closed")"
                                          style="left:@Pct(a.LayoutX, f.Width);top:@Pct(a.LayoutY, f.Height);width:@Pct(a.LayoutWidth, f.Width);height:@Pct(a.LayoutHeight, f.Height)">
-                                        <span class="live-area-name">@a.Name</span>
+                                        <span class="live-area-name">@a.Name@(a.IsActive ? " · " + Model.AreaUse(a) : "")</span>
                                     </div>
                                 }
                                 @foreach (var a in f.DiningAreas)
@@ -189,51 +184,109 @@
                                         var tip = o is null
                                             ? $"Table {t.TableNumber} · {t.Capacity} seats · {(state == DashboardModel.SeatState.Inactive ? "closed" : "free")}"
                                             : $"Table {t.TableNumber} · {o.CustomerName} · {o.Status.DisplayName()} · seated {DashboardModel.Minutes(o.OrderedAt, Model.Now)} · RM {o.TotalAmount:N2}";
+                                        var sub = o is null ? null : state == DashboardModel.SeatState.AwaitingPayment ? "RM" : DashboardModel.ShortMinutes(o.OrderedAt, Model.Now);
                                         var style = $"left:{Pct(t.LayoutX, f.Width)};top:{Pct(t.LayoutY, f.Height)};width:{Pct(t.LayoutWidth, f.Width)};height:{Pct(t.LayoutHeight, f.Height)}";
                                         @* Clicking a table opens the popup below (filled from TablePopupJson). *@
                                         <button type="button" class="lay-preview-table live-table @css @(t.Shape == TableShape.Round ? "is-round" : "")"
                                                 title="@tip" aria-label="@tip" style="@style" data-table-id="@t.Id"
                                                 data-x="@Num(t.LayoutX)" data-y="@Num(t.LayoutY)" data-w="@Num(t.LayoutWidth)" data-h="@Num(t.LayoutHeight)"
-                                                data-shape="@t.Shape" data-capacity="@t.Capacity"><span>@t.TableNumber</span></button>
+                                                data-shape="@t.Shape" data-capacity="@t.Capacity"><span class="dash-tnum">@(t.TableNumber)@if (sub is not null) {<small>@sub</small>}</span></button>
                                     }
                                 }
                             </div>
                         </div>
                     }
                 </div>
-                <p class="small text-muted mt-2 mb-0">Hover over a table for a summary; click it for details.</p>
             }
         </div>
     </div>
 
-    @* ================= RIGHT: latest orders ================= *@
-    <div class="col-12 col-lg-6 col-xl-3 order-3 d-flex flex-column gap-3">
-        <div class="card p-3 flex-grow-1">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h2 class="h6 mb-0">Latest orders</h2>
-                <a asp-page="/Admin/Orders/Index" class="small">All &rarr;</a>
-            </div>
-            <ul class="list-unstyled small mb-0 latest-list">
-                @foreach (var o in Model.LatestOrders)
+    <div class="dash-right">
+        @* ================= Alerts ================= *@
+        <div class="dash-card dash-alerts" id="dash-alerts">
+            <div class="dash-card-head"><span class="dash-title">Alerts</span><span class="dash-count @(Model.AlertCount == 0 ? "is-zero" : "")">@Model.AlertCount</span></div>
+            @if (Model.AlertCount == 0)
+            {
+                <div class="dash-allclear"><span class="dash-tick">✓</span><strong>All clear</strong><span class="dash-muted">No one is waiting. Orders and payments are on time.</span></div>
+            }
+            else
+            {
+                @if (Model.SoldOut.Any())
                 {
-                    <li>
-                        <button type="button" class="latest-item" data-order-id="@o.Id" aria-label="Show order @o.OrderNumber">
-                            <span class="d-flex justify-content-between">
-                                <span class="fw-semibold latest-num">@o.OrderNumber</span>
-                                <span>RM @o.TotalAmount.ToString("N2")</span>
-                            </span>
-                            <span class="d-flex justify-content-between text-muted">
-                                <span>@o.OrderedAt.ToString("h:mm tt") · @KOMA.Pages.Admin.Orders.IndexModel.CustomerName(o) · @(o.RestaurantTable?.TableNumber ?? "—")</span>
-                                <span class="badge @KOMA.Pages.Admin.Orders.IndexModel.BadgeClass(o.Status)">@o.Status.DisplayName()</span>
-                            </span>
-                        </button>
-                    </li>
+                    <div class="dash-grp"><span>Sold out</span><span>@Model.SoldOut.Count</span></div>
+                    <div class="dash-chips">
+                        @foreach (var m in Model.SoldOut.Take(6)) { <span>@m.Name</span> }
+                        @if (Model.SoldOut.Count > 6) { <span>+@(Model.SoldOut.Count - 6)</span> }
+                        <a asp-page="/Admin/MenuItems/Index">Menu →</a>
+                    </div>
                 }
-                @if (!Model.LatestOrders.Any())
+                @if (Model.SlowOrders.Any())
                 {
-                    <li class="text-muted">No orders yet today.</li>
+                    <div class="dash-grp"><span>Slow orders</span><span>@Model.SlowOrders.Count</span></div>
+                    @foreach (var o in Model.SlowOrders.Take(4))
+                    {
+                        var mins = (int)(Model.Now - o.OrderedAt).TotalMinutes;
+                        <div class="dash-arow">
+                            <span class="dash-mins"><b>@mins</b><span>MIN</span></span>
+                            <span class="dash-what"><strong>@o.OrderNumber · @(o.RestaurantTable?.TableNumber is string tn ? "Table " + tn : o.CustomerName)</strong><span>@o.Status.DisplayName() for @mins min</span></span>
+                            <a class="dash-btn" asp-page="/Admin/Orders/Index" asp-route-id="@o.Id">Open</a>
+                        </div>
+                    }
                 }
-            </ul>
+                @if (Model.UnpaidTables.Any())
+                {
+                    <div class="dash-grp"><span>Unpaid tables</span><span>@Model.UnpaidTables.Count</span></div>
+                    @foreach (var o in Model.UnpaidTables.Take(4))
+                    {
+                        <div class="dash-arow">
+                            <span class="dash-rm">RM</span>
+                            <span class="dash-what"><strong>Table @(o.RestaurantTable?.TableNumber ?? "—") · RM @o.TotalAmount.ToString("N2")</strong><span>Waiting to pay</span></span>
+                            <a class="dash-btn" asp-page="/Admin/Orders/Index" asp-route-id="@o.Id">View</a>
+                        </div>
+                    }
+                }
+            }
+            <div class="dash-alerts-foot"><span>Clears itself when each item is fixed.</span><span class="dash-ok">✓ @(Model.TablesTotal - Model.UnpaidTables.Count) tables fine</span></div>
+        </div>
+
+        @* ================= Booking schedule (agenda list) ================= *@
+        <div class="dash-card dash-agenda">
+            <div class="dash-card-head"><span class="dash-title">Booking schedule</span><span class="dash-label-sm">guests · table</span></div>
+            @if (!Model.Agenda.Any())
+            {
+                <p class="dash-muted small mb-0">No bookings today.</p>
+            }
+            else
+            {
+                var nowShown = false;
+                foreach (var row in Model.Agenda)
+                {
+                    var r = row.Booking;
+                    if (!nowShown && r.StartTime >= Model.Now)
+                    {
+                        nowShown = true;
+                        <div class="dash-now"><span>NOW @Model.Now.ToString("h:mm")</span></div>
+                    }
+                    var cls = row.State switch
+                    {
+                        DashboardModel.AgendaState.Arrived => "is-arrived",
+                        DashboardModel.AgendaState.Past => "is-past",
+                        DashboardModel.AgendaState.Next => "is-next",
+                        _ => ""
+                    };
+                    <a class="dash-brow @cls" asp-page="/Reservations/Details" asp-route-id="@r.Id"
+                       title="@r.CustomerName · @r.GuestCount guests · @r.StartTime.ToString("h:mm tt")–@r.EndTime.ToString("h:mm tt")@(string.IsNullOrWhiteSpace(r.SpecialRequests) ? "" : " · " + r.SpecialRequests)">
+                        <span class="dash-btime">@r.StartTime.ToString("h:mm")</span>
+                        <span class="dash-bwho"><strong>@r.CustomerName</strong> <span>· @r.GuestCount · @(r.RestaurantTable?.TableNumber ?? "—")</span></span>
+                        @if (row.State == DashboardModel.AgendaState.Arrived) { <span class="dash-pill is-up">✓</span> }
+                        else if (row.State == DashboardModel.AgendaState.Next) { <span class="dash-pill is-next">in @Math.Max(1, (int)Math.Ceiling((r.StartTime - Model.Now).TotalMinutes)) min</span> }
+                    </a>
+                }
+                if (!nowShown)
+                {
+                    <div class="dash-now"><span>NOW @Model.Now.ToString("h:mm")</span></div>
+                }
+            }
         </div>
     </div>
 </div>
@@ -377,22 +430,49 @@
                 b.addEventListener('shown.bs.tab', function () { save('koma.dashboard.floor', b.dataset.floorId); });
             });
 
-            // Refresh the page every minute so seating and orders stay current.
-            var toggle = document.getElementById('auto-refresh');
-            toggle.checked = load('koma.dashboard.autorefresh') !== 'off';
-            var timer = null;
-            function schedule() {
-                clearTimeout(timer);
-                if (toggle.checked) timer = setTimeout(function () {
-                    // Don't reload while a table popup is open - try again in a minute.
-                    if (document.querySelector('.modal.show')) { schedule(); return; }
+            // Refresh the page every minute so seating, alerts and bookings stay current (always on).
+            function scheduleRefresh() {
+                setTimeout(function () {
+                    // Don't reload while a popup is open - try again in a minute.
+                    if (document.querySelector('.modal.show, dialog[open]')) { scheduleRefresh(); return; }
                     location.reload();
                 }, 60000);
-                document.getElementById('refresh-info').textContent =
-                    'Updated @Model.Now.ToString("h:mm tt")' + (toggle.checked ? ' · refreshes every minute' : ' · auto-refresh off');
             }
-            toggle.addEventListener('change', function () { save('koma.dashboard.autorefresh', toggle.checked ? 'on' : 'off'); schedule(); });
-            schedule();
+            scheduleRefresh();
+
+            // Total orders: tabs filter the number, average and comparison by order type.
+            var dayName = '@Model.Now.ToString("ddd")';
+            function showType(btn) {
+                document.querySelectorAll('.dash-seg button').forEach(function (b) {
+                    var on = b === btn; b.classList.toggle('is-on', on); b.setAttribute('aria-selected', on ? 'true' : 'false');
+                });
+                var n = +btn.dataset.count, last = +btn.dataset.last, cmp = document.getElementById('dash-ord-cmp');
+                document.getElementById('dash-ord-num').textContent = n;
+                document.getElementById('dash-ord-avg').textContent = 'RM ' + btn.dataset.avg;
+                if (last === 0) { cmp.textContent = n ? 'First this weekday' : 'None yet'; cmp.className = 'dash-pill'; }
+                else if (n === last) { cmp.textContent = 'Same as last ' + dayName; cmp.className = 'dash-pill'; }
+                else { cmp.textContent = (n > last ? '↑ ' : '↓ ') + Math.abs(n - last) + ' vs last ' + dayName; cmp.className = 'dash-pill ' + (n > last ? 'is-up' : 'is-down'); }
+            }
+            document.querySelectorAll('.dash-seg button').forEach(function (b) {
+                b.addEventListener('click', function (e) { e.stopPropagation(); showType(b); });
+            });
+
+            // Clicking anywhere else on the Total orders card opens the Orders page for today
+            // (with the selected type, if one is chosen).
+            var ordersCard = document.getElementById('dash-orders');
+            function openOrders() {
+                var url = ordersCard.dataset.href, on = document.querySelector('.dash-seg button.is-on');
+                if (on && on.dataset.type) url += (url.indexOf('?') < 0 ? '?' : '&') + 'type=' + encodeURIComponent(on.dataset.type);
+                location.href = url;
+            }
+            if (ordersCard) {
+                ordersCard.addEventListener('click', openOrders);
+                ordersCard.addEventListener('keydown', function (e) {
+                    if ((e.key === 'Enter' || e.key === ' ') && e.target === ordersCard) { e.preventDefault(); openOrders(); }
+                });
+            }
+            var firstTab = document.querySelector('.dash-seg button');
+            if (firstTab) showType(firstTab);
         })();
     </script>
 }

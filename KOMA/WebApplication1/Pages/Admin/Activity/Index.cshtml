@@ -214,23 +214,16 @@
         @if (Model.CanRevert)
         {
             var revertRoute = Model.Route(id: sel.Id);
-            <dialog class="mn-dialog" id="act-revert" aria-labelledby="act-revert-title">
-                <form method="post" asp-page-handler="Revert" asp-all-route-data="revertRoute">
+            <dialog class="kc" id="act-revert" aria-labelledby="act-revert-title" data-tone="warn">
+                <form method="post" asp-page-handler="Revert" asp-all-route-data="revertRoute" class="kc-form">
                     <input type="hidden" name="logId" value="@sel.Id" />
-                    <div class="mn-dialog-body">
-                        <div class="mn-eyebrow">Revert change</div>
-                        <h2 id="act-revert-title">Put @sel.Title back?</h2>
-                        <p class="mn-muted mb-0">This restores the values from before @sel.At.ToString("h:mm tt"). The revert is also added to Activity.</p>
-                        <ul class="mn-changes">
-                            @foreach (var r in Model.Rows)
-                            {
-                                <li><span>@(r.Item is null ? r.Field : $"{r.Item} · {r.Field}")</span><s>@r.After</s><b aria-hidden="true">→</b><strong>@r.Before</strong></li>
-                            }
-                        </ul>
-                    </div>
-                    <div class="mn-dialog-actions">
-                        <button type="button" class="btn btn-outline-primary" id="act-revert-cancel">Cancel</button>
-                        <button type="submit" class="btn mn-btn-danger-solid">Revert</button>
+                    <div class="kc-band" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg></div>
+                    <div class="kc-body">
+                        <h2 class="kc-title" id="act-revert-title">Put @sel.Title back?</h2>
+                        <div class="kc-actions">
+                            <button type="button" class="btn btn-outline-primary" id="act-revert-cancel">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Revert</button>
+                        </div>
                     </div>
                 </form>
             </dialog>

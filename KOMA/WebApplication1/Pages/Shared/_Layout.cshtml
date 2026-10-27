@@ -84,9 +84,12 @@
         </div>
     </footer>
 
+    <partial name="_ConfirmDialog" />
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/koma-confirm.js" asp-append-version="true"></script>
     @if (Context.Request.Path.StartsWithSegments("/Admin"))
     {
         <script src="~/js/admin-rail.js" asp-append-version="true"></script>

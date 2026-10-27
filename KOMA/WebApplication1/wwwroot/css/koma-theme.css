@@ -931,3 +931,205 @@ a.lvl-3:hover, a.lvl-4:hover { color: var(--paper); }
 .mn-choice.is-danger:has(input:checked) { border-color: var(--rust); }
 .mn-choice.is-disabled { opacity: .5; cursor: not-allowed; }
 .mn-choice .form-select { border-radius: 12px; }
+
+/* ---- Shared confirmation pop-up (design B): colour band with the icon in the middle, one-word buttons ----
+   Markup: Pages/Shared/_ConfirmDialog.cshtml. Also used by the category-delete and revert pop-ups.
+   data-tone: danger = red (delete / cancel), warn = amber (risky change), navy = save. */
+.kc {
+  --kc-tone: var(--rust);
+  border: 0; padding: 0; width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 48px);
+  border-radius: 18px; overflow: hidden; background: var(--card); color: var(--ink);
+  box-shadow: 0 24px 60px rgba(34, 52, 61, .25);
+}
+.kc[open] { display: flex; animation: mn-pop .22s cubic-bezier(.2, .9, .3, 1.2); }
+.kc::backdrop {   /* "soft glass": the current navy dim plus a light blur of the page behind */
+  background: rgba(34, 52, 61, .32); animation: mn-fade .2s ease;
+  -webkit-backdrop-filter: blur(4px) saturate(1.1); backdrop-filter: blur(4px) saturate(1.1);
+}
+.kc[data-tone="warn"] { --kc-tone: #b07a1f; }
+.kc[data-tone="navy"] { --kc-tone: var(--navy); }
+.kc-form { display: flex; width: 100%; margin: 0; }
+.kc-band {
+  width: 76px; flex: none; display: flex; align-items: center; justify-content: center;   /* icon in the middle */
+  background: var(--kc-tone); color: var(--card);
+}
+.kc-band svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.kc-body { flex: 1; min-width: 0; padding: 24px 26px 22px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+.kc-title { margin: 0; font: 400 22px/1.25 Georgia, serif; }
+.kc-text { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.kc-text[hidden], .kc-list[hidden] { display: none; }
+.kc .mn-changes { margin-top: 2px; }
+.kc-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+.kc-actions .btn { min-width: 96px; border-radius: 99px; }
+.kc-actions .btn[hidden] { display: none; }
+@media (max-width: 480px) {
+  .kc-band { width: 52px; }
+  .kc-band svg { width: 22px; height: 22px; }
+  .kc-body { padding: 20px 18px 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .kc[open], .kc::backdrop { animation: none; } }
+
+/* ---------- Today dashboard v7.3 (Pages/Admin/Dashboard.cshtml) ----------
+   Header with date tile + alerts chip · Sales by date · Total orders by type · Live seating · Alerts · Booking schedule.
+   Cards use a light frosted-glass look; the page background stays the normal paper colour. */
+.dash-card {
+  background: rgba(251, 250, 246, .58);
+  -webkit-backdrop-filter: blur(16px) saturate(1.35); backdrop-filter: blur(16px) saturate(1.35);
+  border: 1px solid rgba(255, 255, 255, .7); border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(38, 59, 73, .10), inset 0 1px 0 rgba(255, 255, 255, .8);
+  color: var(--ink);
+}
+.dash-muted { color: var(--muted); }
+.dash-rust { color: var(--rust); }
+.dash-title { font: 700 17px Georgia, serif; }
+.dash-label { font-size: 13px; font-weight: 700; color: var(--ink); }
+.dash-label-sm { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.dash-eyebrow { font-size: 10px; letter-spacing: 2px; font-weight: 700; color: var(--rust); text-transform: uppercase; }
+.dash-hint { font-size: 11px; color: var(--muted); }
+.dash-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: var(--paper-2); color: var(--muted); }
+.dash-pill.is-up { background: #e4eedd; color: #3c6b2f; }
+.dash-pill.is-down { background: #f3dfda; color: var(--rust); }
+.dash-pill.is-next { background: var(--rust); color: var(--card); }
+.dash-card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+
+/* Header */
+.dash-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
+.dash-head h1 { font-size: 32px; line-height: 1; }
+.dash-cal { width: 58px; flex: none; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--card); text-align: center; display: flex; flex-direction: column; }
+.dash-cal-m { background: var(--rust); color: var(--card); font-size: 10px; font-weight: 700; letter-spacing: 1.5px; padding: 3px 0; }
+.dash-cal-d { font: 400 28px/1.1 Georgia, serif; padding-top: 2px; }
+.dash-cal-w { font-size: 10px; color: var(--muted); padding-bottom: 4px; }
+.dash-status { font-size: 12px; margin-top: 4px; }
+.dash-status.is-open { color: #3c6b2f; }
+.dash-status.is-closed { color: var(--rust); }
+.dash-alert-chip { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; border-radius: 99px; background: var(--rust); color: var(--card); font-size: 12.5px; font-weight: 700; text-decoration: none; box-shadow: 0 0 0 4px rgba(151, 69, 53, .15); transition: transform .15s; }
+.dash-alert-chip:hover { color: var(--card); transform: translateY(-1px); }
+.dash-chip-parts { display: flex; gap: 4px; }
+.dash-chip-parts > span { padding: 2px 8px; border-radius: 99px; background: rgba(255, 255, 255, .18); font-size: 11.5px; }
+.dash-live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.dash-live-dot { width: 8px; height: 8px; border-radius: 50%; background: #4f8a3c; box-shadow: 0 0 0 4px rgba(79, 138, 60, .18); animation: dash-pulse 2s infinite; }
+@keyframes dash-pulse { 50% { box-shadow: 0 0 0 7px rgba(79, 138, 60, .05); } }
+
+/* Grid: left (sales, orders, seating) | right (alerts, bookings) */
+.dash-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; align-items: stretch; }
+.dash-left, .dash-right { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.dash-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+/* Sales (whole card is a link to Revenue › Day) */
+.dash-sales { position: relative; display: flex; flex-direction: column; padding: 18px 20px; text-decoration: none; transition: background-color .2s, border-color .2s, color .2s, box-shadow .2s; }
+.dash-sales:hover, .dash-sales:focus-visible { background: var(--navy); border-color: var(--navy); color: var(--paper); box-shadow: 0 12px 26px rgba(38, 59, 73, .25); outline: none; }
+.dash-sales:hover .dash-eyebrow, .dash-sales:focus-visible .dash-eyebrow { color: var(--sand); }
+.dash-go { position: absolute; top: 14px; right: 14px; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; color: var(--rust); transition: all .2s; }
+.dash-sales:hover .dash-go { background: var(--paper); border-color: var(--paper); color: var(--navy); }
+.dash-big { font: 400 40px/1 Georgia, serif; margin: 6px 0; }
+.dash-big small { font-size: 17px; vertical-align: 14px; margin-right: 4px; }
+.dash-cmp { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 3px 0; border-top: 1px solid var(--paper-2); }
+.dash-sales:hover .dash-cmp { border-color: rgba(255, 255, 255, .12); }
+.dash-cmp-day { width: 110px; font-weight: 700; }
+.dash-cmp-amt { font: 400 15px Georgia, serif; }
+.dash-cmp .dash-pill { margin-left: auto; }
+.dash-foot-note { margin-top: auto; padding-top: 6px; font-size: 10.5px; color: var(--muted); }
+.dash-sales:hover .dash-foot-note { color: rgba(244, 241, 233, .7); }
+
+/* Total orders */
+.dash-orders { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.dash-orders-top { display: flex; justify-content: space-between; align-items: center; }
+.dash-orders-num { display: flex; align-items: baseline; gap: 14px; }
+.dash-orders-num b { font: 400 34px/1 Georgia, serif; }
+.dash-orders-num strong { color: var(--ink); }
+.dash-seg { display: flex; gap: 4px; padding: 3px; border-radius: 99px; background: rgba(238, 231, 219, .7); }
+.dash-seg button { flex: 1; border: 0; background: transparent; padding: 6px 4px; border-radius: 99px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.dash-seg button b { color: var(--ink); }
+.dash-seg button.is-on { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgba(34, 52, 61, .12); }
+.dash-orders-foot { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--paper-2); font-size: 12px; color: var(--muted); }
+.dash-orders-foot strong { color: var(--ink); }
+
+/* Live seating */
+.dash-seat { padding: 16px 18px; flex: 1; display: flex; flex-direction: column; }
+.dash-seat-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.dash-seat-sum { display: flex; align-items: center; gap: 12px; font-size: 12.5px; }
+.dash-key { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.dash-floors { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.dash-floor { display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 99px; border: 1px solid var(--line); background: transparent; font-size: 12.5px; color: var(--ink); }
+.dash-floor.active { background: var(--navy); border-color: var(--navy); color: var(--paper); font-weight: 600; }
+.dash-floor-n { opacity: .8; }
+.dash-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rust); }
+.dash-floor.active .dash-dot { background: #e2a99b; }
+.dash-seat .live-map { background: rgba(255, 255, 255, .72); }
+.dash-tnum { display: flex; flex-direction: column; align-items: center; line-height: 1.05; }
+.dash-tnum small { font-size: .85em; font-weight: 400; opacity: .75; }
+
+/* Alerts */
+.dash-alerts { padding: 16px 18px; display: flex; flex-direction: column; }
+.dash-count { padding: 2px 9px; border-radius: 99px; background: var(--rust); color: var(--card); font-size: 11.5px; font-weight: 700; }
+.dash-count.is-zero { background: #e4eedd; color: #3c6b2f; }
+.dash-grp { display: flex; justify-content: space-between; margin: 12px 0 2px; font-size: 10.5px; letter-spacing: 1.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+.dash-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--paper-2); }
+.dash-chips > span { padding: 3px 9px; border-radius: 99px; background: var(--paper-2); font-size: 11.5px; font-weight: 700; }
+.dash-chips a { margin-left: auto; font-size: 12px; color: var(--rust); text-decoration: none; }
+.dash-arow { display: grid; grid-template-columns: 46px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--paper-2); }
+.dash-mins { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.dash-mins b { font: 400 20px Georgia, serif; color: #7a5a2a; }
+.dash-mins span { font-size: 9.5px; letter-spacing: 1px; color: #9a9d95; }
+.dash-rm { font-size: 15px; font-weight: 700; color: var(--rust); text-align: center; }
+.dash-what { display: flex; flex-direction: column; min-width: 0; font-size: 13px; }
+.dash-what span { font-size: 12px; color: var(--muted); }
+.dash-btn { padding: 6px 12px; border-radius: 99px; border: 1px solid var(--navy); font-size: 12px; font-weight: 600; color: var(--ink); text-decoration: none; white-space: nowrap; }
+.dash-btn:hover { background: var(--navy); color: var(--paper); }
+.dash-allclear { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 24px 0; text-align: center; font-size: 12px; }
+.dash-allclear strong { font-size: 14px; }
+.dash-tick { width: 44px; height: 44px; border-radius: 50%; background: #e4eedd; color: #3c6b2f; font-size: 22px; display: flex; align-items: center; justify-content: center; }
+.dash-alerts-foot { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--paper-2); display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--muted); }
+.dash-ok { color: #3c6b2f; white-space: nowrap; }
+
+/* Booking schedule (agenda list) */
+.dash-agenda { padding: 14px 16px; flex: 1; }
+.dash-brow { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border: 1.5px solid transparent; border-radius: 12px; color: var(--ink); text-decoration: none; }
+.dash-brow:hover { background: var(--paper-2); color: var(--ink); }
+.dash-brow.is-arrived, .dash-brow.is-past { opacity: .6; }
+.dash-brow.is-next { background: #f6e9e5; border-color: var(--rust); }
+.dash-btime { font: 400 14px Georgia, serif; }
+.dash-bwho { font-size: 12.5px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-bwho span { color: var(--muted); }
+.dash-now { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 10px; font-weight: 700; color: var(--rust); }
+.dash-now::after { content: ""; flex: 1; height: 2px; background: var(--rust); }
+
+/* Smaller screens: right column drops below; on phones everything stacks. */
+@media (max-width: 1199.98px) {
+  .dash-grid { grid-template-columns: minmax(0, 1fr); }
+  .dash-right { display: grid; grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 767.98px) {
+  .dash-kpis, .dash-right { grid-template-columns: minmax(0, 1fr); }
+  .dash-alert-chip { margin-left: 0; }
+  .dash-head .dash-live { margin-left: auto; }
+}
+@media (prefers-reduced-motion: reduce) { .dash-live-dot { animation: none; } }
+
+/* Dashboard v7.3 tweaks: card titles for Sales / Total orders match Alerts and Booking schedule;
+   the Total orders card is clickable (opens Orders). */
+.dash-title-row { display: flex; align-items: baseline; gap: 8px; padding-right: 36px; }
+.dash-title-sub { font-size: 12px; color: var(--muted); }
+.dash-sales:hover .dash-title-sub { color: rgba(244, 241, 233, .75); }
+.dash-orders { position: relative; cursor: pointer; transition: border-color .2s, box-shadow .2s; }
+.dash-orders .dash-orders-top { padding-right: 36px; }
+.dash-orders:hover, .dash-orders:focus-visible { border-color: var(--navy); box-shadow: 0 12px 26px rgba(38, 59, 73, .16); outline: none; }
+.dash-orders:hover .dash-go, .dash-orders:focus-visible .dash-go { background: var(--navy); border-color: var(--navy); color: var(--paper); }
+.dash-seg { cursor: default; }
+
+/* Total orders card: same navy hover as the Sales card. */
+.dash-orders { transition: background-color .2s, border-color .2s, color .2s, box-shadow .2s; }
+.dash-orders:hover, .dash-orders:focus-visible { background: var(--navy); border-color: var(--navy); color: var(--paper); box-shadow: 0 12px 26px rgba(38, 59, 73, .25); }
+.dash-orders:hover .dash-go, .dash-orders:focus-visible .dash-go { background: var(--paper); border-color: var(--paper); color: var(--navy); }
+.dash-orders:hover .dash-muted, .dash-orders:hover .dash-hint, .dash-orders:hover .dash-orders-foot { color: rgba(244, 241, 233, .75); }
+.dash-orders:hover .dash-orders-num strong, .dash-orders:hover .dash-orders-foot strong { color: var(--paper); }
+.dash-orders:hover .dash-orders-foot { border-color: rgba(255, 255, 255, .12); }
+.dash-orders:hover .dash-seg { background: rgba(255, 255, 255, .12); }
+.dash-orders:hover .dash-seg button { color: rgba(244, 241, 233, .75); }
+.dash-orders:hover .dash-seg button b { color: var(--paper); }
+.dash-orders:hover .dash-seg button.is-on { background: var(--paper); color: var(--navy); }
+.dash-orders:hover .dash-seg button.is-on b { color: var(--navy); }
+.dash-orders:hover .dash-pill:not(.is-up):not(.is-down) { background: rgba(255, 255, 255, .14); color: var(--paper); }
+
+/* Arrow circles removed from the Sales / Total orders cards - no space needs reserving for them. */
+.dash-title-row, .dash-orders .dash-orders-top { padding-right: 0; }
