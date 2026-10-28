@@ -17,8 +17,10 @@ public class RegisterModel(AccountService accounts, SignInManager<ApplicationUse
 
     public class InputModel
     {
-        [Required, StringLength(100), Display(Name = "Full name")]
-        public string FullName { get; set; } = string.Empty;
+        [Required, StringLength(50), Display(Name = "First name")]
+        public string FirstName { get; set; } = string.Empty;
+        [Required, StringLength(49), Display(Name = "Last name")]
+        public string LastName { get; set; } = string.Empty;
         [Required, EmailAddress]
         public string Email { get; set; } = string.Empty;
         [Required, StringLength(100, MinimumLength = 6), DataType(DataType.Password)]
@@ -30,7 +32,9 @@ public class RegisterModel(AccountService accounts, SignInManager<ApplicationUse
     public async Task<IActionResult> OnPostAsync()
     {
         if (!ModelState.IsValid) return Page();
-        var user = new ApplicationUser { UserName = Input.Email.Trim(), Email = Input.Email.Trim(), FullName = Input.FullName.Trim() };
+        var user = new ApplicationUser { UserName = Input.Email.Trim(), Email = Input.Email.Trim(),
+            FirstName = Input.FirstName.Trim(), LastName = Input.LastName.Trim(),
+            FullName = $"{Input.FirstName.Trim()} {Input.LastName.Trim()}" };
         var result = await accounts.CreateAsync(user, Input.Password, "Customer");
         if (!result.Succeeded)
         {
