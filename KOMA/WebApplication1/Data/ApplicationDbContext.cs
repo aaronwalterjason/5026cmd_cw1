@@ -33,6 +33,9 @@ namespace KOMA.Data
         // Engineer B: editable text/photo of the customer landing page (one row).
         public DbSet<LandingPageContent> LandingPageContents => Set<LandingPageContent>();
 
+        // Engineer B: Admin > Activity - changes made by admins/staff and their sign-ins.
+        public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -148,6 +151,11 @@ namespace KOMA.Data
                 .HasOne(i => i.Order).WithMany(o => o.Items)
                 .HasForeignKey(i => i.OrderId)
                 .OnDelete(DeleteBehavior.Cascade);
+            // Activity log is read newest-first, filtered by area and by person.
+            builder.Entity<ActivityLog>().HasIndex(l => l.At);
+            builder.Entity<ActivityLog>().HasIndex(l => new { l.Area, l.At });
+            builder.Entity<ActivityLog>().HasIndex(l => l.UserId);
+
             // Deleting a dish keeps past orders: the line's link is cleared, its saved ItemName/UnitPrice stay.
             builder.Entity<OrderItem>()
                 .HasOne(i => i.MenuItem).WithMany()

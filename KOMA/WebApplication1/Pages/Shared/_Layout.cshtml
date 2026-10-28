@@ -15,7 +15,8 @@
 <body>
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light koma-topbar mb-3">
-            <div class="container">
+            @* Full width: logo and links start at the left edge (above the admin rail) instead of being centred. *@
+            <div class="container-fluid koma-topbar-inner">
                 <a class="navbar-brand koma-brand" asp-area="" asp-page="/Index" aria-label="KOMA home"><span aria-hidden="true">こま</span>KOMA</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
@@ -83,9 +84,12 @@
         </div>
     </footer>
 
+    <partial name="_ConfirmDialog" />
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/koma-confirm.js" asp-append-version="true"></script>
     @if (Context.Request.Path.StartsWithSegments("/Admin"))
     {
         <script src="~/js/admin-rail.js" asp-append-version="true"></script>

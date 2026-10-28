@@ -13,6 +13,7 @@
     var floors = Under("/Admin/Layouts", "/Admin/DiningAreas", "/Admin/Tables");
     var menu = Under("/Admin/MenuItems", "/Admin/MenuCategories");
     var website = Under("/Admin/LandingPage");
+    var activity = Under("/Admin/Activity");
     var reports = Under("/Admin/Reports");
     var accounts = Under("/Admin/Accounts");
     var settings = Under("/Admin/Settings");
@@ -75,6 +76,13 @@
 
         <li class="admin-rail-divider" aria-hidden="true"></li>
 
+        <li class="admin-rail-group @Current(activity)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Activity/Index" aria-current="@Aria(activity)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+                <span class="admin-rail-label">Activity</span>
+            </a>
+            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Admin &amp; staff activity</div>
+        </li>
         <li class="admin-rail-group @Current(reports)">
             <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Reports/Index" aria-current="@Aria(reports)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>

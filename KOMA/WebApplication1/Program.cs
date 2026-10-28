@@ -9,8 +9,12 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found. Check appsettings.json.");
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString));
+// AuditInterceptor writes an Admin > Activity entry whenever an admin/staff member saves a change.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<AuditInterceptor>();
+builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
+    options.UseSqlServer(connectionString)
+           .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
 
 builder.Services.AddDefaultIdentity<KOMA.Models.ApplicationUser>(options =>
 {
@@ -18,7 +22,8 @@ builder.Services.AddDefaultIdentity<KOMA.Models.ApplicationUser>(options =>
         options.Password.RequireNonAlphanumeric = false;  // relaxed for coursework demo logins
     })
     .AddRoles<IdentityRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>();
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddSignInManager<AuditSignInManager>();   // also logs admin/staff sign-ins to Admin > Activity
 
 builder.Services.AddRazorPages();
 builder.Services.AddScoped<AccountService>();

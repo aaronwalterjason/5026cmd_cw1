@@ -153,24 +153,11 @@
 <div class="lp-savebar">
     <span class="mn-muted small">Tip: press Enter in a text box to start a new line on the page.</span>
     <form method="post" asp-page-handler="Reset" class="ms-auto"
-          data-confirm-title="Reset the landing page?" data-confirm-text="All wording and the banner photo go back to the original KOMA versions. Your dish choices on the Menu page are not changed." data-confirm-ok="Reset">
+          data-confirm-title="Reset the landing page?" data-confirm-ok="Reset" data-confirm-icon="undo">
         <button type="submit" class="btn mn-btn-danger">Reset to original</button>
     </form>
     <button type="submit" form="lp-form" class="btn btn-primary">Save changes</button>
 </div>
-
-<dialog class="mn-dialog" id="mn-confirm" aria-labelledby="mn-confirm-title">
-    <div class="mn-dialog-body">
-        <div class="mn-eyebrow" id="mn-confirm-eyebrow">Confirm changes</div>
-        <h2 id="mn-confirm-title">Save changes?</h2>
-        <p id="mn-confirm-text" class="mn-muted mb-0"></p>
-        <ul id="mn-confirm-list" class="mn-changes"></ul>
-    </div>
-    <div class="mn-dialog-actions">
-        <button type="button" class="btn btn-outline-primary" id="mn-confirm-cancel">Cancel</button>
-        <button type="button" class="btn btn-primary" id="mn-confirm-ok">Confirm</button>
-    </div>
-</dialog>
 
 @section Scripts {
     <script>
@@ -184,45 +171,26 @@
             if (f) document.getElementById('lp-hero-img').src = URL.createObjectURL(f);
         });
 
-        // Confirmation popup (same as the Menu page) and the green "saved" popup.
+        // Confirmation popup for saving (shared KOMA pop-up, js/koma-confirm.js; the Reset form is handled there too)
+        // and the green "saved" popup.
         (() => {
-            const dlg = document.getElementById('mn-confirm'), $ = id => document.getElementById(id);
-            const esc = t => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+            const $ = id => document.getElementById(id);
             const short = t => t.length > 60 ? t.slice(0, 57) + '…' : t;
-            let pending = null;
             const valueOf = el => el.type === 'checkbox' ? (el.checked ? 'On' : 'Off')
                 : el.type === 'file' ? (el.files && el.files[0] ? el.files[0].name : '') : el.value.trim();
-            const open = o => {
-                $('mn-confirm-eyebrow').textContent = o.eyebrow; $('mn-confirm-title').textContent = o.title;
-                $('mn-confirm-text').textContent = o.text || '';
-                $('mn-confirm-list').innerHTML = (o.rows || []).join(''); $('mn-confirm-list').hidden = !(o.rows || []).length;
-                const ok = $('mn-confirm-ok'); ok.hidden = !o.onOk; ok.textContent = o.ok || 'Confirm';
-                ok.className = 'btn ' + (o.danger ? 'mn-btn-danger-solid' : 'btn-primary');
-                $('mn-confirm-cancel').textContent = o.onOk ? 'Cancel' : 'OK';
-                pending = o.onOk; dlg.showModal(); (o.onOk ? ok : $('mn-confirm-cancel')).focus();
-            };
-            $('mn-confirm-cancel').addEventListener('click', () => dlg.close());
-            $('mn-confirm-ok').addEventListener('click', () => { const go = pending; pending = null; dlg.close(); go && go(); });
-            dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
 
             document.querySelectorAll('form.js-confirm-save').forEach(form => {
                 const fields = () => [...form.querySelectorAll('[data-label]')];
                 const before = new Map(fields().map(el => [el, valueOf(el)]));
                 form.addEventListener('submit', e => {
                     e.preventDefault();
-                    const rows = fields().filter(el => before.get(el) !== valueOf(el)).map(el =>
-                        `<li><span>${esc(el.dataset.label)}</span><s>${esc(short(before.get(el) || '(empty)'))}</s><b aria-hidden="true">→</b><strong>${esc(short(valueOf(el) || '(empty)'))}</strong></li>`);
-                    if (!rows.length) { open({ eyebrow: 'Nothing to save', title: 'No changes yet', text: "You haven't changed anything on the landing page." }); return; }
-                    open({ eyebrow: 'Confirm changes', title: `Publish ${rows.length} change${rows.length === 1 ? '' : 's'} to the landing page?`,
-                           text: 'Customers will see these straight away.', rows, ok: 'Save changes',
+                    // Title-only pop-up (descriptions are kept for menu items, categories and cancelling orders).
+                    const changed = fields().some(el => before.get(el) !== valueOf(el));
+                    if (!changed) { KomaConfirm.open({ tone: 'navy', icon: 'info', title: 'No changes to save yet' }); return; }
+                    KomaConfirm.open({ tone: 'navy', icon: 'check', title: 'Publish changes to the landing page?', ok: 'Save', no: 'Cancel',
                            onOk: () => HTMLFormElement.prototype.submit.call(form) });
                 });
             });
-            document.querySelectorAll('form[data-confirm-title]').forEach(form => form.addEventListener('submit', e => {
-                e.preventDefault();
-                open({ eyebrow: 'Please confirm', title: form.dataset.confirmTitle, text: form.dataset.confirmText,
-                       ok: form.dataset.confirmOk, danger: true, onOk: () => HTMLFormElement.prototype.submit.call(form) });
-            }));
 
             const toast = $('mn-toast');
             if (toast) {

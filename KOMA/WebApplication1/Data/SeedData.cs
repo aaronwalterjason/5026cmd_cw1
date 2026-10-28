@@ -42,6 +42,7 @@ public static class SeedData
                 await EnsureAsync(email, "Customer#12345", "Customer", name);
             await DemoOrderSeeder.SeedAsync(db);
             await DemoOrderSeeder.EnsureTodayAsync(db);
+            await DemoReservationSeeder.SeedAsync(db);   // sample bookings (once)
         }
 
         async Task EnsureAsync(string email, string password, string role, string name)

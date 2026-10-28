@@ -7,8 +7,8 @@ using KOMA.Models;
 
 namespace KOMA.Pages.Admin
 {
-    // "Today" dashboard: everything about the current service - sales so far, orders by hour,
-    // who is seated where (live floor map), and the latest orders.
+    // "Today" dashboard (layout v7.3): sales so far compared by date, total orders by type, alerts,
+    // who is seated where (live floor map) and today's booking schedule.
     // Longer-term figures live on the Revenue page.
     [Authorize(Roles = "Administrator")]
     public class DashboardModel : PageModel
@@ -52,6 +52,33 @@ namespace KOMA.Pages.Admin
         // Sent with the page so the popup opens instantly (no extra page load).
         public string TablePopupJson { get; private set; } = "{}";
         public string OrderPopupJson { get; private set; } = "{}";   // same popup for Latest orders
+
+        // ---- Dashboard v7.3: header, sales by date, order types, alerts, booking schedule ----
+        public bool IsOpen { get; private set; }
+        public string OpenText { get; private set; } = "";            // "Open until 10 PM" / "Closed · opens 10 AM"
+        public Reservation? NextBooking { get; private set; }
+
+        // Sales so far today vs the same time of day on earlier dates (yesterday, 1 and 2 weeks ago).
+        public record SalesCompare(DateTime Day, decimal Amount, double? ChangePercent);
+        public List<SalesCompare> SalesComparisons { get; private set; } = new();
+
+        // Total orders, split by order type (first entry = all types).
+        public record TypeStat(string Key, string Label, int Count, decimal Average, int LastWeek);
+        public List<TypeStat> OrderTypeStats { get; private set; } = new();
+        public string BusiestType { get; private set; } = "";
+        public int BusiestShare { get; private set; }
+
+        // Alerts: things an admin may need to step in on. Each disappears once it's fixed.
+        public const int SlowOrderMinutes = 15;
+        public IList<MenuItem> SoldOut { get; private set; } = new List<MenuItem>();
+        public IList<Order> SlowOrders { get; private set; } = new List<Order>();
+        public IList<Order> UnpaidTables { get; private set; } = new List<Order>();
+        public int AlertCount => (SoldOut.Any() ? 1 : 0) + SlowOrders.Count + UnpaidTables.Count;
+
+        // Booking schedule (agenda list) for today.
+        public enum AgendaState { Arrived, Past, Next, Upcoming }
+        public record AgendaRow(Reservation Booking, AgendaState State);
+        public List<AgendaRow> Agenda { get; private set; } = new();
 
         // ---- Setup (small summary) ----
         public int MenuItemCount { get; private set; }
@@ -128,6 +155,74 @@ namespace KOMA.Pages.Admin
             LatestOrders = todays.OrderByDescending(o => o.OrderedAt).Take(6).ToList();
 
             BuildTablePopupJson();
+
+            // ---------- Dashboard v7.3 ----------
+            // Opening hours (single settings row; defaults if it's missing).
+            var settings = await _db.RestaurantSettings.AsNoTracking().FirstOrDefaultAsync() ?? new RestaurantSettings();
+            var nowTime = TimeOnly.FromDateTime(Now);
+            IsOpen = nowTime >= settings.OpeningTime && nowTime < settings.ClosingTime;
+            OpenText = IsOpen
+                ? $"Open until {ShortTime(settings.ClosingTime)}"
+                : nowTime < settings.OpeningTime ? $"Closed · opens {ShortTime(settings.OpeningTime)}" : "Closed for today";
+
+            // Sales so far vs the same time of day on earlier dates.
+            var sinceStart = Now - today;
+            foreach (var daysBack in new[] { 1, 7, 14 })
+            {
+                var day = today.AddDays(-daysBack);
+                var amount = await _db.Orders
+                    .Where(o => o.PaymentStatus == PaymentStatus.Paid && o.PaidAt >= day && o.PaidAt < day + sinceStart)
+                    .SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
+                double? change = amount == 0 ? null : (double)((SalesToday - amount) / amount * 100);
+                SalesComparisons.Add(new SalesCompare(day, amount, change));
+            }
+
+            // Orders by type (today so far vs the same weekday last week, same time of day).
+            var lastWeekByType = await _db.Orders
+                .Where(o => o.OrderedAt >= lastWeek && o.OrderedAt < lastWeekNow && o.Status != OrderStatus.Cancelled)
+                .GroupBy(o => o.OrderType).Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(g => g.Key, g => g.Count);
+            OrderTypeStats.Add(new TypeStat("all", "All", OrdersToday, AverageOrder, OrdersSameDayLastWeek));
+            foreach (var type in Enum.GetValues<OrderType>())
+            {
+                var paidOfType = paidToday.Where(o => o.OrderType == type).ToList();
+                OrderTypeStats.Add(new TypeStat(type.ToString(), TypeLabel(type),
+                    notCancelled.Count(o => o.OrderType == type),
+                    paidOfType.Count == 0 ? 0 : paidOfType.Sum(o => o.TotalAmount) / paidOfType.Count,
+                    lastWeekByType.GetValueOrDefault(type)));
+            }
+            var busiest = OrderTypeStats.Skip(1).OrderByDescending(s => s.Count).First();
+            BusiestType = busiest.Count == 0 ? "" : busiest.Label;
+            BusiestShare = OrdersToday == 0 ? 0 : (int)Math.Round(100.0 * busiest.Count / OrdersToday);
+
+            // Alerts.
+            SoldOut = await _db.MenuItems.AsNoTracking().Where(m => !m.IsAvailable).OrderBy(m => m.Name).ToListAsync();
+            var slowBefore = Now.AddMinutes(-SlowOrderMinutes);
+            SlowOrders = open.Where(o => (o.Status == OrderStatus.Pending || o.Status == OrderStatus.Preparing) && o.OrderedAt <= slowBefore)
+                             .OrderBy(o => o.OrderedAt).ToList();
+            UnpaidTables = SeatedOrderByTable.Values.Where(o => o.Status == OrderStatus.Served)
+                             .OrderBy(o => o.OrderedAt).ToList();
+
+            // Booking schedule: today's bookings in time order. "Arrived" = its pre-order / order has started.
+            var bookings = await _db.Reservations.AsNoTracking()
+                .Include(r => r.RestaurantTable)
+                .Where(r => r.StartTime >= today && r.StartTime < tomorrow && r.Status != ReservationStatus.Cancelled)
+                .OrderBy(r => r.StartTime).ThenBy(r => r.CustomerName)
+                .ToListAsync();
+            var bookingIds = bookings.Select(r => r.Id).ToList();
+            var arrived = (await _db.Orders.AsNoTracking()
+                .Where(o => o.ReservationId != null && bookingIds.Contains(o.ReservationId.Value)
+                            && o.Status != OrderStatus.AwaitingArrival && o.Status != OrderStatus.Cancelled)
+                .Select(o => o.ReservationId!.Value).ToListAsync()).ToHashSet();
+            NextBooking = bookings.FirstOrDefault(r => r.StartTime >= Now && !arrived.Contains(r.Id));
+            foreach (var r in bookings)
+            {
+                var state = arrived.Contains(r.Id) ? AgendaState.Arrived
+                          : r.StartTime < Now ? AgendaState.Past
+                          : r.Id == NextBooking?.Id ? AgendaState.Next
+                          : AgendaState.Upcoming;
+                Agenda.Add(new AgendaRow(r, state));
+            }
 
             MenuItemCount = await _db.MenuItems.CountAsync();
             ActivePromotionCount = await _db.Promotions.CountAsync(p => p.IsActive);
@@ -261,6 +356,29 @@ namespace KOMA.Pages.Admin
         public double SeatedShare => TablesTotal == 0 ? 0 : (double)(TablesOccupied - TablesAwaitingPayment) / TablesTotal;
         public double PaymentShare => TablesTotal == 0 ? 0 : (double)TablesAwaitingPayment / TablesTotal;
         public int OccupiedPercent => TablesTotal == 0 ? 0 : (int)Math.Round(100.0 * TablesOccupied / TablesTotal);
+
+        // Seated tables on one floor, and how many of them are waiting to pay (for the floor pills).
+        public int SeatedOn(FloorLayout f) => f.DiningAreas.Where(a => a.IsActive).SelectMany(a => a.Tables)
+            .Count(t => t.IsActive && SeatedOrderByTable.ContainsKey(t.Id));
+        public int PayingOn(FloorLayout f) => f.DiningAreas.Where(a => a.IsActive).SelectMany(a => a.Tables)
+            .Count(t => t.IsActive && SeatedOrderByTable.TryGetValue(t.Id, out var o) && o.Status == OrderStatus.Served);
+        public string AreaUse(DiningArea a) =>
+            $"{a.Tables.Count(t => t.IsActive && SeatedOrderByTable.ContainsKey(t.Id))}/{a.Tables.Count(t => t.IsActive)}";
+
+        // Short labels used on the dashboard.
+        public static string ShortTime(TimeOnly t) => t.Minute == 0 ? t.ToString("h tt") : t.ToString("h:mm tt");
+        public static string ShortMinutes(DateTime since, DateTime now)
+        {
+            var m = Math.Max(0, (int)(now - since).TotalMinutes);
+            return m < 60 ? $"{m}m" : $"{m / 60}h{m % 60:00}";
+        }
+        public static string TypeLabel(OrderType t) => t switch
+        {
+            OrderType.WalkIn => "Walk-in",
+            OrderType.OnlinePreOrder => "Pre-order",
+            OrderType.TableTablet => "Tablet",
+            _ => t.ToString()
+        };
 
         public static string Minutes(DateTime since, DateTime now)
         {
