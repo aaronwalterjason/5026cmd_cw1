@@ -1,0 +1,23 @@
+@{
+    Layout = ViewData.TryGetValue("ParentLayout", out var parentLayout) && parentLayout != null
+        ? parentLayout.ToString()
+        : "/Pages/Shared/_Layout.cshtml";
+}
+
+<h1>Account Settings</h1>
+
+<div class="account-settings">
+    <hr />
+    <div class="row">
+        <div class="col-md-3">
+            <partial name="_ManageNav" />
+        </div>
+        <div class="col-md-9">
+            @RenderBody()
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @RenderSection("Scripts", required: false)
+}

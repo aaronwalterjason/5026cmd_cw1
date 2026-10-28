@@ -113,8 +113,16 @@ namespace KOMA.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<string>("FirstName")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<string>("FullName")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LastName")
+                        .HasMaxLength(49)
+                        .HasColumnType("nvarchar(49)");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");

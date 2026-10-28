@@ -7,9 +7,16 @@
     <meta name="theme-color" content="#263b49" />
     <title>@ViewData["Title"] — KOMA</title>
     <link rel="stylesheet" href="~/css/koma-home.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/customer-header.css" asp-append-version="true" />
 </head>
 <body>
     <a class="skip" href="#main">Skip to content</a>
+    @if (User.IsInRole("Customer"))
+    {
+        <partial name="_CustomerHeader" />
+    }
+    else
+    {
     <header class="header">
         <a class="brand" asp-area="" asp-page="/Index" aria-label="KOMA home"><span aria-hidden="true">こま</span>KOMA</a>
         <nav class="main-nav" aria-label="Main navigation"><a href="#food">Our favourites</a><a href="#story">Our story</a><a href="#experience">The experience</a></nav>
@@ -39,6 +46,7 @@
             }
         </nav>
     </header>
+    }
     <main id="main" tabindex="-1">@RenderBody()</main>
     <footer class="footer"><a class="brand" asp-area="" asp-page="/Index">KOMA</a><div>© @DateTime.Now.Year KOMA · <a asp-area="" asp-page="/Privacy">Privacy</a></div></footer>
     <script src="~/js/koma-home.js" asp-append-version="true" defer></script>

@@ -11,8 +11,15 @@
     @* KOMA theme (same look as the public homepage) - must load last *@
     <link rel="stylesheet" href="~/css/koma-theme.css" asp-append-version="true" />
     <meta name="theme-color" content="#263b49" />
+    <link rel="stylesheet" href="~/css/customer-header.css" asp-append-version="true" />
 </head>
 <body>
+    @if (User.IsInRole("Customer"))
+    {
+        <partial name="_CustomerHeader" />
+    }
+    else
+    {
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light koma-topbar mb-3">
             @* Full width: logo and links start at the left edge (above the admin rail) instead of being centred. *@
@@ -59,6 +66,7 @@
             </div>
         </nav>
     </header>
+    }
     @if (Context.Request.Path.StartsWithSegments("/Admin"))
     {
         @* Admin pages: icon rail on the left (Pages/Admin/Shared/_AdminNav.cshtml) + full-width content. *@
