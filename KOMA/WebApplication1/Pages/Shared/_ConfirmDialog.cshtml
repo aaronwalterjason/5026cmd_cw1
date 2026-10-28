@@ -1,0 +1,17 @@
+@* Shared confirmation pop-up (design B: colour band with the icon in the middle, one-word buttons).
+   Rendered once by _Layout; opened by wwwroot/js/koma-confirm.js for every important decision:
+   - any <form data-confirm-title="..."> asks before submitting (see koma-confirm.js for the options)
+   - scripts call KomaConfirm.open({ title, text, rows, ok, no, tone, icon, onOk })
+   Colours: red = delete/cancel, amber = risky change, navy = save. *@
+<dialog class="kc" id="koma-confirm" aria-labelledby="koma-confirm-title" data-tone="danger">
+    <div class="kc-band" aria-hidden="true"></div>
+    <div class="kc-body">
+        <h2 class="kc-title" id="koma-confirm-title">Are you sure?</h2>
+        <p class="kc-text" hidden></p>
+        <ul class="kc-list mn-changes" hidden></ul>
+        <div class="kc-actions">
+            <button type="button" class="btn btn-outline-primary kc-no">Cancel</button>
+            <button type="button" class="btn mn-btn-danger-solid kc-ok">Confirm</button>
+        </div>
+    </div>
+</dialog>
