@@ -7,6 +7,12 @@ namespace KOMA.Models
     public class ApplicationUser : IdentityUser
     {
         public string? FullName { get; set; }
+        [PersonalData]
+        [System.ComponentModel.DataAnnotations.StringLength(50)]
+        public string? FirstName { get; set; }
+        [PersonalData]
+        [System.ComponentModel.DataAnnotations.StringLength(49)]
+        public string? LastName { get; set; }
         public Customer? Customer { get; set; }
         public Staff? Staff { get; set; }
         public Administrator? Administrator { get; set; }

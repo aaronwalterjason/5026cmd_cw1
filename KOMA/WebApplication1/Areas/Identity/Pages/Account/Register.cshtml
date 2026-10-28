@@ -67,25 +67,16 @@
                          role="alert">
                     </div>
 
-                    <!-- Full Name -->
                     <div class="koma-login-field">
-                        <label asp-for="Input.FullName">
-                            Full name
-                        </label>
-
-                        <input asp-for="Input.FullName"
-                               autocomplete="name"
-                               maxlength="100"
-                               placeholder="Your full name"
-                               aria-required="true"
-                               aria-describedby="register-name-error" />
-
-                        <span asp-validation-for="Input.FullName"
-                              id="register-name-error"
-                              class="koma-login-field-error">
-                        </span>
+                        <label asp-for="Input.FirstName"></label>
+                        <input asp-for="Input.FirstName" autocomplete="given-name" maxlength="50" aria-describedby="first-name-error" />
+                        <span asp-validation-for="Input.FirstName" id="first-name-error" class="koma-login-field-error"></span>
                     </div>
-
+                    <div class="koma-login-field">
+                        <label asp-for="Input.LastName"></label>
+                        <input asp-for="Input.LastName" autocomplete="family-name" maxlength="49" aria-describedby="last-name-error" />
+                        <span asp-validation-for="Input.LastName" id="last-name-error" class="koma-login-field-error"></span>
+                    </div>
                     <!-- Email -->
                     <div class="koma-login-field">
                         <label asp-for="Input.Email">

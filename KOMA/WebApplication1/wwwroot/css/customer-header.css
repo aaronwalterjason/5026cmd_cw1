@@ -1,0 +1,16 @@
+.customer-header { display:flex; align-items:center; flex-wrap:wrap; gap:28px; padding:16px 4%; background:#f4f1e9; border-bottom:1px solid #d5d5c9; color:#22343d; font:14px Arial,Helvetica,sans-serif; }
+.customer-header a { color:#263b49; text-decoration:none; }
+.customer-header .customer-brand { display:flex; align-items:center; gap:12px; font:30px Georgia,serif; letter-spacing:5px; }
+.customer-brand span { writing-mode:vertical-rl; padding:7px 5px; background:#974535; color:#f4f1e9; font:12px Georgia,serif; letter-spacing:0; }
+.customer-links,.customer-account { display:flex; align-items:center; flex-wrap:wrap; gap:20px; }
+.customer-account { margin-left:auto; }
+.customer-account form { margin:0; }
+.customer-greeting { overflow-wrap:anywhere; max-width:260px; }
+.customer-links a { padding:12px 0; }
+.customer-links a[aria-current=page] { box-shadow:0 2px #974535; }
+.customer-header .customer-account-icon { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:50%; }
+.customer-account-icon:hover,.customer-account-icon[aria-current=page] { background:#eee7db; }
+.customer-header .customer-logout { background:#263b49; color:#fff; border:0; border-radius:999px; padding:12px 24px; min-height:44px; font:600 14px Arial,Helvetica,sans-serif; cursor:pointer; }
+.customer-header .customer-logout:hover { background:#405768; }
+.customer-header a:focus-visible,.customer-header button:focus-visible { outline:3px solid #974535; outline-offset:3px; }
+@media(max-width:650px) { .customer-header { gap:12px 20px; } .customer-account { width:100%; margin-left:0; gap:12px; } .customer-greeting { margin-right:auto; max-width:55%; } .customer-links { gap:16px; } }
