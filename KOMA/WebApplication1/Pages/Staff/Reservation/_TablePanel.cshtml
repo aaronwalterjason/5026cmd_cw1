@@ -432,7 +432,9 @@
                 </article>
             }
 
-            @if (Model.Unlinked.Count > 0)
+            @if (Model.Booking == null &&
+                 Model.Session != null &&
+                 Model.Unlinked.Count > 0)
             {
                 <details class="mt-3">
                     <summary>
