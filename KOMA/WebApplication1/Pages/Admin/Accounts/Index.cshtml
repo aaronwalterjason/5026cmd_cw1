@@ -1,48 +1,110 @@
 @page
 @model KOMA.Pages.Admin.Accounts.IndexModel
 @{
-    ViewData["Title"] = "Accounts & Roles";
+    ViewData["Title"] = Model.CurrentGroup is null ? "Accounts" : Model.CurrentGroup.Title + " · Accounts";
 }
-
-<h1>Accounts &amp; Roles</h1>
-<div asp-validation-summary="All" class="text-danger"></div>
 
 @if (TempData["StatusMessage"] is string status)
 {
     <div class="alert alert-success">@status</div>
 }
+<div asp-validation-summary="All" class="text-danger"></div>
 
-<table class="table table-striped">
-    <thead><tr><th>Email</th><th>Current Role</th><th>Change role</th></tr></thead>
-    <tbody>
-    @foreach (var account in Model.Accounts)
+@if (Model.CurrentGroup is null)
+{
+    @* ================= Choose a group =================
+       Three cards; hovering one grows it to 1.5x while the other two shrink to 0.75x (total width stays the same).
+       The rust こま fill rests at 75% and goes to 100% on hover. Clicking grows the card to fill the area, then opens the group. *@
+    <div class="acc-head">
+        <h1 class="mb-0">Accounts</h1>
+        <span class="acc-sub">Choose who you want to manage</span>
+    </div>
+    <div class="acc-row" id="acc-row">
+        @foreach (var g in KOMA.Pages.Admin.Accounts.IndexModel.Groups)
+        {
+            var n = Model.CountFor(g);
+            <a class="acc-card" asp-page="./Index" asp-route-group="@g.Key" aria-label="@g.Title: @n @g.Subtitle">
+                <span class="acc-fill" aria-hidden="true"></span>
+                <span class="acc-kana" aria-hidden="true"><span>こ</span><span>ま</span></span>
+                <span class="acc-text">
+                    <span class="acc-title">@g.Title</span>
+                    <span class="acc-count">@n</span>
+                    <span class="acc-cap">@g.Subtitle</span>
+                </span>
+            </a>
+        }
+    </div>
+}
+else
+{
+    var g = Model.CurrentGroup;
+    var myId = Model.MyId;
+    @* ================= One group: an ID badge per person =================
+       Band colour per group (Shrine palette): Customers ochre, Staff pine green, Admins vermilion.
+       Each badge: initials, name, email, phone, two numbers, and (Staff/Admins only) the role switch, which asks
+       to confirm first. Customers can't be given a staff/admin role. *@
+    <div class="acc-group-head">
+        <a asp-page="./Index" class="acc-back">← All accounts</a>
+        <h1 class="mb-0">@g.Title</h1>
+        <span class="acc-sub">@Model.CountFor(g) @g.Subtitle</span>
+        <input type="search" id="acc-search" class="acc-search" placeholder="Search name, email or phone…" aria-label="Search @g.Title.ToLowerInvariant()" autocomplete="off" />
+    </div>
+
+    @if (!Model.Shown.Any())
     {
-        <tr>
-            <td>@account.Email</td>
-            <td>@account.Role</td>
-            <td>
-                <form method="post" class="d-flex gap-2 js-role-form" data-email="@account.Email" data-current="@account.Role">
-                    <input type="hidden" name="userId" value="@account.UserId" />
-                    <select name="role" class="form-select form-select-sm">
-                        @foreach (var role in Model.AvailableRoles)
-                        {
-                            @if (role == account.Role)
-                            {
-                                <option value="@role" selected>@role</option>
-                            }
-                            else
-                            {
-                                <option value="@role">@role</option>
-                            }
-                        }
-                    </select>
-                    <button type="submit" class="btn btn-sm btn-outline-primary">Update</button>
-                </form>
-            </td>
-        </tr>
+        <p class="text-muted">No @g.Title.ToLowerInvariant() yet.</p>
     }
-    </tbody>
-</table>
+    else
+    {
+        <div class="acc-badges acc-badges--@g.Key" id="acc-badges">
+            @foreach (var a in Model.Shown)
+            {
+                var name = KOMA.Pages.Admin.Accounts.IndexModel.DisplayName(a);
+                var stats = Model.StatsFor(a.UserId);
+                var me = a.UserId == myId;
+                <article class="acc-badge" data-search="@($"{name} {a.Email} {a.Phone}".ToLowerInvariant())">
+                    <div class="acc-badge-band">
+                        <span class="acc-badge-kana" aria-hidden="true">こま</span>
+                        <span class="acc-badge-role">@KOMA.Pages.Admin.Accounts.IndexModel.BadgeLabel(g)</span>
+                        @if (me)
+                        {
+                            <span class="acc-badge-you">YOU</span>
+                        }
+                    </div>
+                    <span class="acc-badge-av" aria-hidden="true">@KOMA.Pages.Admin.Accounts.IndexModel.Initials(a)</span>
+                    <h2 class="acc-badge-name" title="@name">@name</h2>
+                    <div class="acc-badge-mail" title="@a.Email">@a.Email</div>
+                    <div class="acc-badge-phone">@(string.IsNullOrWhiteSpace(a.Phone) ? "No phone number" : a.Phone)</div>
+                    <div class="acc-badge-stats">
+                        <div><b>@stats.First.Value</b><span>@stats.First.Label</span></div>
+                        <div><b>@stats.Second.Value</b><span>@stats.Second.Label</span></div>
+                    </div>
+                    @if (a.Role != "Customer")
+                    {
+                    <form method="post" asp-route-group="@g.Key" class="acc-badge-actions js-role-form" data-email="@a.Email" data-current="@a.Role">
+                        <input type="hidden" name="userId" value="@a.UserId" />
+                        <select name="role" class="acc-badge-select" aria-label="Role for @a.Email">
+                            @foreach (var role in Model.AvailableRoles)
+                            {
+                                if (role == a.Role)
+                                {
+                                    <option value="@role" selected>@(role == "Administrator" ? "Admin" : role)</option>
+                                }
+                                else
+                                {
+                                    <option value="@role">@(role == "Administrator" ? "Admin" : role)</option>
+                                }
+                            }
+                        </select>
+                        <button type="submit" class="acc-badge-btn">Update</button>
+                    </form>
+                    }
+                </article>
+            }
+        </div>
+        <p class="text-muted acc-none" id="acc-none" hidden>No one matches your search.</p>
+    }
+}
 
 @section Scripts {
     <script>
@@ -52,7 +114,7 @@
             const current = form.dataset.current, who = form.dataset.email;
             if (role === current || !window.KomaConfirm) return;
             e.preventDefault();
-            const toAdmin = role === 'Administrator', fromAdmin = current === 'Administrator';
+            const toAdmin = role === 'Administrator';
             KomaConfirm.open({
                 tone: 'warn', icon: 'shield',
                 title: toAdmin ? `Make ${who} an Administrator?` : `Change ${who} to ${role}?`,
@@ -60,5 +122,111 @@
                 onOk: () => HTMLFormElement.prototype.submit.call(form)
             });
         }));
+
+        // Search the badges on this page by name, email or phone (no reload).
+        (() => {
+            const box = document.getElementById('acc-search');
+            if (!box) return;
+            box.addEventListener('input', () => {
+                const q = box.value.trim().toLowerCase();
+                let shown = 0;
+                document.querySelectorAll('#acc-badges .acc-badge').forEach(b => {
+                    const ok = !q || b.dataset.search.includes(q);
+                    b.hidden = !ok;
+                    if (ok) shown++;
+                });
+                const none = document.getElementById('acc-none');
+                if (none) none.hidden = shown > 0;
+            });
+        })();
+
+        // Grey "skeleton" of a group page: the same classes as the real header and ID badges, so every grey shape
+        // sits exactly where the real names, numbers and buttons will appear. Used at the end of the opening transition.
+        function accSkeleton(count, actions) {
+            const bar = (w, h, r) => `<span class="acc-sk" style="width:${w}px;height:${h || 12}px;border-radius:${r || 6}px"></span>`;
+            let cards = '';
+            for (let i = 0; i < count; i++) {
+                cards += `<div class="acc-badge acc-sk-badge"><div class="acc-badge-band acc-sk"></div><span class="acc-badge-av acc-sk"></span>`
+                       + `<span class="acc-badge-name">${bar(90 + (i * 23) % 40, 14)}</span><span class="acc-badge-mail">${bar(120, 10)}</span><span class="acc-badge-phone">${bar(70, 10)}</span>`
+                       + `<div class="acc-badge-stats"><div>${bar(30)}${bar(50, 8)}</div><div>${bar(50)}${bar(50, 8)}</div></div>`
+                       + (actions ? `<div class="acc-badge-actions">${bar(0, 32, 99).replace('width:0px', 'flex:1')}${bar(70, 32, 99)}</div>` : '<div style="height:12px"></div>') + `</div>`;
+            }
+            return `<div class="acc-group-head acc-sk-head">${bar(92)}${bar(110, 30, 8)}${bar(100)}<span class="acc-search acc-sk"></span></div>`
+                 + `<div class="acc-badges">${cards}</div>`;
+        }
+        function accMain() { return document.querySelector('.admin-main') || document.querySelector('main'); }
+        function accSkelLayer(rows, actions) {   // skeleton positioned with the same padding as the page content
+            const cs = getComputedStyle(accMain());
+            const layer = document.createElement('div');
+            layer.className = 'acc-sk-layer';
+            Object.assign(layer.style, { paddingTop: cs.paddingTop, paddingLeft: cs.paddingLeft, paddingRight: cs.paddingRight });
+            layer.innerHTML = accSkeleton(rows, actions);
+            return layer;
+        }
+
+        // Choose a group: clicking a card makes it grow from where it sits until it fills the whole content
+        // area (everything inside the top bar and side menu) while its colour fades from rust to the page
+        // background. As it finishes, a skeleton of the group page fades in, and the group page then opens
+        // under the same skeleton, which fades away to show the real rows - one continuous motion.
+        (() => {
+            const row = document.getElementById('acc-row');
+            if (!row) return;
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            row.querySelectorAll('.acc-card').forEach(card => card.addEventListener('click', e => {
+                if (reduce || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;   // new tab / no animation: just go
+                e.preventDefault();
+                const from = card.getBoundingClientRect();
+                const m = accMain().getBoundingClientRect();
+                const to = { left: Math.max(m.left, 0), top: Math.max(m.top, 0) };
+                to.width = window.innerWidth - to.left;
+                to.height = window.innerHeight - to.top;
+
+                // A copy of the card, fixed on screen exactly where the card is.
+                const fly = document.createElement('div');
+                fly.className = 'acc-fly';
+                fly.innerHTML = card.querySelector('.acc-kana').outerHTML + card.querySelector('.acc-text').outerHTML;
+                Object.assign(fly.style, { left: from.left + 'px', top: from.top + 'px', width: from.width + 'px', height: from.height + 'px' });
+                document.body.appendChild(fly);
+                row.classList.add('is-opening');
+                fly.getBoundingClientRect();   // start the transition from the card's position
+
+                requestAnimationFrame(() => {
+                    fly.classList.add('is-full');
+                    Object.assign(fly.style, { left: to.left + 'px', top: to.top + 'px', width: to.width + 'px', height: to.height + 'px' });
+                });
+
+                // Skeleton badges: as many as the group has (from the card's count), up to 10.
+                const count = parseInt(card.querySelector('.acc-count')?.textContent, 10);
+                const rows = Math.max(1, Math.min(10, isNaN(count) ? 6 : count));
+                setTimeout(() => {
+                    const layer = accSkelLayer(rows, !/group=customers/i.test(card.href));   // customer badges have no role switch
+                    layer.style.width = to.width + 'px';
+                    fly.appendChild(layer);
+                    requestAnimationFrame(() => layer.classList.add('is-in'));
+                }, 220);
+
+                try { sessionStorage.setItem('koma.acc.open', String(rows)); } catch (_) { }
+                setTimeout(() => { location.href = card.href; }, 320);
+            }));
+        })();
+
+        // Arriving on a group page from the cards: start under a page-coloured panel holding the same skeleton,
+        // keep it for a moment (so it never just flickers), then fade it away to reveal the real page underneath.
+        (() => {
+            let rows = 0;
+            try { rows = parseInt(sessionStorage.getItem('koma.acc.open'), 10) || 0; sessionStorage.removeItem('koma.acc.open'); } catch (_) { }
+            if (!rows || document.getElementById('acc-row')) return;
+            const m = accMain().getBoundingClientRect();
+            const veil = document.createElement('div');
+            veil.className = 'acc-veil';
+            Object.assign(veil.style, { left: Math.max(m.left, 0) + 'px', top: Math.max(m.top, 0) + 'px' });
+            const real = document.querySelectorAll('#acc-badges .acc-badge').length;
+            const layer = accSkelLayer(real ? Math.min(real, 12) : rows, !!document.querySelector('#acc-badges .acc-badge-actions'));
+            layer.classList.add('is-in');
+            veil.appendChild(layer);
+            document.body.appendChild(veil);
+            setTimeout(() => veil.classList.add('is-gone'), 200);   // skeleton shows for at least 0.2 s
+            setTimeout(() => veil.remove(), 450);
+        })();
     </script>
 }
