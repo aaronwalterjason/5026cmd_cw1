@@ -31,6 +31,10 @@ namespace KOMA.Models
 
         public int? RestaurantTableId { get; set; }
         public RestaurantTable? RestaurantTable { get; set; }
+        // Links this order to a specific customer visit at the table.
+        public int? TableServiceSessionId { get; set; }
+
+        public TableServiceSession? TableServiceSession { get; set; }
 
         [Display(Name = "Ordered at")]
         public DateTime OrderedAt { get; set; } = DateTime.Now;
@@ -67,13 +71,23 @@ namespace KOMA.Models
 
     public enum OrderStatus
     {
+        [Display(Name = "Pending confirmation")]
         Pending = 0,
+
         Preparing = 1,
-        [Display(Name = "Ready to Serve")] ReadyToServe = 2,
+
+        [Display(Name = "Ready to Serve")]
+        ReadyToServe = 2,
+
         Served = 3,
         Completed = 4,
         Cancelled = 5,
-        [Display(Name = "Awaiting arrival")] AwaitingArrival = 6
+
+        [Display(Name = "Queued for kitchen")]
+        QueuedForKitchen = 6,
+
+        [Display(Name = "Awaiting arrival")]
+        AwaitingArrival = 7
     }
 
     public enum PaymentStatus

@@ -23,7 +23,21 @@ else
                     <td>@booking.StartTime.ToString("dd MMM yyyy, HH:mm")</td>
                     <td>@booking.RestaurantTable.TableNumber</td>
                     <td>@booking.GuestCount</td><td>@booking.Status</td>
-                    <td><a asp-page="Details" asp-route-id="@booking.Id">View details</a></td>
+                    <td>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a asp-page="/Reservations/Details"
+                               asp-route-id="@booking.Id"
+                               class="btn btn-outline-secondary btn-sm">
+                                View details
+                            </a>
+
+                            <a asp-page="/Reservations/PreOrder"
+                               asp-route-id="@booking.Id"
+                               class="btn btn-primary btn-sm">
+                                Pre-order food / view order
+                            </a>
+                        </div>
+                    </td>
                 </tr>
             }
             </tbody>

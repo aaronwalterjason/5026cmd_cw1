@@ -514,6 +514,9 @@ namespace KOMA.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int?>("TableServiceSessionId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("TotalAmount")
                         .HasColumnType("decimal(10,2)");
 
@@ -530,6 +533,8 @@ namespace KOMA.Migrations
                         .HasFilter("[ReservationId] IS NOT NULL");
 
                     b.HasIndex("RestaurantTableId");
+
+                    b.HasIndex("TableServiceSessionId");
 
                     b.ToTable("Orders");
                 });
@@ -742,6 +747,49 @@ namespace KOMA.Migrations
                     b.ToTable("Staffs");
                 });
 
+            modelBuilder.Entity("KOMA.Models.TableServiceSession", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ContactNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("EndTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("GuestCount")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ReservationId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RestaurantTableId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReservationId")
+                        .IsUnique()
+                        .HasFilter("[ReservationId] IS NOT NULL");
+
+                    b.HasIndex("RestaurantTableId", "StartTime", "EndTime");
+
+                    b.ToTable("TableServiceSessions");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
                     b.Property<string>("Id")
@@ -945,11 +993,18 @@ namespace KOMA.Migrations
                         .HasForeignKey("RestaurantTableId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("KOMA.Models.TableServiceSession", "TableServiceSession")
+                        .WithMany()
+                        .HasForeignKey("TableServiceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Customer");
 
                     b.Navigation("Reservation");
 
                     b.Navigation("RestaurantTable");
+
+                    b.Navigation("TableServiceSession");
                 });
 
             modelBuilder.Entity("KOMA.Models.OrderItem", b =>
@@ -1008,6 +1063,24 @@ namespace KOMA.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("KOMA.Models.TableServiceSession", b =>
+                {
+                    b.HasOne("KOMA.Models.Reservation", "Reservation")
+                        .WithMany()
+                        .HasForeignKey("ReservationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("KOMA.Models.RestaurantTable", "RestaurantTable")
+                        .WithMany()
+                        .HasForeignKey("RestaurantTableId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Reservation");
+
+                    b.Navigation("RestaurantTable");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

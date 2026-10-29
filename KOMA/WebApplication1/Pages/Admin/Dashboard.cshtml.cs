@@ -17,7 +17,13 @@ namespace KOMA.Pages.Admin
         public DashboardModel(ApplicationDbContext db) => _db = db;
 
         private static readonly OrderStatus[] ActiveStatuses =
-            { OrderStatus.Pending, OrderStatus.Preparing, OrderStatus.ReadyToServe, OrderStatus.Served };
+        {
+            OrderStatus.Pending,
+            OrderStatus.QueuedForKitchen,
+            OrderStatus.Preparing,
+            OrderStatus.ReadyToServe,
+            OrderStatus.Served
+        };
 
         // ---- Today's numbers ----
         public DateTime Now { get; private set; }
@@ -294,7 +300,9 @@ namespace KOMA.Pages.Admin
             customer = o.CustomerName,
             type = o.OrderType.DisplayName(),
             status = o.Status.DisplayName(),
-            step = (int)o.Status,   // 0 Pending, 1 Preparing, 2 Ready to Serve, 3 Served, 4 Completed (progress bar)
+            step = Array.IndexOf(
+                KOMA.Services.OrderWorkflowService.Steps,
+                o.Status),
             cancelled = o.Status == OrderStatus.Cancelled,
             active = ActiveStatuses.Contains(o.Status) && o.PaymentStatus == PaymentStatus.Unpaid,
             orderedAt = o.OrderedAt.ToString("h:mm tt"),

@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace KOMA.Pages.Staff.Reservation
+namespace KOMA.Pages.Staff.Orders
 {
-    public class _ReservationFloorModel : PageModel
+    public class _OrderBoardModel : PageModel
     {
         public void OnGet()
         {

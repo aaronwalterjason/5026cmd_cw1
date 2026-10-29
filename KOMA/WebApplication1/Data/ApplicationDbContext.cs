@@ -26,6 +26,8 @@ namespace KOMA.Data
 
         // Engineer B: customer orders and their line items.
         public DbSet<Order> Orders => Set<Order>();
+        public DbSet<TableServiceSession> TableServiceSessions
+            => Set<TableServiceSession>();
         public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 
         // Engineer B: editable text/photo of the customer landing page (one row).
@@ -37,6 +39,43 @@ namespace KOMA.Data
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+
+            // Each visit belongs to one restaurant table.
+            builder.Entity<TableServiceSession>()
+                .HasOne(s => s.RestaurantTable)
+                .WithMany()
+                .HasForeignKey(s => s.RestaurantTableId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // A visit may belong to a reservation, or be a walk-in.
+            builder.Entity<TableServiceSession>()
+                .HasOne(s => s.Reservation)
+                .WithMany()
+                .HasForeignKey(s => s.ReservationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // A reservation can have only one linked visit.
+            // Multiple walk-in visits can have a null ReservationId.
+            builder.Entity<TableServiceSession>()
+                .HasIndex(s => s.ReservationId)
+                .IsUnique()
+                .HasFilter("[ReservationId] IS NOT NULL");
+
+            // Supports looking up visits by table and time.
+            builder.Entity<TableServiceSession>()
+                .HasIndex(s => new
+                {
+                    s.RestaurantTableId,
+                    s.StartTime,
+                    s.EndTime
+                });
+
+            // Several food orders can belong to the same visit.
+            builder.Entity<Order>()
+                .HasOne(o => o.TableServiceSession)
+                .WithMany()
+                .HasForeignKey(o => o.TableServiceSessionId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Reservation table relationships.
             builder.Entity<Reservation>()

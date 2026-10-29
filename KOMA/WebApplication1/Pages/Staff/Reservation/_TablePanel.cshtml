@@ -1,0 +1,489 @@
+﻿@model KOMA.Pages.Staff.Reservations.TablePanelModel
+@using KOMA.Models
+@using KOMA.Services
+
+@{
+    var booking = Model.Booking;
+    var session = Model.Session;
+    var canForm = Model.CanCreate || Model.CanEdit;
+}
+
+<section class="table-panel"
+         data-title="Table @Model.Table.TableNumber"
+         data-current-table="@Model.TableId">
+
+    <div class="table-panel-context">
+        <strong>
+            Table @Model.Table.TableNumber · Capacity @Model.Table.Capacity
+        </strong>
+
+        <div>@Model.Selection.Label</div>
+
+        @if (booking != null)
+        {
+            <div>
+                Booking R-@booking.Id.ToString("D5") ·
+                @booking.CustomerName ·
+                @booking.StartTime.ToString("HH:mm")–@booking.EndTime.ToString("HH:mm")
+            </div>
+        }
+        else if (session != null)
+        {
+            <div>
+                Walk-in · @session.CustomerName ·
+                @session.StartTime.ToString("HH:mm")–@session.EndTime.ToString("HH:mm")
+            </div>
+        }
+    </div>
+
+    <div class="panel-message" role="status" aria-live="polite"></div>
+
+    @if (Model.Bookings.Count + Model.WalkIns.Count > 1)
+    {
+        <p>More than one visit overlaps this selection. Choose the customer:</p>
+
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            @foreach (var b in Model.Bookings)
+            {
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        data-booking="@b.Id">
+                    @b.CustomerName · @b.StartTime.ToString("HH:mm")
+                </button>
+            }
+
+            @foreach (var s in Model.WalkIns)
+            {
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        data-session="@s.Id">
+                    @s.CustomerName · walk-in @s.StartTime.ToString("HH:mm")
+                </button>
+            }
+        </div>
+    }
+
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active"
+                    id="booking-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#booking-panel"
+                    type="button"
+                    role="tab"
+                    aria-controls="booking-panel"
+                    aria-selected="true">
+                Booking details
+            </button>
+        </li>
+
+        <li class="nav-item" role="presentation">
+            <button class="nav-link"
+                    id="food-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#food-panel"
+                    type="button"
+                    role="tab"
+                    aria-controls="food-panel"
+                    aria-selected="false">
+                Food orders
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active"
+             id="booking-panel"
+             role="tabpanel"
+             aria-labelledby="booking-tab">
+
+            @if (booking != null)
+            {
+                <p>
+                    <strong>Status:</strong> @booking.Status ·
+                    <strong>Guests:</strong> @booking.GuestCount
+                </p>
+
+                <p>
+                    <strong>Contact:</strong>
+                    @booking.ContactNumber · @booking.Email
+                </p>
+
+                <p style="white-space:pre-wrap"><strong>Requests:</strong> @(booking.SpecialRequests ?? "None")</p>
+
+                @if (Model.CanEdit)
+                {
+                    <form method="post"
+                          action="@Url.Page("TablePanel", "BookingStatus", Model.Route)"
+                          class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+                        @Html.AntiForgeryToken()
+
+                        <input type="hidden"
+                               name="rowVersion"
+                               value="@Convert.ToBase64String(booking.RowVersion)" />
+
+                        @if (booking.Status == ReservationStatus.Pending)
+                        {
+                            <button name="confirm"
+                                    value="true"
+                                    class="btn btn-primary">
+                                Confirm booking
+                            </button>
+                        }
+
+                        <label class="small">
+                            <input type="checkbox"
+                                   name="confirmCancel"
+                                   value="true" />
+                            Confirm cancellation
+                        </label>
+
+                        <button name="confirm"
+                                value="false"
+                                class="btn btn-outline-danger">
+                            Cancel booking
+                        </button>
+                    </form>
+                }
+            }
+            else if (session != null)
+            {
+                <p>
+                    <strong>Walk-in guest:</strong>
+                    @session.CustomerName · @session.GuestCount guests
+                </p>
+
+                <p>
+                    <strong>Contact:</strong>
+                    @(session.ContactNumber ?? "Not provided")
+                </p>
+
+                <p>This is a recorded dining visit, not a reservation.</p>
+            }
+
+            @if (canForm)
+            {
+                <details open="@(booking == null)">
+                    <summary class="mb-3">
+                        @(booking == null
+                            ? "Create reservation"
+                            : "Edit customer details")
+                    </summary>
+
+                    <form method="post"
+                          action="@Url.Page("TablePanel", "Save", Model.Route)">
+                        @Html.AntiForgeryToken()
+
+                        <input type="hidden"
+                               name="input.RowVersion"
+                               value="@(booking == null ? "" : Convert.ToBase64String(booking.RowVersion))" />
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="guest-name" class="form-label">
+                                    Customer name
+                                </label>
+                                <input id="guest-name"
+                                       name="input.CustomerName"
+                                       value="@booking?.CustomerName"
+                                       class="form-control"
+                                       required maxlength="100" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="guest-phone" class="form-label">
+                                    Contact number
+                                </label>
+                                <input id="guest-phone"
+                                       name="input.ContactNumber"
+                                       value="@booking?.ContactNumber"
+                                       class="form-control"
+                                       required maxlength="30" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="guest-email" class="form-label">
+                                    Email (optional)
+                                </label>
+                                <input id="guest-email"
+                                       name="input.Email"
+                                       value="@booking?.Email"
+                                       type="email"
+                                       class="form-control"
+                                       maxlength="256" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="guest-count" class="form-label">
+                                    Guests
+                                </label>
+                                <input id="guest-count"
+                                       name="input.GuestCount"
+                                       value="@(booking?.GuestCount ?? 1)"
+                                       type="number"
+                                       min="1"
+                                       max="@Math.Min(20, Model.Table.Capacity)"
+                                       class="form-control"
+                                       required />
+                            </div>
+
+                            <div class="col-12">
+                                <label for="guest-notes" class="form-label">
+                                    Special requests
+                                </label>
+                                <textarea id="guest-notes"
+                                          name="input.SpecialRequests"
+                                          class="form-control"
+                                          maxlength="500">@booking?.SpecialRequests</textarea>
+                            </div>
+                        </div>
+
+                        <p class="small text-muted mt-3">
+                            This form uses the table and booking time shown above.
+                        </p>
+
+                        <button class="btn btn-primary">
+                            @(booking == null
+                                ? "Create reservation"
+                                : "Save details")
+                        </button>
+                    </form>
+                </details>
+            }
+            else if (booking == null && session == null)
+            {
+                <p>No booking or recorded walk-in matches this selection.</p>
+
+                @if (Model.Selection.IsNow &&
+                     Model.Selection.IsOpen &&
+                     Model.Table.IsActive &&
+                     Model.Table.DiningArea?.IsActive == true)
+                {
+                    <details>
+                        <summary>Record a walk-in visit</summary>
+
+                        <form method="post"
+                              action="@Url.Page("TablePanel", "WalkIn", Model.Route)"
+                              class="mt-3">
+                            @Html.AntiForgeryToken()
+
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="walk-name" class="form-label">
+                                        Customer name
+                                    </label>
+                                    <input id="walk-name"
+                                           name="name"
+                                           class="form-control"
+                                           required maxlength="100" />
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="walk-phone" class="form-label">
+                                        Contact (optional)
+                                    </label>
+                                    <input id="walk-phone"
+                                           name="phone"
+                                           class="form-control"
+                                           maxlength="30" />
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="walk-guests" class="form-label">
+                                        Guests
+                                    </label>
+                                    <input id="walk-guests"
+                                           name="guests"
+                                           class="form-control"
+                                           type="number"
+                                           min="1"
+                                           max="@Math.Min(20, Model.Table.Capacity)"
+                                           value="1"
+                                           required />
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="walk-minutes" class="form-label">
+                                        Visit duration (minutes)
+                                    </label>
+                                    <input id="walk-minutes"
+                                           name="minutes"
+                                           class="form-control"
+                                           type="number"
+                                           min="15" max="240"
+                                           value="60"
+                                           required />
+                                </div>
+                            </div>
+
+                            <p class="small text-muted mt-3">
+                                Starts when saved. The visit must not overlap
+                                another booking.
+                            </p>
+
+                            <button class="btn btn-primary">
+                                Record walk-in
+                            </button>
+                        </form>
+                    </details>
+                }
+                else
+                {
+                    <p class="text-muted">
+                        Choose a future opening-hours slot to create a reservation.
+                    </p>
+                }
+            }
+        </div>
+
+        <div class="tab-pane fade"
+             id="food-panel"
+             role="tabpanel"
+             aria-labelledby="food-tab">
+
+            @if (!Model.Orders.Any())
+            {
+                <p>No food orders for this booking or visit yet.</p>
+            }
+
+            @foreach (var order in Model.Orders)
+            {
+                <article class="card card-body mb-3">
+                    <h3 class="h5">
+                        @order.OrderNumber · @order.Status
+                    </h3>
+
+                    <p>
+                        @order.CustomerName ·
+                        Placed @order.OrderedAt.ToString("dd MMM yyyy HH:mm")
+                    </p>
+
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Quantity</th>
+                                    <th>RM</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in order.Items)
+                                {
+                                    <tr>
+                                        <td>@item.DishName</td>
+                                        <td>@item.Quantity</td>
+                                        <td>@item.LineTotal.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p>Total: RM @order.TotalAmount.ToString("N2")</p>
+
+                    @if (!string.IsNullOrWhiteSpace(order.Notes))
+                    {
+                        <p style="white-space:pre-wrap"><strong>Notes:</strong> @order.Notes</p>
+                    }
+
+                    @if (order.Status is OrderStatus.Pending
+                        or OrderStatus.AwaitingArrival
+                        or OrderStatus.ReadyToServe)
+                    {
+                        <form method="post"
+                              action="@Url.Page("TablePanel", "Order", Model.Route)">
+                            @Html.AntiForgeryToken()
+
+                            <input type="hidden"
+                                   name="orderId"
+                                   value="@order.Id" />
+
+                            <input type="hidden"
+                                   name="expectedStatus"
+                                   value="@order.Status" />
+
+                            <input type="hidden"
+                                   name="reviewToken"
+                                   value="@OrderWorkflowService.ReviewToken(order)" />
+
+                            @if (order.Status == OrderStatus.AwaitingArrival)
+                            {
+                                <p class="small text-muted">
+                                    The customer's pre-order is saved.
+                                    No staff approval is required.
+                                    Send it to the kitchen after the customer arrives.
+                                </p>
+
+                                <label class="d-block mb-3">
+                                    <input type="checkbox"
+                                           name="arrivalConfirmed"
+                                           value="true"
+                                           required />
+                                    The customer has arrived and is ready for food preparation.
+                                </label>
+                            }
+
+                            <button type="submit" class="btn btn-primary">
+                                @OrderWorkflowService.ActionLabel(order.Status)
+                            </button>
+                        </form>
+                    }
+                </article>
+            }
+
+            @if (Model.Booking == null &&
+                 Model.Session != null &&
+                 Model.Unlinked.Count > 0)
+            {
+                <details class="mt-3">
+                    <summary>
+                        Assign an existing order to this customer visit
+                    </summary>
+
+                    <p class="small text-muted">
+                        These orders share this table but are not linked to a visit.
+                        Check the customer and order reference before assigning one.
+                    </p>
+
+                    <form method="post"
+                          action="@Url.Page("TablePanel", "Link", Model.Route)">
+                        @Html.AntiForgeryToken()
+
+                        <label for="unlinked-order" class="form-label">
+                            Unlinked order
+                        </label>
+
+                        <select id="unlinked-order"
+                                name="orderId"
+                                class="form-select mb-2"
+                                required>
+                            <option value="">Choose an order</option>
+
+                            @foreach (var order in Model.Unlinked)
+                            {
+                                <option value="@order.Id">
+                                    @order.OrderNumber · @order.CustomerName ·
+                                    @order.OrderedAt.ToString("dd MMM yyyy HH:mm") ·
+                                    RM @order.TotalAmount.ToString("N2")
+                                </option>
+                            }
+                        </select>
+
+                        <label class="d-block mb-2">
+                            <input type="checkbox"
+                                   name="reviewed"
+                                   value="true"
+                                   required />
+                            I verified this order belongs to the customer shown above.
+                        </label>
+
+                        <button class="btn btn-outline-secondary">
+                            Assign order to this visit
+                        </button>
+                    </form>
+                </details>
+            }
+        </div>
+    </div>
+</section>
