@@ -36,7 +36,8 @@
                 {
                     <a asp-area="" asp-page="/Staff/Index">Staff Dashboard</a>
                 }
-                <a class="account-name" asp-area="Identity" asp-page="/Account/Manage/Index">@User.Identity.Name</a>
+                <span class="account-name"><partial name="_AccountGreeting" /></span>
+                <partial name="_AccountSettingsLink" />
                 <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Page("/Index", new { area = "" })" method="post"><button class="button small" type="submit">Logout</button></form>
             }
             else

@@ -1,0 +1,10 @@
+@using Microsoft.AspNetCore.Identity
+@using KOMA.Models
+@inject UserManager<ApplicationUser> UserManager
+@{
+    var account = await UserManager.GetUserAsync(User);
+    var name = !string.IsNullOrWhiteSpace(account?.FirstName)
+        ? account.FirstName.Trim()
+        : account?.FullName?.Trim();
+}
+@(string.IsNullOrWhiteSpace(name) ? "My Account" : $"Hello, {name}")
