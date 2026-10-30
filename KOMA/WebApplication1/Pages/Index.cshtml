@@ -54,11 +54,15 @@
                 <div class="food-card-body"><p class="eyebrow">@(dish.IsRecommended && dish.IsSeasonal ? "KOMA PICKS / SEASONAL" : dish.IsRecommended ? "KOMA PICKS" : "SEASONAL SPOTLIGHT")</p><h3>@dish.Name</h3><p>@dish.Description</p>
                     @if (User.Identity?.IsAuthenticated != true)
                     {
-                        <a class="button order-button" asp-area="Identity" asp-page="/Account/Login" asp-route-returnUrl="@Url.Page("/Index", new { dish = dish.Id })" aria-label="Order @dish.Name now">Order Now <span aria-hidden="true">↗</span></a>
+                        <a class="button order-button" asp-area="Identity" asp-page="/Account/Login" asp-route-returnUrl="@Url.Page("/Reservations/Edit", new { area = "" })" aria-label="Order @dish.Name now">Order Now <span aria-hidden="true">↗</span></a>
+                    }
+                    else if (User.IsInRole("Customer"))
+                    {
+                        <a class="button order-button" asp-area="" asp-page="/Reservations/Edit" aria-label="Order @dish.Name now">Order Now <span aria-hidden="true">↗</span></a>
                     }
                     else
                     {
-                        <button class="button order-button" type="button" data-order-message="@(User.IsInRole("Customer") ? "Online ordering is not available yet. Please check back soon." : "Ordering is available to customer accounts. Please sign in with a customer account.")" aria-label="Order @dish.Name now">Order Now <span aria-hidden="true">↗</span></button>
+                        <button class="button order-button" type="button" data-order-message="Ordering is available to customer accounts. Please sign in with a customer account." aria-label="Order @dish.Name now">Order Now <span aria-hidden="true">↗</span></button>
                     }
                 </div>
             </article>
@@ -66,7 +70,7 @@
     </div>
         </section>
     }
-    <p class="order-status" role="status" aria-live="polite">@if (Request.Query.ContainsKey("dish") && User.Identity?.IsAuthenticated == true) { <text>@(User.IsInRole("Customer") ? "You are signed in. Online ordering is not available yet. Please check back soon." : "Ordering is available to customer accounts. Please sign in with a customer account.")</text> }</p>
+    <p class="order-status" role="status" aria-live="polite"></p>
 </section>
 @if (c.ShowStory)
 {
