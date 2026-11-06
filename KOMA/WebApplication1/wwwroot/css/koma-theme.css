@@ -1151,3 +1151,8 @@ a.lvl-3:hover, a.lvl-4:hover { color: var(--paper); }
 
 /* Arrow circles removed from the Sales / Total orders cards - no space needs reserving for them. */
 .dash-title-row, .dash-orders .dash-orders-top { padding-right: 0; }
+
+/* Center Staff sidebar labels, including wrapped text. */
+.admin-rail[aria-label="Staff"] .admin-rail-label {
+    text-align: center;
+}

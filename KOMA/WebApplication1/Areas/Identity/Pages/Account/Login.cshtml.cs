@@ -116,6 +116,20 @@ namespace KOMA.Areas.Identity.Pages.Account
                 if (result.Succeeded)
                 {
                     _logger.LogInformation("User logged in.");
+
+                    var user = await _signInManager.UserManager.FindByNameAsync(Input.Email);
+                    if (user != null)
+                    {
+                        if (await _signInManager.UserManager.IsInRoleAsync(user, "Administrator"))
+                        {
+                            return RedirectToPage("/Admin/Dashboard", new { area = "" });
+                        }
+
+                        if (await _signInManager.UserManager.IsInRoleAsync(user, "Staff"))
+                        {
+                            return RedirectToPage("/Staff/Index", new { area = "" });
+                        }
+                    }
                     return LocalRedirect(returnUrl);
                 }
                 if (result.RequiresTwoFactor)

@@ -1,4 +1,4 @@
-﻿@model KOMA.Pages.Staff.Orders.OrderBoardModel
+@model KOMA.Pages.Staff.Orders.OrderBoardModel
 @using KOMA.Models
 @using KOMA.Services
 
@@ -22,22 +22,7 @@
         </a>
     </header>
 
-    <nav class="staff-nav" aria-label="Staff navigation">
-        <a asp-page="/Staff/Index"
-           class="btn btn-outline-secondary btn-sm">
-            Dashboard
-        </a>
 
-        <a asp-page="/Staff/Orders/Index"
-           class="btn @(Model.Kitchen ? "btn-outline-secondary" : "btn-dark") btn-sm">
-            Customer orders
-        </a>
-
-        <a asp-page="/Staff/Orders/Kitchen"
-           class="btn @(Model.Kitchen ? "btn-dark" : "btn-outline-secondary") btn-sm">
-            Kitchen queue
-        </a>
-    </nav>
 
     <p class="small text-muted">
         Refresh to see changes from other users.
