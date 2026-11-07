@@ -139,7 +139,6 @@
         @* ---- Account ---- *@
         <section id="cp-t-acct" role="tabpanel" hidden>
             <div class="cp-acct">
-                <div><span>Two-step</span><span>@(p.TwoFactor ? "On" : "Off")</span></div>
                 <div><span>Failed sign-ins</span><span>@p.FailedSignIns</span></div>
                 <div><span>Status</span><span><span class="cp-dot @(p.Locked ? "bad" : "ok")"></span>@(p.Locked ? "Locked" : "Active")</span></div>
             </div>

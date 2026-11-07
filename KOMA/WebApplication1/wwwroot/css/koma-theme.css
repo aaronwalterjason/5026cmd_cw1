@@ -1152,12 +1152,10 @@ a.lvl-3:hover, a.lvl-4:hover { color: var(--paper); }
 /* Arrow circles removed from the Sales / Total orders cards - no space needs reserving for them. */
 .dash-title-row, .dash-orders .dash-orders-top { padding-right: 0; }
 
-<<<<<<< HEAD
 /* Center Staff sidebar labels, including wrapped text. */
 .admin-rail[aria-label="Staff"] .admin-rail-label {
     text-align: center;
 }
-=======
 /* ---------- Admin > Accounts: choose a group (Pages/Admin/Accounts/Index.cshtml) ----------
    Three cards share the row equally (1 + 1 + 1). Hovering one makes it 1.5 and the others 0.75 each,
    so the total width never changes. The rust fill with こま rests at 75% and goes to 100% on hover. */
@@ -2070,4 +2068,3 @@ td.sc-who { padding: 8px 12px; }
 .ce-banner form { margin: 0; }
 .ce-banner button { border: 0; border-radius: 99px; padding: 5px 14px; background: #263b49; color: #f4f1e9; font-size: 12px; font-weight: 700; cursor: pointer; }
 .ce-banner button:hover { background: #1d2f3b; }
->>>>>>> origin/admin/dashboard

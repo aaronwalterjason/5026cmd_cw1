@@ -32,7 +32,6 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LogoutPath = "/Identity/Account/Logout";
     options.AccessDeniedPath = "/Identity/Account/AccessDenied";
 });
-builder.Services.AddTransient<IEmailSender, UnconfiguredEmailSender>();
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizeAreaFolder("Identity", "/Account/Manage");
@@ -49,7 +48,7 @@ builder.Services.AddScoped<MenuImageService>();
 builder.Services.Configure<KOMA.Services.Email.EmailOptions>(builder.Configuration.GetSection("Email"));
 builder.Services.AddSingleton<KOMA.Services.Email.MailKitSender>();
 builder.Services.AddSingleton<KOMA.Services.Email.IMailSender>(sp => sp.GetRequiredService<KOMA.Services.Email.MailKitSender>());
-builder.Services.AddSingleton<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>(sp => sp.GetRequiredService<KOMA.Services.Email.MailKitSender>());
+builder.Services.AddSingleton<KOMA.Services.IEmailSender>(sp => sp.GetRequiredService<KOMA.Services.Email.MailKitSender>());
 builder.Services.AddScoped<KOMA.Services.Email.BookingEmailService>();
 builder.Services.AddScoped<KOMA.Services.Email.AccountEmailService>();   // confirm email + password reset
 builder.Services.AddHostedService<KOMA.Services.Email.BookingEmailWorker>();
