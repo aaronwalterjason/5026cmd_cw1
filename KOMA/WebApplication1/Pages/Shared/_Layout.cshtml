@@ -1,3 +1,6 @@
+@{
+    var staffWorkspace = Context.Request.Path.StartsWithSegments("/Staff") || ViewContext.RouteData.Values["page"] as string == "/Dining/Setup";
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,6 +15,10 @@
     <link rel="stylesheet" href="~/css/koma-theme.css" asp-append-version="true" />
     <meta name="theme-color" content="#263b49" />
     <link rel="stylesheet" href="~/css/customer-header.css" asp-append-version="true" />
+    @if (staffWorkspace)
+    {
+        <link rel="stylesheet" href="~/css/staff-workspace.css" asp-append-version="true" />
+    }
 </head>
 <body>
     @if (User.IsInRole("Customer"))
@@ -74,12 +81,12 @@
             </main>
         </div>
     }
-    else if (Context.Request.Path.StartsWithSegments("/Staff"))
+    else if (staffWorkspace)
     {
         <div class="admin-shell">
             <partial name="~/Pages/Staff/Shared/_StaffNav.cshtml" />
             <main role="main" class="admin-main pb-3">
-                @RenderBody()
+                <div class="staff-workspace">@RenderBody()</div>
             </main>
         </div>
     }

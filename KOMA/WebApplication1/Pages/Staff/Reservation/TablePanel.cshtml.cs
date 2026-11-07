@@ -11,11 +11,7 @@ namespace KOMA.Pages.Staff.Reservations;
 
 [Authorize(Roles = "Staff,Administrator")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public class TablePanelModel(
-    ApplicationDbContext db,
-    ReservationService reservations,
-    TableSessionService sessions,
-    OrderWorkflowService workflow) : PageModel
+public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public int TableId { get; set; }
@@ -45,33 +41,38 @@ public class TablePanelModel(
     public TableServiceSession? Session { get; private set; }
 
     public List<Order> Orders { get; private set; } = [];
-    public List<Order> Unlinked { get; private set; } = [];
-
-    public bool CanEdit =>
-        Booking != null &&
-        Booking.Status != ReservationStatus.Cancelled &&
-        Booking.StartTime > ReservationRules.MalaysiaNow;
-
-    public bool CanCreate =>
-        Booking == null &&
-        Session == null &&
-        Bookings.Count == 0 &&
-        WalkIns.Count == 0 &&
-        Selection.CanCreate &&
-        Table.IsActive &&
-        Table.DiningArea?.IsActive == true;
-
-    public object Route => new
+    public IEnumerable<Order> Outstanding => Orders.Where(o => o.Status != OrderStatus.Cancelled && o.PaymentStatus == PaymentStatus.Unpaid);
+    public List<RestaurantTable> MoveTargets { get; private set; } = [];
+    private IQueryable<RestaurantTable> AvailableFor(TableServiceSession visit)
     {
-        TableId,
-        BookingId,
-        SessionId,
-        Date = Date?.ToString("yyyy-MM-dd"),
-        Time = Time?.ToString("HH:mm"),
-        At = At?.ToString("s")
-    };
+        var now = ReservationRules.MalaysiaNow;
+        return db.RestaurantTables.Where(t => t.Id != visit.RestaurantTableId && t.IsActive &&
+            t.DiningArea!.IsActive && t.Capacity >= visit.GuestCount &&
+            !db.Reservations.Any(r => r.RestaurantTableId == t.Id && r.Status != ReservationStatus.Cancelled &&
+                r.StartTime < visit.EndTime && r.EndTime > now) &&
+            !db.TableServiceSessions.Any(s => s.RestaurantTableId == t.Id && s.StartTime < visit.EndTime && s.EndTime > now));
+    }
 
-    private async Task<bool> LoadAsync()
+    public async Task<IActionResult> OnPostMoveWalkInAsync(int destination)
+    {
+        if (!ModelState.IsValid || !SessionId.HasValue) return BadRequest("Choose a walk-in visit.");
+        await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        await dining.LockAsync();
+        var now = ReservationRules.MalaysiaNow;
+        var visit = await db.TableServiceSessions.SingleOrDefaultAsync(s => s.Id == SessionId &&
+            s.RestaurantTableId == TableId && s.ReservationId == null && s.StartTime <= now && s.EndTime > now);
+        if (visit == null || !await AvailableFor(visit).AnyAsync(t => t.Id == destination))
+            return new ConflictObjectResult("The visit or table availability changed. Reopen the table to try again.");
+        visit.RestaurantTableId = destination;
+        await db.Orders.Where(o => o.TableServiceSessionId == visit.Id)
+            .ExecuteUpdateAsync(u => u.SetProperty(o => o.RestaurantTableId, (int?)destination));
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
+        return new OkResult();
+    }
+
+    public string BillToken => string.Join(".", Outstanding.Select(OrderWorkflowService.ReviewToken));
+    private async Task<bool> LoadAsync(bool trackOrders = false)
     {
         var settings = await db.RestaurantSettings
             .AsNoTracking()
@@ -160,11 +161,11 @@ public class TablePanelModel(
 
         if (selectedBookingId.HasValue || selectedSessionId.HasValue)
         {
-            Orders = await db.Orders
-                .AsNoTracking()
+            var query = trackOrders ? db.Orders.AsTracking() : db.Orders.AsNoTracking();
+            Orders = await query
                 .Include(o => o.Items)
                 .ThenInclude(i => i.MenuItem)
-                .Where(o => o.RestaurantTableId == TableId)
+                .Where(o => o.RestaurantTableId == TableId && o.Status != OrderStatus.AwaitingArrival && o.Status != OrderStatus.Pending)
                 .Where(o =>
                     // Customer pre-orders linked directly to this reservation.
                     (selectedBookingId.HasValue &&
@@ -180,23 +181,27 @@ public class TablePanelModel(
                 .OrderBy(o => o.Id)
                 .ToListAsync();
 
-            // Only genuinely unassigned orders belong in this section.
-            // Pre-orders already linked to a reservation must not appear here.
-            Unlinked = await db.Orders
-                .AsNoTracking()
-                .Where(o =>
-                    o.RestaurantTableId == TableId &&
-                    o.ReservationId == null &&
-                    o.TableServiceSessionId == null &&
-                    o.Status != OrderStatus.Cancelled &&
-                    o.Status != OrderStatus.Completed)
-                .OrderByDescending(o => o.OrderedAt)
-                .Take(100)
-                .ToListAsync();
+
         }
 
         return true;
     }
+
+    public async Task<IActionResult> OnPostSettleAsync(PaymentMethod? method, string? billToken)
+    {
+        if (!ModelState.IsValid || method is not (PaymentMethod.Cash or PaymentMethod.Card or PaymentMethod.TouchNGo) ||
+            (!BookingId.HasValue && !SessionId.HasValue)) return BadRequest("Choose a visit and payment method.");
+        await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        if (!await LoadAsync(true) || !Outstanding.Any() || BillToken != billToken)
+            return ConflictResultForBill();
+        foreach (var order in Outstanding.ToList()) OrderWorkflowService.RecordPayment(order, method.Value);
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
+        return new OkResult();
+    }
+
+    private static IActionResult ConflictResultForBill() =>
+        new ConflictObjectResult("The bill changed. Reopen Food orders and review it before settling.");
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -206,166 +211,8 @@ public class TablePanelModel(
                 "Selection changed or is invalid. Close and reopen the table.");
         }
 
+        if (Booking == null && Session != null && Session.EndTime > ReservationRules.MalaysiaNow)
+            MoveTargets = await AvailableFor(Session).OrderBy(t => t.TableNumber).ToListAsync();
         return Partial("_TablePanel", this);
-    }
-
-    public async Task<IActionResult> OnPostSaveAsync(
-        ReservationInput input)
-    {
-        if (!await LoadAsync())
-            return Error("The selected booking changed. Reopen this table.");
-
-        if (Booking != null ? !CanEdit : !CanCreate)
-            return Error("Reservations cannot be saved for this selection.");
-
-        // Take the table and time from the verified selection.
-        input.RestaurantTableId = TableId;
-        input.Date = DateOnly.FromDateTime(
-            Booking?.StartTime ?? Selection.Start);
-        input.Time = TimeOnly.FromDateTime(
-            Booking?.StartTime ?? Selection.Start);
-
-        ModelState.Clear();
-
-        if (!TryValidateModel(input))
-        {
-            var message = string.Join(" ",
-                ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .Select(e => e.ErrorMessage));
-
-            return Error(message);
-        }
-
-        return await RunAsync(async () =>
-            (await reservations.SaveAsync(input, Booking?.Id, User)).Error);
-    }
-
-    public async Task<IActionResult> OnPostBookingStatusAsync(
-        string rowVersion,
-        bool confirm,
-        bool confirmCancel)
-    {
-        if (!ModelState.IsValid ||
-            !await LoadAsync() ||
-            Booking == null)
-        {
-            return Error("Refresh this booking first.");
-        }
-
-        if (!confirm && !confirmCancel)
-            return Error("Tick the cancellation confirmation first.");
-
-        return await RunAsync(() =>
-            reservations.ChangeStatusAsync(
-                Booking.Id, rowVersion, confirm, User));
-    }
-
-    public async Task<IActionResult> OnPostOrderAsync(
-        int orderId,
-        OrderStatus? expectedStatus,
-        string? reviewToken,
-        bool arrivalConfirmed)
-    {
-        if (!ModelState.IsValid ||
-            !await LoadAsync() ||
-            (Booking == null && Session == null) ||
-            expectedStatus is not
-                (OrderStatus.Pending or
-                 OrderStatus.AwaitingArrival or
-                 OrderStatus.ReadyToServe) ||
-            !Orders.Any(o => o.Id == orderId) ||
-            string.IsNullOrWhiteSpace(reviewToken))
-        {
-            return Error(
-                "The order does not match this booking or visit. " +
-                "Close and reopen the table.");
-        }
-
-        return await RunAsync(() =>
-            workflow.AdvanceAsync(
-                id: orderId,
-                expected: expectedStatus.Value,
-                expectedSessionId: Booking == null ? Session?.Id : null,
-                expectedBookingId: Booking?.Id,
-                expectedTableId: TableId,
-                expectedReview: reviewToken,
-                arrivalConfirmed: arrivalConfirmed));
-    }
-
-    public async Task<IActionResult> OnPostLinkAsync(
-        int orderId,
-        bool reviewed)
-    {
-        if (!ModelState.IsValid ||
-            !reviewed ||
-            !await LoadAsync() ||
-            (Booking == null && Session == null) ||
-            !Unlinked.Any(o => o.Id == orderId))
-        {
-            return Error(
-                "Select an unlinked order and confirm its customer " +
-                "matches this visit.");
-        }
-
-        return await RunAsync(() =>
-            sessions.LinkOrderAsync(
-                TableId,
-                Booking?.Id,
-                Booking == null ? Session?.Id : null,
-                orderId));
-    }
-
-    public async Task<IActionResult> OnPostWalkInAsync(
-        string name,
-        string? phone,
-        int guests,
-        int minutes)
-    {
-        if (!ModelState.IsValid ||
-            !await LoadAsync() ||
-            !Selection.IsNow ||
-            Bookings.Count > 0 ||
-            WalkIns.Count > 0)
-        {
-            return Error(
-                "Use Now on an available table to record a walk-in.");
-        }
-
-        return await RunAsync(async () =>
-            (await sessions.CreateWalkInAsync(
-                TableId, name, phone, guests, minutes)).Error);
-    }
-
-    private JsonResult Error(string message) =>
-        new(new { ok = false, message });
-
-    private async Task<IActionResult> RunAsync(
-        Func<Task<string?>> action)
-    {
-        try
-        {
-            var error = await action();
-
-            return error == null
-                ? new JsonResult(new
-                {
-                    ok = true,
-                    message = "Saved. Table information refreshed."
-                })
-                : Error(error);
-        }
-        catch (Microsoft.Data.SqlClient.SqlException)
-        {
-            return Error(
-                "The database is busy or unavailable. " +
-                "Refresh before trying again.");
-        }
-        catch (DbUpdateException)
-        {
-            return Error(
-                "The information changed or could not be saved. " +
-                "Refresh before trying again.");
-        }
     }
 }

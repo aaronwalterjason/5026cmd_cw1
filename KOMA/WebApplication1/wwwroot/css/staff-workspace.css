@@ -1,8 +1,7 @@
-﻿/* Layout additions for Staff pages.
+/* Layout additions for Staff pages.
    Colours, buttons, forms and cards use koma-theme.css. */
 
 .staff-workspace {
-    padding: 8px 0 32px;
     min-width: 0;
 }
 
@@ -44,10 +43,11 @@
 
         .staff-workspace .staff-action-card .btn {
             margin-top: auto;
+            width: fit-content;
             display: inline-flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 20px;
+            justify-content: center;
+            gap: .5rem;
         }
 
     .staff-workspace .reservation-summary {
@@ -106,10 +106,6 @@
 @media (max-width: 767.98px) {
     .staff-workspace .staff-action-grid {
         grid-template-columns: 1fr;
-    }
-
-    .staff-workspace .staff-action-card .btn {
-        width: 100%;
     }
 
     .staff-workspace .staff-page-header > .btn {

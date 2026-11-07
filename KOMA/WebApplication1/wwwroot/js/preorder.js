@@ -32,7 +32,8 @@
     function render() {
         const focusKey = document.activeElement?.dataset.focusKey;
         lines.replaceChildren();
-        let total = 0, count = 0;
+        const saved = document.getElementById("saved-dishes");
+        let total = Number(saved?.dataset.cents || 0), count = 0;
         for (const item of items) {
             const quantity = qty(item);
             item.card.classList.toggle("is-selected", quantity > 0);
@@ -53,11 +54,11 @@
             const remove = button("Remove", () => { item.input.value = 0; render(); item.input.focus(); }, "po-remove", "Remove " + item.name + " from cart");
             row.append(stepper, remove); lines.append(row);
         }
-        document.getElementById("cart-empty").hidden = count > 0;
+        document.getElementById("cart-empty").hidden = !!saved || count > 0;
         document.getElementById("cart-count").textContent = String(count);
         document.getElementById("cart-total").textContent = currency(total);
         document.getElementById("expected-total").value = (total / 100).toFixed(2);
-        review.disabled = count === 0;
+        review.disabled = !saved && count === 0;
         if (focusKey) [...lines.querySelectorAll("button")].find(b => b.dataset.focusKey === focusKey)?.focus();
     }
     for (const item of items) {
@@ -91,6 +92,7 @@
         if (!form.reportValidity()) return;
         const summary = document.getElementById("review-lines");
         summary.replaceChildren();
+        document.querySelectorAll("#saved-dishes p").forEach(line => summary.append(line.cloneNode(true)));
         for (const item of items.filter(item => qty(item) > 0)) {
             const row = el("div", undefined, "po-review-line");
             row.append(el("span", qty(item) + " × " + item.name), el("strong", currency(qty(item) * item.cents)));

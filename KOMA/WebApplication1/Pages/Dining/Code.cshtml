@@ -1,0 +1,7 @@
+@page
+@model KOMA.Pages.Dining.CodeModel
+@{ ViewData["Title"] = "My dining QR"; }
+<h1>My dining QR</h1>
+<p>Scan this code on your table’s tablet. It is valid once for five minutes.</p>
+<img width="260" height="260" class="img-fluid" alt="Your dining QR code" src="data:image/png;base64,@Model.Image" />
+<p><a asp-page="Code">Get a new code</a></p>

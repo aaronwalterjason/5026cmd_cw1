@@ -4,6 +4,10 @@
 @{ ViewData["Title"] = "Reservation details"; var booking = Model.Booking; }
 <h1>Reservation R-@booking.Id.ToString("D5")</h1>
 <p><a asp-page="PreOrder" asp-route-id="@booking.Id" class="btn btn-outline-primary">Pre-order dishes / view pre-order</a></p>
+@if (User.IsInRole("Customer"))
+{
+    <a asp-page="/Dining/Code" class="btn btn-outline-primary mb-3">Show my dining QR</a>
+}
 @if (TempData["SuccessMessage"] is string success) { <div class="alert alert-success" role="status">@success</div> }
 @if (TempData["ErrorMessage"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
 <div class="card mb-4"><div class="card-header"><strong>@booking.Status</strong></div><div class="card-body">
@@ -36,3 +40,4 @@
         <button type="submit" class="btn btn-outline-danger">Cancel reservation</button>
     </form>
 }
+

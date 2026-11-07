@@ -15,7 +15,7 @@
     {
         <details class="po-saved" open="@(!Model.CanEdit)">
             <summary>Saved pre-order · @Model.ExistingOrder.Status.DisplayName() · RM @Model.ExistingOrder.TotalAmount.ToString("N2")</summary>
-            <ul>@foreach (var item in Model.ExistingOrder.Items) { <li>@item.Quantity × @item.DishName <strong>RM @item.LineTotal.ToString("N2")</strong></li> }</ul>
+            <partial name="_OrderBill" model="Model.ExistingOrder" />
             @if (Model.CanEdit) { <p>Your saved order stays unchanged until you confirm your new selection.</p> }
         </details>
     }
@@ -24,55 +24,7 @@
         <form method="post" id="preorder-form">
             <div asp-validation-summary="All" class="text-danger" role="alert"></div>
             <input type="hidden" name="ExpectedTotal" id="expected-total" />
-            <div class="po-layout">
-                <section aria-label="Food menu" class="po-menu">
-                    <div class="po-tools"><h2>Explore the menu</h2><label class="po-search"><span class="visually-hidden">Search dishes</span><input id="menu-search" type="search" placeholder="Search your favourites…" /></label></div>
-                    <div class="po-filters" aria-label="Menu categories">
-                        <button type="button" class="is-active" data-category="all" aria-pressed="true">All dishes <span>@Model.Menu.Count</span></button>
-                        @foreach (var group in Model.Menu.GroupBy(m => m.MenuCategoryId))
-                        { <button type="button" data-category="@group.Key" aria-pressed="false">@group.First().MenuCategory?.Name <span>@group.Count()</span></button> }
-                    </div>
-                    <p id="menu-count" class="po-caption" aria-live="polite">@Model.Menu.Count dishes to discover</p>
-                    <div class="po-grid">
-                        @foreach (var item in Model.Menu)
-                        {
-                            <article class="po-dish" data-id="@item.Id" data-category="@item.MenuCategoryId" data-name="@item.Name" data-description="@item.Description" data-price="@item.Price.ToString(CultureInfo.InvariantCulture)">
-                                <div class="po-photo">
-                                    <span class="po-photo-fallback">KOMA<span>Photo coming soon</span></span>
-                                    @if (!string.IsNullOrWhiteSpace(item.ImageUrl)) { <img src="@item.ImageUrl" alt="@item.Name" loading="lazy" /> }
-                                    @if (item.IsRecommended || item.IsSeasonal) { <span class="po-badge">@(item.IsSeasonal ? "Seasonal special" : "KOMA favourite")</span> }
-                                </div>
-                                <div class="po-dish-body"><p class="po-category">@item.MenuCategory?.Name</p><h3>@item.Name</h3><p class="po-description">@item.Description</p>
-                                    <div class="po-dish-bottom"><strong>RM @item.Price.ToString("N2")</strong><div class="po-stepper">
-                                        <button type="button" data-delta="-1" aria-label="Remove one @item.Name">−</button>
-                                        <input id="dish-@item.Id" aria-label="Quantity of @item.Name" name="Quantities[@item.Id]" type="number" min="0" max="99" value="@Model.Quantities.GetValueOrDefault(item.Id)" />
-                                        <button type="button" data-delta="1" aria-label="Add one @item.Name">+</button>
-                                    </div></div>
-                                </div>
-                            </article>
-                        }
-                    </div>
-                    <div id="menu-empty" class="po-empty" hidden="@(Model.Menu.Count > 0)"><h3>No dishes found</h3><p>Try another category or search. If the menu is empty, please check back later.</p></div>
-                </section>
-                <aside class="po-cart" id="your-cart" aria-labelledby="cart-heading">
-                    <div class="po-cart-heading"><div><p class="po-eyebrow">SOMETHING TO LOOK FORWARD TO</p><h2 id="cart-heading">Your pre-order</h2></div><span id="cart-count">0</span></div>
-                    <div id="cart-lines"></div>
-                    <div id="cart-empty" class="po-empty"><span class="po-empty-symbol" aria-hidden="true">＋</span><h3>A good meal starts here.</h3><p>Add a dish from the menu to start your pre-order.</p></div>
-                    <div class="po-cart-total"><span>Food total</span><strong id="cart-total" aria-live="polite">RM 0.00</strong></div>
-                    <p class="po-caption">No payment is collected here. Review your selection before saving.</p>
-                    <button id="review-order" class="po-primary" type="button" disabled>Review pre-order →</button>
-                    <noscript><p>Enable JavaScript to see your live cart, or save the quantities entered beside each dish.</p><button type="submit">Save selected dishes</button></noscript>
-                    <a class="po-later" asp-page="Details" asp-route-id="@Model.Id">I’ll choose my food later</a>
-                    <div class="po-arrival">Prepared after arrival<span>Your pre-order waits until you reach the restaurant.</span></div>
-                </aside>
-            </div>
-            <dialog id="review-dialog" class="po-review" aria-labelledby="review-title">
-                <p class="po-eyebrow">ONE LAST LOOK</p><h2 id="review-title">Your meal, all lined up.</h2>
-                <p>Check your dishes and total. Confirming saves your pre-order; no payment is taken.</p>
-                <div id="review-lines"></div>
-                <div class="po-cart-total"><span>Food total</span><strong id="review-total"></strong></div>
-                <div class="po-review-actions"><button type="button" id="keep-browsing" class="po-secondary">Keep browsing</button><button type="submit" class="po-primary" id="confirm-order">Confirm pre-order</button></div>
-            </dialog>
+            <partial name="_OrderingMenu" model="new KOMA.Services.OrderingMenu(Model.Menu, Model.Quantities, Model.Id)" />
         </form>
     }
     else { <p>This pre-order is no longer editable.</p><a asp-page="Details" asp-route-id="@Model.Id">Back to reservation</a> }

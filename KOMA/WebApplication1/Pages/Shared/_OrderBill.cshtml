@@ -1,0 +1,13 @@
+@model KOMA.Models.Order
+<ul class="list-unstyled my-3 px-2">
+    @foreach (var item in Model.Items.OrderBy(i => i.Id))
+    {
+        <li class="d-flex justify-content-between align-items-baseline gap-3 py-2">
+            <span>@item.Quantity × @item.DishName</span>
+            <strong class="text-nowrap">RM @item.LineTotal.ToString("N2")</strong>
+        </li>
+    }
+</ul>
+<div class="d-flex justify-content-between gap-3 border-top pt-2 px-2">
+    <span>Food total</span><strong class="text-nowrap">RM @Model.TotalAmount.ToString("N2")</strong>
+</div>

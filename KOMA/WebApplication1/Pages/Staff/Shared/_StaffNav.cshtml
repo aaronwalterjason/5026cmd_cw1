@@ -2,9 +2,9 @@
     var path = (Context.Request.Path.Value ?? "").TrimEnd('/');
     bool At(string route) => path.Equals(route, StringComparison.OrdinalIgnoreCase);
     var dashboard = At("/Staff") || At("/Staff/Index");
-    var reservations = At("/Staff/Reservation/Manage");
+    var tablet = At("/Dining/Setup");
     var kitchen = At("/Staff/Orders/Kitchen");
-    var tables = !reservations && (path.StartsWith("/Staff/Reservation", StringComparison.OrdinalIgnoreCase)
+    var tables = (path.StartsWith("/Staff/Reservation", StringComparison.OrdinalIgnoreCase)
         || At("/Staff/Orders") || At("/Staff/Orders/Index"));
     string Current(bool active) => active ? "is-current" : "";
     string? Aria(bool active) => active ? "page" : null;
@@ -21,18 +21,11 @@
         </li>
         <li class="admin-rail-divider" aria-hidden="true"></li>
         <li class="admin-rail-group @Current(tables)">
-            <a class="admin-rail-btn" asp-area="" asp-page="/Staff/Reservation/Index" aria-current="@Aria(tables)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Staff/Reservation/Index" asp-route-Now="true" aria-current="@Aria(tables)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M6 3v4m12-4v4M6 17v4m12-4v4"/></svg>
                 <span class="admin-rail-label">Table<br />service</span>
             </a>
             <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Table service</div>
-        </li>
-        <li class="admin-rail-group @Current(reservations)">
-            <a class="admin-rail-btn" asp-area="" asp-page="/Staff/Reservation/Manage" asp-route-From="" asp-route-To="" aria-current="@Aria(reservations)">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18M7 15h3m4 0h3M7 18h3"/></svg>
-                <span class="admin-rail-label">Reservations</span>
-            </a>
-            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Customer details and booking times</div>
         </li>
         <li class="admin-rail-group @Current(kitchen)">
             <a class="admin-rail-btn" asp-area="" asp-page="/Staff/Orders/Kitchen" aria-current="@Aria(kitchen)">
@@ -40,6 +33,12 @@
                 <span class="admin-rail-label">Kitchen<br />queue</span>
             </a>
             <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Kitchen queue</div>
+        </li>
+        <li class="admin-rail-group @Current(tablet)">
+            <a class="admin-rail-btn" asp-page="/Dining/Setup" aria-current="@Aria(tablet)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="18" cy="12" r=".7"/></svg>
+                <span class="admin-rail-label">Tablet<br />mode</span>
+            </a>
         </li>
     </ul>
 </nav>

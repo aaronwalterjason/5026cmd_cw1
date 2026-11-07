@@ -1,0 +1,11 @@
+@page
+@model KOMA.Pages.Dining.SetupModel
+@{ ViewData["Title"] = "Tablet mode"; }
+<header class="staff-page-header"><h1>@ViewData["Title"]</h1></header>
+<form method="post" class="card card-body" style="max-width:34rem">
+<div asp-validation-summary="All" class="text-danger"></div>
+<label asp-for="TableId">Assign this tablet to a table</label>
+<select class="form-select my-2" asp-for="TableId" required><option value="">Choose a table</option>
+@foreach (var t in Model.Tables) { <option value="@t.Id">@t.DiningArea?.Name · Table @t.TableNumber</option> }
+</select><p>Opening tablet mode signs out your Staff account. Pairing a replacement tablet disconnects the previous one.</p>
+<button class="btn btn-primary">Start tablet mode</button></form>

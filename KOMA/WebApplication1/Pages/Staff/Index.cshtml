@@ -5,16 +5,12 @@
     ViewData["Title"] = "Staff Dashboard";
 }
 
-<link rel="stylesheet"
-      href="~/css/staff-workspace.css"
-      asp-append-version="true" />
 
-<div class="staff-workspace">
     <header class="staff-page-header">
         <div>
             <h1>Staff Dashboard</h1>
             <p class="text-muted">
-                Manage table service and kitchen preparation.
+                Check tables, manage kitchen orders or set up a tablet.
             </p>
         </div>
 
@@ -36,12 +32,10 @@
             </h2>
 
             <p class="text-muted">
-                Check table availability, manage bookings and walk-ins,
-                review customer orders, confirm orders for the kitchen,
-                and mark ready orders served.
+                Check reservations and view the food orders submitted for each table.
             </p>
 
-            <a asp-page="/Staff/Reservation/Index"
+            <a asp-page="/Staff/Reservation/Index" asp-route-Now="true"
                class="btn btn-primary">
                 Open table service
                 <span aria-hidden="true">↗</span>
@@ -68,5 +62,10 @@
                 <span aria-hidden="true">↗</span>
             </a>
         </section>
+        <section class="card p-3 staff-action-card">
+            <h2 class="h4">Tablet mode</h2>
+            <p class="text-muted">Set up this tablet for a table or help a guest order.</p>
+            <a asp-page="/Dining/Setup" class="btn btn-primary">Open tablet mode <span aria-hidden="true">↗</span></a>
+        </section>
     </div>
-</div>
+
