@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace KOMA.Pages.Reservations;
 
 [Authorize(Roles = "Customer,Staff,Administrator")]
-public class PreOrderModel(ApplicationDbContext context) : PageModel
+public class PreOrderModel(ApplicationDbContext context, KOMA.Services.Email.BookingEmailService emails) : PageModel
 {
     [BindProperty(SupportsGet = true)] public int Id { get; set; }
     [BindProperty] public Dictionary<int, int> Quantities { get; set; } = [];
@@ -73,6 +73,7 @@ public class PreOrderModel(ApplicationDbContext context) : PageModel
                 ModelState.AddModelError("", "Menu prices have changed. Review your updated cart total before confirming again.");
                 return Page();
             }
+            var oldTotal = ExistingOrder?.TotalAmount;   // for the "Booking updated" email
             var order = ExistingOrder ?? new Order
             {
                 ReservationId = Id, OrderType = OrderType.OnlinePreOrder,
@@ -88,6 +89,7 @@ public class PreOrderModel(ApplicationDbContext context) : PageModel
                 order.Items.Add(new OrderItem { MenuItemId = item.Id, ItemName = item.Name, Quantity = choice.Value, UnitPrice = item.Price });
             }
             order.TotalAmount = order.Items.Sum(i => i.UnitPrice * i.Quantity);
+            await emails.QueuePreOrderAsync(booking, oldTotal, order.TotalAmount, byCustomer: !IsStaff);
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
             TempData["SuccessMessage"] = "Pre-order saved. It is awaiting your arrival and has not been sent to the kitchen.";
