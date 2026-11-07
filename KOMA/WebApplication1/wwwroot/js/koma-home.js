@@ -62,6 +62,7 @@
         };
         const restart = () => {
             window.clearInterval(timer);
+            if (document.querySelector('.promotion-dialog[open]')) { cancelSlide(); return; }
             if (cards.length > 1 && !hovered && !focused && !document.hidden && !reducedMotion.matches) timer = window.setInterval(() => move(1), 5000);
         };
         gallery.addEventListener('mouseenter', () => { hovered = true; restart(); });
@@ -74,8 +75,28 @@
             move(event.key === 'ArrowLeft' ? -1 : 1);
         });
         document.addEventListener('visibilitychange', restart);
+        document.addEventListener('promotiondialogchange', restart);
         reducedMotion.addEventListener('change', restart);
         restart();
+    });
+    document.querySelectorAll('[data-promotion-dialog]').forEach(button => button.addEventListener('click', () => {
+        const dialog = document.getElementById(button.dataset.promotionDialog);
+        if (!dialog || dialog.open) return;
+        dialog.showModal();
+        document.body.classList.add('promotion-open');
+        document.dispatchEvent(new Event('promotiondialogchange'));
+    }));
+    document.querySelectorAll('.promotion-dialog').forEach(dialog => {
+        dialog.querySelector('[data-close-promotion]').addEventListener('click', () => dialog.close());
+        dialog.addEventListener('click', event => {
+            if (event.target !== dialog) return;
+            const box = dialog.getBoundingClientRect();
+            if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close();
+        });
+        dialog.addEventListener('close', () => {
+            document.body.classList.remove('promotion-open');
+            document.dispatchEvent(new Event('promotiondialogchange'));
+        });
     });
     document.querySelectorAll('[data-order-message]').forEach(button => button.addEventListener('click', () => {
         document.querySelector('.order-status').textContent = button.dataset.orderMessage;

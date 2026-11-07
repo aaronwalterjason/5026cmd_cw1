@@ -70,8 +70,56 @@
     </div>
         </section>
     }
+    <section class="food-gallery promotion-gallery" id="promotions" aria-labelledby="promotions-title" aria-roledescription="carousel">
+        <div class="food-toolbar"><h3 id="promotions-title">Promotions</h3></div>
+        @if (Model.Promotions.Count == 0)
+        {
+            <p class="food-empty">New promotions are on the way. Check back soon.</p>
+        }
+        <div class="food-track" aria-label="Promotion pictures" tabindex="0">
+            @foreach (var promotion in Model.Promotions)
+            {
+                <button class="food-card promotion-card" type="button" data-promotion-dialog="promotion-@promotion.Id"
+                        aria-label="View @promotion.Title promotion details" aria-haspopup="dialog" aria-controls="promotion-@promotion.Id">
+                    <span class="dish-photo"><img src="@promotion.BannerImageUrl" alt="@promotion.Title" loading="lazy" /></span>
+                </button>
+            }
+        </div>
+    </section>
     <p class="order-status" role="status" aria-live="polite"></p>
 </section>
+@foreach (var promotion in Model.Promotions)
+{
+    <dialog class="promotion-dialog" id="promotion-@promotion.Id" aria-labelledby="promotion-title-@promotion.Id">
+        <div class="promotion-dialog-header">
+            <p class="eyebrow">KOMA PROMOTIONS</p>
+            <button type="button" class="promotion-close" data-close-promotion aria-label="Close promotion details" autofocus>×</button>
+        </div>
+        <img class="promotion-detail-image" src="@promotion.BannerImageUrl" alt="@promotion.Title" loading="lazy" />
+        <div class="promotion-details">
+            <h2 id="promotion-title-@promotion.Id">@promotion.Title</h2>
+            @if (!string.IsNullOrWhiteSpace(promotion.BannerText))
+            {
+                <p>@Lines(promotion.BannerText)</p>
+            }
+            <dl class="promotion-facts">
+                <div><dt>Offer</dt><dd>@promotion.DiscountPercent.ToString("0.##")% off selected dishes</dd></div>
+                <div><dt>Dates</dt><dd>@promotion.StartDate.ToString("d MMM yyyy") – @promotion.EndDate.ToString("d MMM yyyy")</dd></div>
+                <div><dt>When</dt><dd>@promotion.ScheduleText() <span>(Malaysia time)</span></dd></div>
+            </dl>
+            @if (promotion.MenuItems.Count > 0)
+            {
+                <h3>Included dishes</h3>
+                <ul class="promotion-dishes">
+                    @foreach (var dish in promotion.MenuItems.OrderBy(m => m.Name))
+                    {
+                        <li>@dish.Name</li>
+                    }
+                </ul>
+            }
+        </div>
+    </dialog>
+}
 @if (c.ShowStory)
 {
 <section class="story reveal" id="story">
