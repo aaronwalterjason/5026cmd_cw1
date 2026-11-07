@@ -12,9 +12,10 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 // AuditInterceptor writes an Admin > Activity entry whenever an admin/staff member saves a change.
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AuditInterceptor>();
+builder.Services.AddSingleton<RequestTimingInterceptor>();   // speed check (see Services/RequestTiming.cs)
 builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
     options.UseSqlServer(connectionString)
-           .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
+           .AddInterceptors(sp.GetRequiredService<AuditInterceptor>(), sp.GetRequiredService<RequestTimingInterceptor>()));
 
 builder.Services.AddDefaultIdentity<KOMA.Models.ApplicationUser>(options =>
 {
@@ -31,9 +32,10 @@ builder.Services.AddScoped<ReservationService>();
 builder.Services.AddScoped<TableSessionService>();
 builder.Services.AddScoped<OrderWorkflowService>();
 builder.Services.AddScoped<MenuImageService>();
-// Check role changes on the next request, rather than retaining old role claims.
+// Re-check the signed-in user (role changes, locked accounts) at most once a minute.
+// Zero re-checked on EVERY request (4-6 extra queries each time), which slowed every page.
 builder.Services.Configure<SecurityStampValidatorOptions>(options =>
-    options.ValidationInterval = TimeSpan.Zero);
+    options.ValidationInterval = TimeSpan.FromMinutes(1));
 
 var app = builder.Build();
 
@@ -47,6 +49,24 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 // Serve photos uploaded after the application was built.
 app.UseStaticFiles();
+
+// Speed check: time every page request and its database queries (Output window + DevTools Server Timing).
+app.Use(async (ctx, next) =>
+{
+    var sw = System.Diagnostics.Stopwatch.StartNew();
+    ctx.Response.OnStarting(() =>
+    {
+        var db = RequestTimingInterceptor.Of(ctx);
+        ctx.Response.Headers.Append("Server-Timing",
+            $"total;desc=\"server total\";dur={sw.Elapsed.TotalMilliseconds:0}, sql;desc=\"{db.Count} queries\";dur={db.Ms:0}");
+        return Task.CompletedTask;
+    });
+    await next();
+    var s = RequestTimingInterceptor.Of(ctx);
+    if (!Path.HasExtension(ctx.Request.Path.Value))   // pages and handlers only, not css/js/images
+        app.Logger.LogWarning("KOMA timing  {Method} {Path}{Query}  {Ms:0} ms  ·  {Count} queries, {DbMs:0} ms",
+            ctx.Request.Method, ctx.Request.Path, ctx.Request.QueryString, sw.Elapsed.TotalMilliseconds, s.Count, s.Ms);
+});
 
 app.UseRouting();
 
