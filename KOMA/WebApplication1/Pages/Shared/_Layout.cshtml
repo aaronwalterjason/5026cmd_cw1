@@ -21,6 +21,7 @@
     @if (User.IsInRole("Customer"))
     {
         <partial name="_CustomerHeader" />
+        <partial name="_ConfirmEmailBanner" />
     }
     else if (!isAdmin)
     {
