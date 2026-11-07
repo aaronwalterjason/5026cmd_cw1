@@ -2,26 +2,146 @@
 @model KOMA.Pages.Admin.Reports.IndexModel
 @{
     ViewData["Title"] = "Reports";
+    var M = Model;
+    string Url2(KOMA.Pages.Admin.Reports.IndexModel.Part p) => p.Key == "team"
+        ? Url.Page(p.LinkPage, new { group = "staff", view = "schedule" })!
+        : Url.Page(p.LinkPage)!;
+    var icons = new Dictionary<string, string>
+    {
+        ["book"] = "M4 6h16v14H4zM4 10h16M9 3v4M15 3v4",
+        ["arrive"] = "M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11zM12 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z",
+        ["order"] = "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8",
+        ["kitchen"] = "M6 13.9A4 4 0 018 6a5 5 0 018 0 4 4 0 012 7.9V20H6zM6 17h12",
+        ["serve"] = "M3 18h18M5 18a7 7 0 0114 0M12 8V6M10 6h4",
+        ["help"] = "M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0",
+        ["team"] = "M9 11a4 4 0 100-8 4 4 0 000 8zM2 21a7 7 0 0114 0M17 11a3 3 0 100-6M22 21a6 6 0 00-5-6",
+    };
 }
+@*
+    Reports: one card per stage of the restaurant flow (Book -> Arrive -> Order -> Kitchen -> Serve -> Help -> Team).
+    Each card = one chart + one table + CSV + a link to the page to act on. Charts are plain HTML/SVG (no chart library).
+*@
+<div class="rp-head">
+    <h1 class="mb-0">Reports</h1>
+    <form method="get" class="rp-range">
+        <select name="days" aria-label="Date range" onchange="this.form.submit()">
+            @foreach (var r in KOMA.Pages.Admin.Reports.IndexModel.Ranges)
+            {
+                <option value="@r.Days" selected="@(r.Days == M.Days)">@r.Label</option>
+            }
+        </select>
+        <noscript><button type="submit">Show</button></noscript>
+    </form>
+</div>
 
-<h1>Reports</h1>
+<div class="rp-grid">
+    @foreach (var p in M.Parts)
+    {
+        <section class="rp-card" id="rp-@p.Key">
+            <header class="rp-card-head">
+                <span class="rp-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15"><path d="@icons[p.Key]" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+                <h2>@p.Title</h2>
+                @if (!string.IsNullOrEmpty(p.Sub))
+                {
+                    <span class="rp-sub">@p.Sub</span>
+                }
+                <span class="rp-tools">
+                    @if (!p.Empty)
+                    {
+                        <a class="rp-csv" asp-page-handler="Csv" asp-route-part="@p.Key" asp-route-days="@M.Days" title="Download CSV"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>CSV</a>
+                    }
+                    <a class="koma-go" href="@Url2(p)">@p.Link<span class="koma-go-disc" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span></a>
+                </span>
+            </header>
 
-<form method="get" class="row g-2 align-items-end mb-4">
-    <div class="col-auto">
-        <label class="form-label">From</label>
-        <input type="date" name="from" class="form-control" value="@Model.FromDate.ToString("yyyy-MM-dd")" />
-    </div>
-    <div class="col-auto">
-        <label class="form-label">To</label>
-        <input type="date" name="to" class="form-control" value="@Model.ToDate.ToString("yyyy-MM-dd")" />
-    </div>
-    <div class="col-auto">
-        <button type="submit" class="btn btn-primary">Filter</button>
-    </div>
-</form>
-
-<div class="alert alert-info">
-    TODO (Intermediate, Week 7-8): reservation stats, sales totals, popular items for this range -
-    wire this up once the Reservations/Orders tables exist on <code>ApplicationDbContext</code>.<br />
-    TODO (Advanced, Week 9): charts + CSV/PDF/Excel export buttons.
+            @if (p.Empty)
+            {
+                <partial name="_Empty" model='new EmptyState("calendar", "Nothing in this range", "Try a longer range.", null, null, true)' />
+            }
+            else
+            {
+                <div class="rp-body">
+                    <div class="rp-chart">
+                        @switch (p.Key)
+                        {
+                            case "book":
+                                var top = Math.Max(1, p.Bars.Max(b => b.Value));
+                                <div class="rp-funnel">
+                                    @for (var i = 0; i < p.Bars.Count; i++)
+                                    {
+                                        var b = p.Bars[i];
+                                        <div><span>@b.Label</span><span class="rp-track"><span class="rp-fill rp-shade-@i" style="width:@((b.Value / top * 100).ToString("0"))%"></span></span><b>@b.Text</b></div>
+                                    }
+                                </div>
+                                break;
+                            case "arrive":
+                                var amax = Math.Max(1, p.Bars.Max(b => b.Value));
+                                <div class="rp-cols">
+                                    @foreach (var b in p.Bars)
+                                    {
+                                        <div title="@b.Label: @b.Text"><b>@b.Text</b><span class="@(b.Hot ? "is-hot" : b.Label == "On time" ? "is-main" : "")" style="height:@((b.Value / amax * 100).ToString("0"))%"></span><small>@b.Label</small></div>
+                                    }
+                                </div>
+                                break;
+                            case "kitchen":
+                            case "serve":
+                                if (p.Key == "serve")
+                                {
+                                    <div class="rp-split"><span style="flex:@Math.Max(M.StaffShare, 1)"></span><span style="flex:@Math.Max(100 - M.StaffShare, 1)"></span></div>
+                                    <div class="rp-split-key"><span><b>@M.StaffShare%</b> by staff</span><span><b>@(100 - M.StaffShare)%</b> on the tablet</span></div>
+                                }
+                                if (p.Bars.Count >= 2)
+                                {
+                                    var lmax = Math.Max(1, p.Bars.Max(b => b.Value));
+                                    var n = p.Bars.Count;
+                                    var pts = string.Join(" ", p.Bars.Select((b, i) => $"{i * 100.0 / (n - 1):0.#},{40 - b.Value / lmax * 36:0.#}"));
+                                    <svg class="rp-line" viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label="@(p.Key == "kitchen" ? "Minutes from order to ready, by hour" : "Minutes from ready to table, by day")"><polyline points="@pts" vector-effect="non-scaling-stroke" /></svg>
+                                    <div class="rp-axis">@foreach (var b in p.Bars.Where((b, i) => n <= 12 || i % (n / 6 + 1) == 0)) {<span title="@b.Text">@b.Label</span>}</div>
+                                }
+                                else if (p.Bars.Count == 1)
+                                {
+                                    <div class="rp-big">@p.Bars[0].Text <small>@p.Bars[0].Label</small></div>
+                                }
+                                break;
+                            case "team":
+                                var tmax = Math.Max(1, Math.Max(p.Bars.Max(b => b.Value), M.TeamStaff.DefaultIfEmpty(0).Max() * KOMA.Pages.Admin.Reports.IndexModel.GuestsPerStaff));
+                                <div class="rp-team">
+                                    @for (var i = 0; i < p.Bars.Count; i++)
+                                    {
+                                        var b = p.Bars[i];
+                                        var staffLine = M.TeamStaff[i] * KOMA.Pages.Admin.Reports.IndexModel.GuestsPerStaff / tmax * 100;
+                                        <div title="@b.Label: @b.Text"><span class="rp-team-bar @(b.Hot ? "is-hot" : "")" style="height:@((b.Value / tmax * 100).ToString("0"))%"></span><i class="rp-team-staff" style="bottom:@(staffLine.ToString("0"))%"></i><small>@b.Label</small></div>
+                                    }
+                                </div>
+                                <div class="rp-key"><span><i class="k-bar"></i>Guests</span><span><i class="k-line"></i>Staff on shift</span><span><i class="k-hot"></i>Not enough staff</span></div>
+                                break;
+                            default:
+                                var hmax = Math.Max(1, p.Bars.Max(b => b.Value));
+                                <div class="rp-bars">
+                                    @foreach (var b in p.Bars)
+                                    {
+                                        <div><span title="@b.Label">@b.Label</span><span class="rp-track"><span class="rp-fill" style="width:@((b.Value / hmax * 100).ToString("0"))%"></span></span><b>@b.Text</b></div>
+                                    }
+                                </div>
+                                break;
+                        }
+                    </div>
+                    <div class="rp-table">
+                        @if (p.Rows.Count > 0)
+                        {
+                            <table>
+                                <thead><tr>@for (var c = 0; c < p.Head.Count; c++) {<th class="@(c > 0 ? "num" : "")">@p.Head[c]</th>}</tr></thead>
+                                <tbody>
+                                    @for (var r = 0; r < p.Rows.Count; r++)
+                                    {
+                                        <tr>@for (var c = 0; c < p.Rows[r].Length; c++) {<td class="@(c > 0 ? "num" : "") @(p.RedCells.Contains((r, c)) ? "is-hot" : "")">@p.Rows[r][c]</td>}</tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+            }
+        </section>
+    }
 </div>

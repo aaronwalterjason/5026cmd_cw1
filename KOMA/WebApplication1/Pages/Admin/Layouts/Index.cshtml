@@ -20,11 +20,9 @@
 
 @if (!Model.Floors.Any())
 {
-    <div class="card p-4 text-center">
-        <p class="mb-2">No floor layouts yet.</p>
-        <p class="text-muted small">Start by creating a floor (e.g. "Ground Floor") and drawing its size.</p>
-        <div><a class="btn btn-primary" asp-page="./Create">Create your first floor</a></div>
-    </div>
+    <section class="koma-empty-card">
+        <partial name="_Empty" model='new EmptyState("floor", "No floor layouts yet", "Start by creating a floor (e.g. Ground Floor) and drawing its size.", "Create your first floor", Url.Page("./Create"))' />
+    </section>
 }
 
 <div class="row g-3">

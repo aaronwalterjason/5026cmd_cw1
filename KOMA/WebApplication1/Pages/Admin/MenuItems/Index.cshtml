@@ -75,8 +75,7 @@
         <form method="get" class="mn-search">
             @if (Model.Cat.HasValue) { <input type="hidden" name="cat" value="@Model.Cat" /> }
             <label class="visually-hidden" for="mn-q">Search dishes</label>
-            <input id="mn-q" type="search" name="q" value="@Model.Q" class="form-control"
-                   placeholder="@(Model.CurrentCategory is null ? "Search all dishes" : "Search in this category")" />
+            <input id="mn-q" type="search" aria-label="Search dishes" name="q" value="@Model.Q" class="form-control" />
         </form>
 
         <div class="mn-items">
@@ -114,7 +113,7 @@
             }
             @if (!Model.Items.Any())
             {
-                <p class="mn-muted m-3">@(string.IsNullOrWhiteSpace(Model.Q) ? "No dishes here yet." : "No dishes match your search.")</p>
+                <partial name="_Empty" model='string.IsNullOrWhiteSpace(Model.Q) ? new EmptyState("bowl", "No dishes here yet", "Add the first dish to this category.", "+ Add a dish", Url.Page("./Index", newItemRoute)) : new EmptyState("search", "No dishes match", "Try another name or clear the search.")' />
             }
         </div>
     </section>
@@ -254,10 +253,7 @@
         }
         else
         {
-            <div class="mn-empty">
-                <p class="mb-2">No dishes here yet.</p>
-                <a asp-page="./Index" asp-all-route-data="newItemRoute" class="btn btn-primary">+ Add a dish</a>
-            </div>
+            <partial name="_Empty" model='new EmptyState("bowl", "Nothing cooking yet", "Add a dish, or pick one on the left to edit it.", "+ Add a dish", Url.Page("./Index", newItemRoute))' />
         }
     </section>
 </div>
