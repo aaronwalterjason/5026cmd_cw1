@@ -22,3 +22,6 @@ obj/
 # OS files
 .DS_Store
 Thumbs.db
+
+KOMA/_merge_backup/
+KOMA/_prototypes/
