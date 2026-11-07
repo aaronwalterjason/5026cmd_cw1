@@ -100,22 +100,25 @@ namespace KOMA.Pages.Admin
                 .Where(o => o.OrderedAt >= today && o.OrderedAt < tomorrow)
                 .ToListAsync();
 
-            var paidToday = await _db.Orders.AsNoTracking()
-                .Include(o => o.Items)
-                .Where(o => o.PaymentStatus == PaymentStatus.Paid && o.PaidAt >= today && o.PaidAt < tomorrow)
+            // One light query (no full records) for every "so far" figure: today, yesterday, 7 and 14 days ago.
+            // This replaced 7 separate queries (paid today, last week sales/orders, 3 comparisons, last week by type).
+            var since = today.AddDays(-14);
+            var recent = await _db.Orders.AsNoTracking()
+                .Where(o => o.OrderedAt >= since || (o.PaidAt != null && o.PaidAt >= since))
+                .Select(o => new { o.OrderType, o.Status, o.PaymentStatus, o.OrderedAt, o.PaidAt, o.TotalAmount,
+                    Qty = o.Items.Sum(i => (int?)i.Quantity) ?? 0 })
                 .ToListAsync();
+            var paidRecent = recent.Where(o => o.PaymentStatus == PaymentStatus.Paid && o.PaidAt != null).ToList();
+            var paidToday = paidRecent.Where(o => o.PaidAt >= today && o.PaidAt < tomorrow).ToList();
 
             // Same day last week, up to the same time of day - a fair "so far" comparison.
             var lastWeekNow = lastWeek + (Now - today);
-            SalesSameDayLastWeek = await _db.Orders
-                .Where(o => o.PaymentStatus == PaymentStatus.Paid && o.PaidAt >= lastWeek && o.PaidAt < lastWeekNow)
-                .SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
-            OrdersSameDayLastWeek = await _db.Orders
-                .CountAsync(o => o.OrderedAt >= lastWeek && o.OrderedAt < lastWeekNow && o.Status != OrderStatus.Cancelled);
+            SalesSameDayLastWeek = paidRecent.Where(o => o.PaidAt >= lastWeek && o.PaidAt < lastWeekNow).Sum(o => o.TotalAmount);
+            OrdersSameDayLastWeek = recent.Count(o => o.OrderedAt >= lastWeek && o.OrderedAt < lastWeekNow && o.Status != OrderStatus.Cancelled);
 
             SalesToday = paidToday.Sum(o => o.TotalAmount);
             PaidOrdersToday = paidToday.Count;
-            ItemsSoldToday = paidToday.Sum(o => o.Items.Sum(i => i.Quantity));
+            ItemsSoldToday = paidToday.Sum(o => o.Qty);
             var notCancelled = todays.Where(o => o.Status != OrderStatus.Cancelled).ToList();
             OrdersToday = notCancelled.Count;
 
@@ -170,18 +173,15 @@ namespace KOMA.Pages.Admin
             foreach (var daysBack in new[] { 1, 7, 14 })
             {
                 var day = today.AddDays(-daysBack);
-                var amount = await _db.Orders
-                    .Where(o => o.PaymentStatus == PaymentStatus.Paid && o.PaidAt >= day && o.PaidAt < day + sinceStart)
-                    .SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
+                var amount = paidRecent.Where(o => o.PaidAt >= day && o.PaidAt < day + sinceStart).Sum(o => o.TotalAmount);
                 double? change = amount == 0 ? null : (double)((SalesToday - amount) / amount * 100);
                 SalesComparisons.Add(new SalesCompare(day, amount, change));
             }
 
             // Orders by type (today so far vs the same weekday last week, same time of day).
-            var lastWeekByType = await _db.Orders
+            var lastWeekByType = recent
                 .Where(o => o.OrderedAt >= lastWeek && o.OrderedAt < lastWeekNow && o.Status != OrderStatus.Cancelled)
-                .GroupBy(o => o.OrderType).Select(g => new { g.Key, Count = g.Count() })
-                .ToDictionaryAsync(g => g.Key, g => g.Count);
+                .GroupBy(o => o.OrderType).ToDictionary(g => g.Key, g => g.Count());
             OrderTypeStats.Add(new TypeStat("all", "All", OrdersToday, AverageOrder, OrdersSameDayLastWeek));
             foreach (var type in Enum.GetValues<OrderType>())
             {
@@ -196,7 +196,8 @@ namespace KOMA.Pages.Admin
             BusiestShare = OrdersToday == 0 ? 0 : (int)Math.Round(100.0 * busiest.Count / OrdersToday);
 
             // Alerts.
-            SoldOut = await _db.MenuItems.AsNoTracking().Where(m => !m.IsAvailable).OrderBy(m => m.Name).ToListAsync();
+            var menu = await _db.MenuItems.AsNoTracking().ToListAsync();   // small table: one query gives both the count and sold-out list
+            SoldOut = menu.Where(m => !m.IsAvailable).OrderBy(m => m.Name).ToList();
             var slowBefore = Now.AddMinutes(-SlowOrderMinutes);
             SlowOrders = open.Where(o => (o.Status == OrderStatus.Pending || o.Status == OrderStatus.Preparing) && o.OrderedAt <= slowBefore)
                              .OrderBy(o => o.OrderedAt).ToList();
@@ -224,7 +225,7 @@ namespace KOMA.Pages.Admin
                 Agenda.Add(new AgendaRow(r, state));
             }
 
-            MenuItemCount = await _db.MenuItems.CountAsync();
+            MenuItemCount = menu.Count;
             ActivePromotionCount = await _db.Promotions.CountAsync(p => p.IsActive);
         }
 
