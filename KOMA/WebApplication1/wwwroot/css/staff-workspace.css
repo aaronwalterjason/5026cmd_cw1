@@ -123,3 +123,5 @@
         padding: 12px;
     }
 }
+
+.staff-workspace .validation-summary-valid { display: none; }
