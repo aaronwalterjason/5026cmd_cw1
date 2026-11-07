@@ -1,8 +1,12 @@
 @* Admin icon rail (design A - one icon per page). Rendered by Pages/Shared/_Layout.cshtml on every page under /Admin.
    Every icon is a direct link (one click, no flyout menus). Hovering or focusing an icon shows its name tag.
    To add a page: copy one <li> below, set its path prefixes in Under(...), its page, icon and label. *@
+@inject KOMA.Data.ApplicationDbContext Db
 @{
     var path = Context.Request.Path.Value ?? "";
+    // Red count on Orders: help requests from table tablets still waiting (Admin > Orders keeps it live).
+    var helpWaiting = 0;
+    try { helpWaiting = Db.HelpRequests.Count(h => h.DoneAt == null); } catch { /* table not created yet (run Update-Database) */ }
     bool Under(params string[] prefixes) => prefixes.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase));
     bool atAdminRoot = path.TrimEnd('/').Equals("/Admin", StringComparison.OrdinalIgnoreCase);
     string Current(bool on) => on ? "is-current" : "";
@@ -12,14 +16,21 @@
     var revenue = Under("/Admin/Revenue");
     var floors = Under("/Admin/Layouts", "/Admin/DiningAreas", "/Admin/Tables");
     var menu = Under("/Admin/MenuItems", "/Admin/MenuCategories");
+    var promos = Under("/Admin/Promotions");
     var website = Under("/Admin/LandingPage");
     var activity = Under("/Admin/Activity");
     var reports = Under("/Admin/Reports");
     var accounts = Under("/Admin/Accounts");
     var settings = Under("/Admin/Settings");
+    // Initials for the round account button at the bottom of the menu (from the sign-in name / email).
+    var me = User.Identity?.Name ?? "";
+    var initials = new string(me.Split('@')[0].Split('.', '_', '-', ' ').Where(w => w.Length > 0).Take(2).Select(w => char.ToUpperInvariant(w[0])).ToArray());
+    if (initials.Length == 0) initials = "A";
+    var shortName = me.Split('@')[0];
 }
 
 <nav class="admin-rail admin-rail-direct" id="admin-rail" aria-label="Admin">
+    <a class="admin-rail-brand" asp-area="" asp-page="/Admin/Dashboard" aria-label="KOMA admin - Today"><span class="admin-rail-tag" aria-hidden="true">こま</span>KOMA</a>
     <ul class="admin-rail-list">
 
         <li class="admin-rail-group @Current(today)">
@@ -37,6 +48,7 @@
             <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Orders/Index" aria-current="@Aria(orders)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                 <span class="admin-rail-label">Orders</span>
+                <span class="admin-rail-badge" hidden="@(helpWaiting == 0)" title="Help requests waiting">@helpWaiting</span>
             </a>
             <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Orders</div>
         </li>
@@ -64,6 +76,14 @@
                 <span class="admin-rail-label">Menu</span>
             </a>
             <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Dishes &amp; categories</div>
+        </li>
+
+        <li class="admin-rail-group @Current(promos)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Promotions/Index" aria-current="@Aria(promos)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
+                <span class="admin-rail-label">Promos</span>
+            </a>
+            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Promotions</div>
         </li>
 
         <li class="admin-rail-group @Current(website)">
@@ -107,4 +127,15 @@
             <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Settings</div>
         </li>
     </ul>
+
+    @* ---- You: account settings + log out ---- *@
+    <div class="admin-rail-account">
+        <a class="admin-rail-me" asp-area="Identity" asp-page="/Account/Manage/Index" title="@me" aria-label="My account">@initials</a>
+        <div class="admin-rail-who">
+            <a class="admin-rail-name" asp-area="Identity" asp-page="/Account/Manage/Index" title="@me">@shortName</a>
+            <form method="post" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Page("/Index", new { area = "" })">
+                <button type="submit" class="admin-rail-logout">Log out</button>
+            </form>
+        </div>
+    </div>
 </nav>

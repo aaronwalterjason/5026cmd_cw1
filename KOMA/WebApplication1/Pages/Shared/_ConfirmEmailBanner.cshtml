@@ -1,0 +1,24 @@
+@using Microsoft.AspNetCore.Identity
+@inject UserManager<KOMA.Models.ApplicationUser> Users
+@*
+    Thin banner for signed-in customers whose email isn't confirmed yet, with "Resend email".
+    Hidden on the account pages themselves.
+*@
+@{
+    var path = Context.Request.Path;
+    KOMA.Models.ApplicationUser? me = null;
+    if (User.IsInRole("Customer") && !path.StartsWithSegments("/Identity")) me = await Users.GetUserAsync(User);
+}
+@if (TempData["ConfirmBanner"] is string msg)
+{
+    <div class="ce-banner is-ok" role="status">@msg</div>
+}
+else if (me is { EmailConfirmed: false })
+{
+    <div class="ce-banner" role="status">
+        <span>Please confirm your email <b>@me.Email</b> to get booking updates.</span>
+        <form method="post" asp-area="Identity" asp-page="/Account/SendConfirmation" asp-route-returnUrl="@(path + Context.Request.QueryString)">
+            <button type="submit">Resend email</button>
+        </form>
+    </div>
+}

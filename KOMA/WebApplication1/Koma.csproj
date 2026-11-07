@@ -16,6 +16,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.13" />
+<<<<<<< HEAD
+=======
+    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="10.0.13" />
+    <PackageReference Include="MailKit" Version="4.16.0" />
+>>>>>>> origin/admin/dashboard
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.13" />
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <!-- Microsoft.VisualStudio.Web.CodeGeneration.Design (Visual Studio's "Add Scaffolded Item" wizard) was removed:

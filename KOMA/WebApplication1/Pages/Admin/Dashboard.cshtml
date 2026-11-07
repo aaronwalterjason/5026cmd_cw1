@@ -133,7 +133,7 @@
 
             @if (!Model.Floors.Any())
             {
-                <p class="dash-muted mb-0">No floor layouts yet. <a asp-page="/Admin/Layouts/Create">Create a floor</a> to see live seating here.</p>
+                <partial name="_Empty" model='new EmptyState("floor", "No floor layouts yet", "Create a floor to see live seating here.", "Create a floor", Url.Page("/Admin/Layouts/Create"), true)' />
             }
             else
             {
@@ -217,7 +217,7 @@
                     <div class="dash-chips">
                         @foreach (var m in Model.SoldOut.Take(6)) { <span>@m.Name</span> }
                         @if (Model.SoldOut.Count > 6) { <span>+@(Model.SoldOut.Count - 6)</span> }
-                        <a asp-page="/Admin/MenuItems/Index">Menu →</a>
+                        <a class="koma-go" asp-page="/Admin/MenuItems/Index">Menu<span class="koma-go-disc" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
                     </div>
                 }
                 @if (Model.SlowOrders.Any())
@@ -254,7 +254,7 @@
             <div class="dash-card-head"><span class="dash-title">Booking schedule</span><span class="dash-label-sm">guests · table</span></div>
             @if (!Model.Agenda.Any())
             {
-                <p class="dash-muted small mb-0">No bookings today.</p>
+                <partial name="_Empty" model='new EmptyState("calendar", "No bookings today", null, null, null, true)' />
             }
             else
             {

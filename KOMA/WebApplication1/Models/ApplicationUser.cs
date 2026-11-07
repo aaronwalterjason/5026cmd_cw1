@@ -7,6 +7,9 @@ namespace KOMA.Models
     public class ApplicationUser : IdentityUser
     {
         public string? FullName { get; set; }
+
+        // Customer turned off booking reminder emails (Pages/Notifications/Reminders). Other booking emails always send.
+        public bool NoReminderEmails { get; set; }
         [PersonalData]
         [System.ComponentModel.DataAnnotations.StringLength(50)]
         public string? FirstName { get; set; }

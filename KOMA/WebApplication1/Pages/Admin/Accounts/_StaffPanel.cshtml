@@ -1,0 +1,205 @@
+@model KOMA.Pages.Admin.Accounts.IndexModel.StaffPanel
+@using KOMA.Pages.Admin.Accounts
+@*
+    Staff / Admin details panel (Admin > Accounts > Staff or Admins, slides in from the right).
+    Tabs: Activity (their changes in Admin > Activity) · Sign-ins · Account (role, status, reset link, lock).
+    Safety: you can't change your own role or lock yourself; the last admin can't be demoted (AccountService).
+*@
+@{
+    var p = Model;
+    var band = p.IsAdmin ? "#d0442b" : "#42602d";
+    var tel = string.IsNullOrWhiteSpace(p.Phone) ? null : new string(p.Phone.Where(c => char.IsDigit(c) || c == '+').ToArray());
+    string When(DateTime d) => d.Date == DateTime.Today ? d.ToString("h:mm tt") : d.Date == DateTime.Today.AddDays(-1) ? "Yesterday, " + d.ToString("h:mm tt") : d.ToString("ddd d MMM, h:mm tt");
+    string Day(DateTime d) => d.Date == DateTime.Today ? "TODAY" : d.Date == DateTime.Today.AddDays(-1) ? "YESTERDAY" : d.ToString("ddd d MMM").ToUpperInvariant();
+    string AreaIcon(string a) => a switch
+    {
+        "Menu" => "M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4z",
+        "Bookings" => "M4 6h16v14H4zM4 10h16M9 3v4M15 3v4",
+        "Floors" => "M1 6v16l7-4 8 4 7-4V2l-7 4-8-4z",
+        _ => "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+    };
+    var group = p.IsAdmin ? "admins" : "staff";
+    var lastAdmin = p.IsAdmin && p.AdminCount <= 1;
+}
+<aside class="cp" role="dialog" aria-modal="true" aria-labelledby="cp-name" data-id="@p.Id" style="--cp-band:@band">
+    <header class="cp-head">
+        <div class="cp-band">
+            <span class="cp-band-role">@(p.IsAdmin ? "ADMIN" : "STAFF")</span>
+            <span class="cp-band-kana" aria-hidden="true">こま</span>
+            <div class="cp-band-tools">
+                <span class="cp-nav">
+                    <button type="button" data-cp-prev aria-label="Previous"><svg viewBox="0 0 24 24" width="13" height="13"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+                    <span data-cp-pos></span>
+                    <button type="button" data-cp-next aria-label="Next"><svg viewBox="0 0 24 24" width="13" height="13"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+                </span>
+                <button type="button" class="cp-close" data-cp-close aria-label="Close"><svg viewBox="0 0 24 24" width="15" height="15"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" /></svg></button>
+            </div>
+        </div>
+        <div class="cp-id">
+            <span class="cp-av cp-av-staff" aria-hidden="true">@p.Initials</span>
+            <div class="cp-who">
+                <h2 id="cp-name">@p.Name <span class="cp-dot @(p.Locked ? "bad" : "ok")" title="@(p.Locked ? "Locked" : "Active")"></span>@if (p.IsMe) {<span class="cp-you">YOU</span>}</h2>
+                <div class="cp-meta">
+                    @(p.IsAdmin ? "Admin" : "Staff")@(p.FirstSeen is null ? "" : " since " + p.FirstSeen.Value.ToString("MMM yyyy"))@(p.LastActive is null ? "" : " · active " + IndexModel.Ago(p.LastActive))
+                </div>
+            </div>
+        </div>
+        <div class="cp-lines">
+            @if (!string.IsNullOrEmpty(p.Email))
+            {
+                <a href="mailto:@p.Email" title="Email"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M3 6h18v12H3zM3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>@p.Email @if (p.EmailConfirmed) {<svg class="cp-tick" viewBox="0 0 24 24" width="13" height="13" aria-label="Verified"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>}</a>
+            }
+            @if (tel is not null)
+            {
+                <a href="tel:@tel" title="Call"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>@p.Phone</a>
+            }
+        </div>
+        <div class="cp-stats">
+            <div><b>@(p.LastActive is null ? "—" : IndexModel.Ago(p.LastActive))</b><span>last active</span></div>
+            <div><b>@p.Changes7</b><span>changes · 7 days</span></div>
+            <div><b>@p.SignIns7</b><span>sign-ins · 7 days</span></div>
+            @if (p.IsAdmin)
+            {
+                <div><b>@p.AdminCount</b><span>admins in total</span></div>
+            }
+            else
+            {
+                <div><b>@p.HelpDone</b><span>help requests done</span></div>
+            }
+        </div>
+        <nav class="cp-tabs" role="tablist">
+            <button type="button" role="tab" class="is-on" data-cp-tab="cp-t-act" title="Activity" aria-label="Activity"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M22 12h-4l-3 9L9 3l-3 9H2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+            <button type="button" role="tab" data-cp-tab="cp-t-sign" title="Sign-ins" aria-label="Sign-ins"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+            @if (p.HasSchedule)
+            {
+                <button type="button" role="tab" data-cp-tab="cp-t-sched" title="Schedule" aria-label="Schedule"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 6h16v14H4zM4 10h16M9 3v4M15 3v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+            }
+            <button type="button" role="tab" data-cp-tab="cp-t-acct" title="Account" aria-label="Account"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+        </nav>
+    </header>
+
+    <div class="cp-body" data-cp-body>
+        @* ---- Activity: their changes, newest first, grouped by day; each opens in Admin > Activity (Undo is there) ---- *@
+        <section id="cp-t-act" role="tabpanel">
+            @if (p.Activity.Count == 0)
+            {
+                <partial name="_Empty" model='new EmptyState("notebook", "No changes yet", null, null, null, true)' />
+            }
+            @{ string? lastDay = null; }
+            @foreach (var a in p.Activity)
+            {
+                var d = Day(a.At);
+                if (d != lastDay)
+                {
+                    lastDay = d;
+                    <div class="cp-day">@d</div>
+                }
+                <a class="cp-act" asp-page="/Admin/Activity/Index" asp-route-id="@a.Id" asp-route-days="0">
+                    <span class="cp-act-icon"><svg viewBox="0 0 24 24" width="15" height="15"><path d="@AreaIcon(a.Area)" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+                    <span class="cp-act-main"><span>@a.Action · <b>@a.Title</b></span><small>@a.Area · @a.At.ToString("h:mm tt")@(a.Summary is null ? "" : " · " + a.Summary)@(a.Reverted ? " · undone" : "")</small></span>
+                    <svg class="cp-act-go" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+                </a>
+            }
+            @if (p.Activity.Count > 0)
+            {
+                <a class="koma-go cp-all" asp-page="/Admin/Activity/Index" asp-route-who="@(p.IsAdmin ? "admins" : "staff")" asp-route-q="@p.Name" asp-route-days="30">All activity<span class="koma-go-disc" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span></a>
+            }
+        </section>
+
+        @* ---- Sign-ins ---- *@
+        <section id="cp-t-sign" role="tabpanel" hidden>
+            @if (p.SignIns.Count == 0)
+            {
+                <partial name="_Empty" model='new EmptyState("calendar", "No sign-ins recorded", null, null, null, true)' />
+            }
+            @foreach (var s in p.SignIns)
+            {
+                <div class="cp-sign"><span class="cp-dot @(s.Ok ? "ok" : "bad")"></span><span class="cp-sign-when">@When(s.At)</span><span class="cp-sign-dev">@s.Device</span>@if (!s.Ok) {<b class="cp-sign-bad">@s.Action</b>}</div>
+            }
+        </section>
+
+        @* ---- Schedule: next shift + this month (from Admin > Accounts > Staff > Schedule) ---- *@
+        @if (p.HasSchedule)
+        {
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var mEnd = p.SchedMonth.AddMonths(1).AddDays(-1);
+            <section id="cp-t-sched" role="tabpanel" hidden>
+                @if (p.NextShift is { } n)
+                {
+                    <div class="cp-next sh-c@(n.Colour)">
+                        <span class="cp-next-date"><small>@n.Date.ToString("ddd").ToUpperInvariant()</small><b>@n.Date.Day</b></span>
+                        <span class="cp-next-what"><small>NEXT SHIFT</small><b>@n.Name</b></span>
+                    </div>
+                }
+                else
+                {
+                    <partial name="_Empty" model='new EmptyState("calendar", "No shifts planned", null, null, null, true)' />
+                }
+                <div class="cp-cal-head"><span>@p.SchedMonth.ToString("MMMM")</span><small>@p.ShiftsMonth shifts · @IndexModel.Hrs(p.HoursMonth)@(p.LeaveMonth > 0 ? $" · {p.LeaveMonth} leave" : "")</small></div>
+                <div class="cp-cal">
+                    @foreach (var dn in new[] { "M", "T", "W", "T", "F", "S", "S" })
+                    {
+                        <small>@dn</small>
+                    }
+                    @for (var k = 0; k < ((int)p.SchedMonth.DayOfWeek + 6) % 7; k++)
+                    {
+                        <i></i>
+                    }
+                    @for (var d = p.SchedMonth; d <= mEnd; d = d.AddDays(1))
+                    {
+                        var x = p.SchedDays.FirstOrDefault(sd => sd.Date == d);
+                        <span class="@(x is null ? "" : x.Leave ? "is-leave" : "sh-c" + x.Colour) @(d < today ? "is-past" : "") @(d == today ? "is-today" : "")"><b>@d.Day</b>@if (x is not null) {<em>@x.Name</em>}</span>
+                    }
+                </div>
+                <a class="koma-go cp-all" asp-page="/Admin/Accounts/Index" asp-route-group="staff" asp-route-view="schedule">Edit in Schedule<span class="koma-go-disc" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span></a>
+            </section>
+        }
+
+        @* ---- Account ---- *@
+        <section id="cp-t-acct" role="tabpanel" hidden>
+            <div class="cp-acct">
+                <div>
+                    <span>Role</span>
+                    @if (p.IsMe || lastAdmin)
+                    {
+                        <span class="cp-role-fixed"><span class="cp-seg is-off"><span class="@(p.IsAdmin ? "" : "is-on")">Staff</span><span class="@(p.IsAdmin ? "is-on" : "")">Admin</span></span><small>@(p.IsMe ? "can't change your own role" : "the only admin")</small></span>
+                    }
+                    else
+                    {
+                        <form method="post" asp-page="./Index" asp-route-group="@group" class="js-role-form cp-role" data-email="@p.Email" data-current="@p.Role">
+                            <input type="hidden" name="userId" value="@p.Id" />
+                            <input type="hidden" name="role" value="@p.Role" />
+                            <input type="hidden" name="panel" value="1" />
+                            <span class="cp-seg">
+                                <button type="submit" data-role="Staff" class="@(p.IsAdmin ? "" : "is-on")" disabled="@(!p.IsAdmin)">Staff</button>
+                                <button type="submit" data-role="Administrator" class="@(p.IsAdmin ? "is-on" : "")" disabled="@p.IsAdmin">Admin</button>
+                            </span>
+                        </form>
+                    }
+                </div>
+                <div><span>Status</span><span><span class="cp-dot @(p.Locked ? "bad" : "ok")"></span>@(p.Locked ? "Locked" : "Active")</span></div>
+                <div><span>Two-step sign-in</span><span>@(p.TwoFactor ? "On" : "Off")</span></div>
+                <div><span>Failed sign-ins</span><span>@p.FailedSignIns</span></div>
+            </div>
+            <div class="cp-acct-actions">
+                <form method="post" asp-page="./Index" asp-page-handler="ResetLink" class="js-cp-reset" data-name="@p.Name">
+                    <input type="hidden" name="userId" value="@p.Id" />
+                    <button type="submit" class="cp-lock"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8M3 3v5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>Password reset link</button>
+                </form>
+                <div class="cp-reset-out" hidden><input type="text" readonly aria-label="Password reset link" /><button type="button" data-cp-copy>Copy</button></div>
+                @if (!p.IsMe)
+                {
+                    <form method="post" asp-page="./Index" asp-page-handler="Lock" class="js-cp-lock" data-name="@p.Name" data-lock="@(p.Locked ? "0" : "1")">
+                        <input type="hidden" name="userId" value="@p.Id" />
+                        <input type="hidden" name="lockIt" value="@(p.Locked ? "false" : "true")" />
+                        <button type="submit" class="cp-lock @(p.Locked ? "" : "is-bad")">
+                            <svg viewBox="0 0 24 24" width="14" height="14"><path d="@(p.Locked ? "M6 11h12v9H6zM8.5 11V7a3.5 3.5 0 017 0" : "M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 017 0v3")" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                            @(p.Locked ? "Unlock account" : "Lock account")
+                        </button>
+                    </form>
+                }
+            </div>
+            <p class="cp-note">Staff can mark dishes sold out, manage bookings and serve orders. Admins can change everything, including accounts.</p>
+        </section>
+    </div>
+</aside>

@@ -30,11 +30,26 @@ namespace KOMA.Models
         [Display(Name = "Unit price (RM)")]
         public decimal UnitPrice { get; set; }
 
+        // Where this dish is: Preparing -> Ready (plated, waiting at the pass) -> Served.
+        // Served can be confirmed by staff/admin (Admin > Orders) or by the customer on the table tablet.
+        public DishStatus Status { get; set; } = DishStatus.Preparing;
+        public DateTime? ReadyAt { get; set; }
+        public DateTime? ServedAt { get; set; }
+        [StringLength(20)]
+        public string? ServedVia { get; set; }   // "Staff" or "Tablet"
+
         [NotMapped]
         public decimal LineTotal => UnitPrice * Quantity;
 
         // Name to show on screens: the saved name (falls back to the dish for any old row without one).
         [NotMapped]
         public string DishName => !string.IsNullOrWhiteSpace(ItemName) ? ItemName : MenuItem?.Name ?? "(removed item)";
+    }
+
+    public enum DishStatus
+    {
+        Preparing = 0,
+        [Display(Name = "Ready to serve")] Ready = 1,
+        Served = 2
     }
 }

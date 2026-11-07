@@ -10,7 +10,11 @@ using Microsoft.EntityFrameworkCore;
 namespace KOMA.Pages.Reservations;
 
 [Authorize(Roles = "Customer,Staff,Administrator")]
+<<<<<<< HEAD
 public class PreOrderModel(ApplicationDbContext context, DiningOrderService dining) : PageModel
+=======
+public class PreOrderModel(ApplicationDbContext context, KOMA.Services.Email.BookingEmailService emails) : PageModel
+>>>>>>> origin/admin/dashboard
 {
     [BindProperty(SupportsGet = true)] public int Id { get; set; }
     [BindProperty] public Dictionary<int, int> Quantities { get; set; } = [];
@@ -69,6 +73,7 @@ public class PreOrderModel(ApplicationDbContext context, DiningOrderService dini
                 ModelState.AddModelError("", "Menu prices have changed. Review your updated cart total before confirming again.");
                 return Page();
             }
+            var oldTotal = ExistingOrder?.TotalAmount;   // for the "Booking updated" email
             var order = ExistingOrder ?? new Order
             {
                 ReservationId = Id, OrderType = OrderType.OnlinePreOrder,
@@ -78,8 +83,18 @@ public class PreOrderModel(ApplicationDbContext context, DiningOrderService dini
             };
             if (ExistingOrder == null) context.Orders.Add(order);
             else { context.OrderItems.RemoveRange(order.Items); order.Items.Clear(); }
+<<<<<<< HEAD
             foreach (var line in lines) order.Items.Add(line);
             order.TotalAmount = currentTotal;
+=======
+            foreach (var choice in selected)
+            {
+                var item = Menu.Single(m => m.Id == choice.Key);
+                order.Items.Add(new OrderItem { MenuItemId = item.Id, ItemName = item.Name, Quantity = choice.Value, UnitPrice = item.Price });
+            }
+            order.TotalAmount = order.Items.Sum(i => i.UnitPrice * i.Quantity);
+            await emails.QueuePreOrderAsync(booking, oldTotal, order.TotalAmount, byCustomer: !IsStaff);
+>>>>>>> origin/admin/dashboard
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
             TempData["SuccessMessage"] = "Pre-order saved. It is awaiting your arrival and has not been sent to the kitchen.";

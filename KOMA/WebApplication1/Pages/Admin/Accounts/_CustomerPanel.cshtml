@@ -1,0 +1,156 @@
+@model KOMA.Pages.Admin.Accounts.IndexModel.CustomerPanel
+@using KOMA.Pages.Admin.Accounts
+@*
+    Customer details panel (Admin > Accounts > Customers, slides in from the right). Minimal B: icon tabs.
+    Loaded by the badge click through ?handler=Detail&id=... Every value comes from existing data:
+    Reservations, Orders (+ items), table sessions (check-ins) and the Identity account.
+*@
+@{
+    var p = Model;
+    var now = DateTime.Now;
+    string Whole(decimal v) => "RM " + Math.Round(v).ToString("#,0");
+    string Dot(IndexModel.PanelBooking b) => b.Status == ReservationStatus.Cancelled ? "bad" : b.Attended ? "ok" : "mid";
+    string DotTip(IndexModel.PanelBooking b) => b.Status == ReservationStatus.Cancelled ? "Cancelled" : b.Attended ? "Came" : "No-show";
+    var past = p.Bookings.Where(b => b.Start <= now).Take(12).ToList();
+    var tel = string.IsNullOrWhiteSpace(p.Phone) ? null : new string(p.Phone.Where(c => char.IsDigit(c) || c == '+').ToArray());
+}
+<aside class="cp" role="dialog" aria-modal="true" aria-labelledby="cp-name" data-id="@p.Id">
+    <header class="cp-head">
+        <div class="cp-band">
+            <span class="cp-band-kana" aria-hidden="true">こま</span>
+            <div class="cp-band-tools">
+                <span class="cp-nav">
+                    <button type="button" data-cp-prev aria-label="Previous customer"><svg viewBox="0 0 24 24" width="13" height="13"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+                    <span data-cp-pos></span>
+                    <button type="button" data-cp-next aria-label="Next customer"><svg viewBox="0 0 24 24" width="13" height="13"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+                </span>
+                <button type="button" class="cp-close" data-cp-close aria-label="Close"><svg viewBox="0 0 24 24" width="15" height="15"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" /></svg></button>
+            </div>
+        </div>
+        <div class="cp-id">
+            <span class="cp-av" aria-hidden="true">@p.Initials</span>
+            <div class="cp-who">
+                <h2 id="cp-name">@p.Name <span class="cp-dot @(p.Locked ? "bad" : "ok")" title="@(p.Locked ? "Locked" : "Active")"></span></h2>
+                @if (p.Since is not null)
+                {
+                    <div class="cp-meta">Since @p.Since.Value.ToString("MMM yyyy")</div>
+                }
+            </div>
+        </div>
+        <div class="cp-lines">
+            @if (!string.IsNullOrEmpty(p.Email))
+            {
+                <a href="mailto:@p.Email" title="Email"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M3 6h18v12H3zM3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>@p.Email @if (p.EmailConfirmed) {<svg class="cp-tick" viewBox="0 0 24 24" width="13" height="13" aria-label="Verified"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>}</a>
+            }
+            @if (tel is not null)
+            {
+                <a href="tel:@tel" title="Call"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>@p.Phone @if (p.PhoneConfirmed) {<svg class="cp-tick" viewBox="0 0 24 24" width="13" height="13" aria-label="Verified"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>}</a>
+            }
+        </div>
+        <div class="cp-stats">
+            <div><b>@p.Visits</b><span>visits</span></div>
+            <div><b>@Whole(p.Spent)</b><span>spent</span></div>
+            <div><b>@(p.AvgPerVisit is null ? "—" : Whole(p.AvgPerVisit.Value))</b><span>per visit</span></div>
+            <div><b>@(p.ShowedPct is null ? "—" : p.ShowedPct + "%")</b><span>showed up</span></div>
+        </div>
+        <nav class="cp-tabs" role="tablist">
+            <button type="button" role="tab" class="is-on" data-cp-tab="cp-t-book" title="Bookings" aria-label="Bookings"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 6h16v14H4zM4 10h16M9 3v4M15 3v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+            <button type="button" role="tab" data-cp-tab="cp-t-order" title="Orders" aria-label="Orders"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M5 8h14l-1 12H6zM9 8V6a3 3 0 016 0v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+            <button type="button" role="tab" data-cp-tab="cp-t-like" title="Likes" aria-label="Likes"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 20s-7-4.5-7-10a4 4 0 017-2.5A4 4 0 0119 10c0 5.5-7 10-7 10z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+            <button type="button" role="tab" data-cp-tab="cp-t-acct" title="Account" aria-label="Account"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+        </nav>
+    </header>
+
+    <div class="cp-body" data-cp-body>
+        @* ---- Bookings: upcoming, then past visits as dots (green came · amber no-show · red cancelled) ---- *@
+        <section id="cp-t-book" role="tabpanel">
+            @if (p.Upcoming.Count == 0 && past.Count == 0)
+            {
+                <p class="cp-empty">—</p>
+            }
+            @foreach (var b in p.Upcoming)
+            {
+                <a class="cp-up" asp-page="/Reservations/Details" asp-route-id="@b.Id">
+                    <span class="cp-date"><small>@b.Start.ToString("MMM").ToUpperInvariant()</small><b>@b.Start.Day</b></span>
+                    <span class="cp-up-main">
+                        <span>@b.Start.ToString("h:mm tt").ToLowerInvariant() · @b.Guests · @b.Table @if (b.Status == ReservationStatus.Pending) {<span class="cp-dot mid" title="Pending"></span>}</span>
+                        @if (!string.IsNullOrWhiteSpace(b.Request))
+                        {
+                            <small><svg viewBox="0 0 24 24" width="12" height="12"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>@b.Request</small>
+                        }
+                    </span>
+                </a>
+            }
+            @if (past.Count > 0)
+            {
+                <div class="cp-past">
+                    @foreach (var b in past)
+                    {
+                        <a asp-page="/Reservations/Details" asp-route-id="@b.Id" title="@DotTip(b)"><span class="cp-dot @Dot(b)"></span>@b.Start.ToString("d MMM")</a>
+                    }
+                </div>
+            }
+        </section>
+
+        @* ---- Orders: date + total, dishes underneath; a dot only when not paid ---- *@
+        <section id="cp-t-order" role="tabpanel" hidden>
+            @if (p.Orders.Count == 0)
+            {
+                <p class="cp-empty">—</p>
+            }
+            @foreach (var o in p.Orders.Take(30))
+            {
+                var flag = o.Cancelled ? "bad" : o.Paid == PaymentStatus.Refunded ? "bad" : o.Paid == PaymentStatus.Unpaid ? "mid" : null;
+                var tip = o.Cancelled ? "Cancelled" : o.Paid.ToString();
+                <a class="cp-row" asp-page="/Admin/Orders/Details" asp-route-id="@o.Id">
+                    <span class="cp-row-main"><span>@o.At.ToString("ddd d MMM")</span><small>@o.Items</small></span>
+                    @if (flag is not null)
+                    {
+                        <span class="cp-dot @flag" title="@tip"></span>
+                    }
+                    <b>RM @o.Total.ToString("#,0.00")</b>
+                </a>
+            }
+        </section>
+
+        @* ---- Likes: dishes and repeated requests, then habits as icons ---- *@
+        <section id="cp-t-like" role="tabpanel" hidden>
+            @if (p.Dishes.Count + p.Asks.Count > 0)
+            {
+                <div class="cp-chips">
+                    @foreach (var d in p.Dishes)
+                    {
+                        <span>@d.Name <b>×@d.Qty</b></span>
+                    }
+                    @foreach (var a in p.Asks)
+                    {
+                        <span class="cp-chip-ask">@a.Text <b>×@a.Count</b></span>
+                    }
+                </div>
+            }
+            <div class="cp-habits">
+                <span title="Usual party"><svg viewBox="0 0 24 24" width="15" height="15"><path d="M9 11a3 3 0 100-6 3 3 0 000 6zM3 20a6 6 0 0112 0M17 11a2.5 2.5 0 100-5M21 20a5 5 0 00-4-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>@(p.UsualParty ?? "—")</span>
+                <span title="Usual time"><svg viewBox="0 0 24 24" width="15" height="15"><path d="M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>@(p.UsualTime ?? "—")</span>
+                <span title="Favourite table"><svg viewBox="0 0 24 24" width="15" height="15"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12zM12 11.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>@(p.FavouriteSpot ?? "—")</span>
+                <span title="Pays by"><svg viewBox="0 0 24 24" width="15" height="15"><path d="M3 6h18v12H3zM3 10h18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>@(p.PaysBy ?? "—")</span>
+            </div>
+        </section>
+
+        @* ---- Account ---- *@
+        <section id="cp-t-acct" role="tabpanel" hidden>
+            <div class="cp-acct">
+                <div><span>Two-step</span><span>@(p.TwoFactor ? "On" : "Off")</span></div>
+                <div><span>Failed sign-ins</span><span>@p.FailedSignIns</span></div>
+                <div><span>Status</span><span><span class="cp-dot @(p.Locked ? "bad" : "ok")"></span>@(p.Locked ? "Locked" : "Active")</span></div>
+            </div>
+            <form method="post" asp-page="./Index" asp-page-handler="Lock" class="js-cp-lock" data-name="@p.Name" data-lock="@(p.Locked ? "0" : "1")">
+                <input type="hidden" name="userId" value="@p.Id" />
+                <input type="hidden" name="lockIt" value="@(p.Locked ? "false" : "true")" />
+                <button type="submit" class="cp-lock @(p.Locked ? "" : "is-bad")">
+                    <svg viewBox="0 0 24 24" width="14" height="14"><path d="@(p.Locked ? "M6 11h12v9H6zM8.5 11V7a3.5 3.5 0 017 0" : "M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 017 0v3")" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                    @(p.Locked ? "Unlock account" : "Lock account")
+                </button>
+            </form>
+        </section>
+    </div>
+</aside>

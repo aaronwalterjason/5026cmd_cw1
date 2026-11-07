@@ -1,0 +1,295 @@
+@page
+@model KOMA.Pages.Admin.Promotions.IndexModel
+@using KOMA.Models
+@{
+    ViewData["Title"] = "Promotions";
+    var live = Model.Promotions.Count(p => Model.StatusOf(p) == "Live");
+    var later = Model.Promotions.Count(p => Model.StatusOf(p) == "Today");
+    var sched = Model.Promotions.Count(p => Model.StatusOf(p) == "Scheduled");
+    var inp = Model.Input;
+    var chosen = Model.Dishes.Where(d => inp.DishIds.Contains(d.Id)).ToList();
+    var pct = inp.DiscountPercent.ToString("0.##");
+    int[] quick = { 10, 15, 20, 25, 30 };
+    string Mins(int m) { var t = new TimeOnly(m / 60, m % 60); return Promotion.Clock(t); }
+    var bannerStyle = string.IsNullOrEmpty(inp.BannerImageUrl) ? "" : $"background-image:url({inp.BannerImageUrl})";
+}
+
+@if (TempData["StatusMessage"] is string status)
+{
+    <div class="alert alert-success">@status</div>
+}
+
+@* ================= No promotions yet: one welcome card instead of an empty list and panel ================= *@
+@if (!Model.Promotions.Any() && Model.Mode != "new")
+{
+    <div class="pr-head"><h1 class="mb-0">Promotions</h1></div>
+    <section class="koma-empty-card is-bare">
+        <partial name="_Empty" model='new EmptyState("tag", "No promotions yet", "Create a deal to show on the customer home page.", "+ Create the first one", Url.Page("./Index", new { mode = "new" }))' />
+    </section>
+}
+else
+{
+@* ================= Promotions: list on the left, the chosen promotion on the right ================= *@
+<div class="pr-head">
+    <h1 class="mb-0">Promotions</h1>
+    <a class="pr-plus" asp-page="./Index" asp-route-mode="new" aria-label="New promotion" title="New promotion"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></a>
+</div>
+
+<div class="pr-shell">
+    <aside class="pr-list">
+        <input type="search" id="pr-search" class="pr-search" aria-label="Search promotions" autocomplete="off" />
+        @if (!Model.Promotions.Any())
+        {
+            <partial name="_Empty" model='new EmptyState("tag", "No promotions yet", null, null, null, true)' />
+        }
+        @foreach (var p in Model.Promotions)
+        {
+            var st = Model.StatusOf(p);
+            var on = Model.Current?.Id == p.Id;
+            <a class="pr-row @(on ? "is-current" : "") @(st is "Paused" or "Ended" ? "is-off" : "")" asp-page="./Index" asp-route-id="@p.Id" data-search="@p.Title.ToLowerInvariant()" aria-current="@(on ? "page" : null)">
+                <span class="pr-pct">@p.DiscountPercent.ToString("0.##")%</span>
+                <span class="pr-row-text"><span class="pr-row-title">@p.Title</span></span>
+            </a>
+        }
+    </aside>
+
+    @if (!Model.Editing)
+    {
+        <section class="pr-editor pr-editor-empty">
+            <p>Pick a promotion on the left.</p>
+        </section>
+    }
+    else
+    {
+        <form method="post" enctype="multipart/form-data" asp-page-handler="Save" class="pr-editor" id="pr-form">
+            <input type="hidden" asp-for="Input.Id" />
+            <input type="hidden" asp-for="Input.IsActive" />
+            <div asp-validation-summary="All" class="text-danger pr-errors"></div>
+
+            @* ---- The banner: what customers see. Title and banner text are typed right on it. ---- *@
+            <div class="pr-banner @(string.IsNullOrEmpty(inp.BannerImageUrl) ? "is-plain" : "")" id="pr-banner" style="@bannerStyle">
+                <span class="pr-banner-kana" aria-hidden="true">こま</span>
+                <div class="pr-banner-copy">
+                    <div class="pr-banner-when" id="pr-when">@(inp.Days.Count == 7 ? "Every day" : string.Join(" ", inp.Days.Select(d => Promotion.DayNames[d]))) · @(inp.AllDay ? "All day" : Mins(inp.FromMin) + " – " + Mins(inp.ToMin))</div>
+                    <div class="pr-banner-pct"><span id="pr-pct-show">@pct</span>% off</div>
+                    <label class="visually-hidden" for="Input_Title">Promotion name</label>
+                    <input asp-for="Input.Title" class="pr-banner-title" placeholder="Name" autocomplete="off" />
+                    <label class="visually-hidden" for="Input_BannerText">Banner text</label>
+                    <input asp-for="Input.BannerText" class="pr-banner-text" placeholder="Banner text" autocomplete="off" />
+                </div>
+                <div class="pr-banner-tools">
+                    <label class="pr-chip-btn" for="pr-photo">Photo</label>
+                    <input type="file" id="pr-photo" name="Banner" accept="image/jpeg,image/png,image/webp" class="visually-hidden" />
+                    @if (!string.IsNullOrEmpty(inp.BannerImageUrl))
+                    {
+                        <label class="pr-chip-btn pr-chip-light"><input type="checkbox" asp-for="Input.RemoveImage" id="pr-remove" /> Remove</label>
+                    }
+                </div>
+            </div>
+
+            <div class="pr-set">
+                @* ---- One row per setting: label on the left, control on the right ---- *@
+                <div class="pr-set-row"><span class="pr-set-label">Discount</span>
+                    <div class="pr-quick" role="group" aria-label="Quick discount">
+                        @foreach (var q in quick)
+                        {
+                            <button type="button" class="pr-q @(inp.DiscountPercent == q ? "is-on" : "")" data-q="@q" aria-pressed="@(inp.DiscountPercent == q ? "true" : "false")">@q</button>
+                        }
+                        <label class="pr-other"><input asp-for="Input.DiscountPercent" type="number" min="1" max="90" step="1" id="pr-pct" /> %</label>
+                    </div>
+                </div>
+                <div class="pr-set-row"><span class="pr-set-label">Days</span>
+                    <div class="pr-days" role="group" aria-label="Days">
+                        @for (var i = 0; i < 7; i++)
+                        {
+                            var on = inp.Days.Contains(i);
+                            <label class="pr-day" title="@Promotion.DayNames[i]">
+                                <input type="checkbox" name="Input.Days" value="@i" checked="@on" data-day="@Promotion.DayNames[i]" />
+                                <span>@Promotion.DayNames[i].Substring(0, 1)</span>
+                            </label>
+                        }
+                    </div>
+                </div>
+                <div class="pr-set-row @(inp.AllDay ? "is-allday" : "")" id="pr-time-card"><span class="pr-set-label">Time</span>
+                    <div>
+                        <div class="pr-time-top"><label class="pr-allday"><input type="checkbox" asp-for="Input.AllDay" id="pr-allday" /> All day</label><span class="pr-time-show" id="pr-time-show">@(inp.AllDay ? "All day" : Mins(inp.FromMin) + " – " + Mins(inp.ToMin))</span></div>
+                        <div class="pr-range" id="pr-range">
+                        <div class="pr-range-track"></div>
+                        <div class="pr-range-fill" id="pr-fill"></div>
+                        <input type="range" asp-for="Input.FromMin" min="600" max="1320" step="15" aria-label="Start time" id="pr-from" />
+                        <input type="range" asp-for="Input.ToMin" min="600" max="1320" step="15" aria-label="End time" id="pr-to" />
+                    </div>
+                        <div class="pr-range-marks" aria-hidden="true"><span>10am</span><span>12pm</span><span>2pm</span><span>4pm</span><span>6pm</span><span>8pm</span><span>10pm</span></div>
+                    </div>
+                </div>
+                <div class="pr-set-row"><span class="pr-set-label">Dates</span>
+                    <div class="pr-dates-wrap"><div class="pr-dates">
+                        <input asp-for="Input.StartDate" type="date" aria-label="Start date" />
+                        <span aria-hidden="true">→</span>
+                        <input asp-for="Input.EndDate" type="date" aria-label="End date" />
+                    </div><span class="pr-note" id="pr-days-count"></span></div>
+                </div>
+                <div class="pr-set-row"><span class="pr-set-label">Dishes</span>
+                    <div class="pr-dish-sum">
+                        <span class="pr-avatars" id="pr-avatars">
+                            @foreach (var d in chosen.Take(6))
+                            {
+                                <span class="pr-av" title="@d.Name" style="@(string.IsNullOrEmpty(d.Image) ? "" : $"background-image:url({d.Image})")">@(string.IsNullOrEmpty(d.Image) ? d.Name.Substring(0, 1) : "")</span>
+                            }
+                        </span>
+                        <span id="pr-dish-count">@chosen.Count</span>
+                        <button type="button" class="pr-link" id="pr-dishes-open">Edit</button>
+                    </div>
+                </div>
+                <div class="pr-set-row"><span class="pr-set-label">Home page</span>
+                    <div class="pr-home-ctl"><label class="pr-switch"><input type="checkbox" asp-for="Input.ShowOnHome" /><span class="pr-switch-ui" aria-hidden="true"></span><span class="visually-hidden">Show on the home page</span></label>
+                        <span class="pr-note">@(Model.HomeUsedByOthers + (inp.ShowOnHome ? 1 : 0))/@KOMA.Pages.Admin.Promotions.IndexModel.HomeSlots</span></div>
+                </div>
+            </div>
+
+            @* ---- Dish picker ---- *@
+            <dialog class="pr-dialog" id="pr-dishes" aria-labelledby="pr-dishes-title">
+                <div class="pr-dialog-head"><h2 id="pr-dishes-title">Dishes</h2><span class="pr-badge">−<b id="pr-dlg-pct">@pct</b>%</span></div>
+                <div class="pr-dialog-body">
+                    @foreach (var cat in Model.Dishes.GroupBy(d => d.Category))
+                    {
+                        <div class="pr-label">@cat.Key</div>
+                        <div class="pr-dish-grid">
+                            @foreach (var d in cat)
+                            {
+                                var on = inp.DishIds.Contains(d.Id);
+                                var elsewhere = d.PromotionId is not null && d.PromotionId != inp.Id;
+                                <label class="pr-dish">
+                                    <input type="checkbox" name="Input.DishIds" value="@d.Id" checked="@on" data-name="@d.Name" data-img="@d.Image" data-price="@d.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                                    <span class="pr-dish-img" style="@(string.IsNullOrEmpty(d.Image) ? "" : $"background-image:url({d.Image})")"></span>
+                                    <span class="pr-dish-name">@d.Name</span>
+                                    <span class="pr-dish-price"><s>RM @d.Price.ToString("0.00")</s> <b class="js-new-price">RM @((d.Price * (1 - inp.DiscountPercent / 100m)).ToString("0.00"))</b></span>
+                                    @if (elsewhere)
+                                    {
+                                        <span class="pr-dish-warn">From @d.PromotionTitle</span>
+                                    }
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="pr-dialog-foot"><button type="button" class="btn btn-primary" id="pr-dishes-done">Done</button></div>
+            </dialog>
+
+            <div class="pr-foot">
+                <button type="submit" class="btn btn-primary">@(Model.IsNew ? "Create" : "Save")</button>
+                <a class="pr-link" asp-page="./Index" asp-route-id="@(Model.IsNew ? (int?)null : inp.Id)">Discard</a>
+                @if (!Model.IsNew)
+                {
+                    <span class="pr-foot-right">
+                        <button type="submit" class="pr-link" asp-page-handler="Toggle" asp-route-id="@inp.Id" formnovalidate>@(inp.IsActive ? "Pause" : "Resume")</button>
+                        <button type="button" class="pr-link pr-danger" id="pr-delete" data-url="@Url.Page("./Index", "Delete", new { id = inp.Id })" data-title="@inp.Title">Delete</button>
+                    </span>
+                }
+            </div>
+        </form>
+    }
+</div>
+
+}
+
+@section Scripts {
+    <script>
+        (() => {
+            // Search the list.
+            const search = document.getElementById('pr-search');
+            search?.addEventListener('input', () => {
+                const q = search.value.trim().toLowerCase();
+                document.querySelectorAll('.pr-row').forEach(r => r.hidden = !!q && !r.dataset.search.includes(q));
+            });
+
+            const form = document.getElementById('pr-form');
+            if (!form) return;
+            const clock = m => { const h = Math.floor(m / 60), mm = m % 60, hh = ((h + 11) % 12) + 1; return hh + (mm ? ':' + String(mm).padStart(2, '0') : '') + (h < 12 ? ' am' : ' pm'); };
+
+            // Discount: quick buttons + "Other" box, mirrored on the banner and the dish prices.
+            const pct = document.getElementById('pr-pct');
+            const showPct = () => {
+                const v = parseFloat(pct.value) || 0;
+                document.getElementById('pr-pct-show').textContent = v;
+                document.getElementById('pr-dlg-pct').textContent = v;
+                form.querySelectorAll('.pr-q').forEach(b => { const on = +b.dataset.q === v; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on); });
+                form.querySelectorAll('.pr-dish input').forEach(i => {
+                    const el = i.closest('.pr-dish').querySelector('.js-new-price');
+                    el.textContent = 'RM ' + (parseFloat(i.dataset.price) * (1 - v / 100)).toFixed(2);
+                });
+            };
+            form.querySelectorAll('.pr-q').forEach(b => b.addEventListener('click', () => { pct.value = b.dataset.q; showPct(); }));
+            pct.addEventListener('input', showPct);
+
+            // Days + time: one line on the banner.
+            const from = document.getElementById('pr-from'), to = document.getElementById('pr-to'), allDay = document.getElementById('pr-allday');
+            const fill = document.getElementById('pr-fill'), card = document.getElementById('pr-time-card');
+            const timeText = () => allDay.checked ? 'All day' : clock(+from.value) + ' – ' + clock(+to.value);
+            const showWhen = () => {
+                const days = [...form.querySelectorAll('.pr-day input:checked')].map(i => i.dataset.day);
+                const d = days.length === 7 ? 'Every day' : days.join(' ');
+                document.getElementById('pr-when').textContent = (d || 'No days picked') + ' · ' + timeText();
+                document.getElementById('pr-time-show').textContent = timeText();
+            };
+            const showRange = (moved) => {
+                if (+from.value > +to.value - 15) { if (moved === from) from.value = +to.value - 15; else to.value = +from.value + 15; }
+                const span = 1320 - 600, a = (+from.value - 600) / span * 100, b = (+to.value - 600) / span * 100;
+                fill.style.left = a + '%'; fill.style.width = (b - a) + '%';
+                card.classList.toggle('is-allday', allDay.checked);
+                from.disabled = to.disabled = allDay.checked;
+                showWhen();
+            };
+            from.addEventListener('input', () => showRange(from));
+            to.addEventListener('input', () => showRange(to));
+            allDay.addEventListener('change', () => showRange());
+            form.querySelectorAll('.pr-day input').forEach(i => i.addEventListener('change', showWhen));
+            showRange();
+
+            // Dates: how long it runs.
+            const sd = document.getElementById('Input_StartDate'), ed = document.getElementById('Input_EndDate');
+            const showDays = () => {
+                const a = new Date(sd.value), b = new Date(ed.value);
+                const n = Math.round((b - a) / 864e5) + 1;
+                document.getElementById('pr-days-count').textContent = isNaN(n) ? '' : n > 0 ? n + 'd' : '!';
+            };
+            sd.addEventListener('change', showDays); ed.addEventListener('change', showDays); showDays();
+
+            // Photo: preview on the banner straight away.
+            const photo = document.getElementById('pr-photo'), banner = document.getElementById('pr-banner');
+            photo.addEventListener('change', () => {
+                const f = photo.files[0]; if (!f) return;
+                banner.style.backgroundImage = 'url(' + URL.createObjectURL(f) + ')';
+                banner.classList.remove('is-plain');
+            });
+            document.getElementById('pr-remove')?.addEventListener('change', e => {
+                banner.classList.toggle('is-plain', e.target.checked);
+                banner.style.backgroundImage = e.target.checked ? '' : banner.dataset.img || banner.style.backgroundImage;
+            });
+
+            // Dish picker.
+            const dlg = document.getElementById('pr-dishes');
+            document.getElementById('pr-dishes-open').addEventListener('click', () => dlg.showModal());
+            document.getElementById('pr-dishes-done').addEventListener('click', () => dlg.close());
+            dlg.addEventListener('close', () => {
+                const on = [...dlg.querySelectorAll('input:checked')];
+                document.getElementById('pr-dish-count').textContent = on.length;
+                const av = document.getElementById('pr-avatars'); av.innerHTML = '';
+                on.slice(0, 6).forEach(i => {
+                    const s = document.createElement('span'); s.className = 'pr-av'; s.title = i.dataset.name;
+                    if (i.dataset.img) s.style.backgroundImage = 'url(' + i.dataset.img + ')'; else s.textContent = i.dataset.name[0];
+                    av.appendChild(s);
+                });
+            });
+
+            // Delete asks first (shared KOMA pop-up).
+            const del = document.getElementById('pr-delete');
+            del?.addEventListener('click', () => {
+                const go = () => { form.action = del.dataset.url; form.noValidate = true; HTMLFormElement.prototype.submit.call(form); };
+                if (!window.KomaConfirm) { if (confirm('Delete this promotion?')) go(); return; }
+                KomaConfirm.open({ tone: 'danger', icon: 'trash', title: `Delete “${del.dataset.title}”?`,
+                    ok: 'Delete', no: 'Cancel', onOk: go });
+            });
+        })();
+    </script>
+}
