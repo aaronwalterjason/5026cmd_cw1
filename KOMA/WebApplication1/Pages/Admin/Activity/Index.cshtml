@@ -54,6 +54,7 @@
                 <a asp-page="./Index" asp-all-route-data="tabRoute" class="@(Model.TabKey == t.Key ? "is-on" : "")"
                    aria-current="@(Model.TabKey == t.Key ? "page" : null)">@t.Label</a>
             }
+            <a asp-page="./Emails">Emails</a>
         </nav>
 
         <form method="get" class="act-filters" id="act-filters">

@@ -1,0 +1,101 @@
+@page
+@model KOMA.Pages.Admin.Activity.EmailsModel
+@using KOMA.Models
+@using KOMA.Pages.Admin.Activity
+@{
+    ViewData["Title"] = "Emails · Activity";
+    var colors = new Dictionary<BookingEmailType, string> { [BookingEmailType.Confirmed] = "#263b49", [BookingEmailType.Updated] = "#4f6d82", [BookingEmailType.Cancelled] = "#974535", [BookingEmailType.Reminder] = "#8b6a2e", [BookingEmailType.ConfirmEmail] = "#42602d", [BookingEmailType.PasswordReset] = "#7a837e" };
+    string Label(BookingEmailType t) => t switch { BookingEmailType.ConfirmEmail => "Confirm email", BookingEmailType.PasswordReset => "Password reset", _ => t.ToString() };
+    string When(DateTime d) => d.Date == KOMA.Services.ReservationRules.MalaysiaNow.Date ? d.ToString("h:mm tt") : d.ToString("d MMM, h:mm tt");
+}
+@*
+    Admin > Activity > Emails: the booking email outbox (Services/Email). Failed rows show the reason and Resend;
+    Skipped = nothing to send (no address, booking cancelled first ...); Waiting = queued (grouped edits, reminders).
+*@
+@if (TempData["StatusMessage"] is string status)
+{
+    <div class="alert alert-success">@status</div>
+}
+<div class="em-head">
+    <h1 class="mb-0">Activity</h1>
+    <form method="get" class="em-range">
+        @if (Model.Status is not null) { <input type="hidden" name="status" value="@Model.Status" /> }
+        <select name="days" aria-label="Period" onchange="this.form.submit()">
+            <option value="1" selected="@(Model.Days == 1)">Today</option>
+            <option value="7" selected="@(Model.Days == 7)">Last 7 days</option>
+            <option value="30" selected="@(Model.Days == 30)">Last 30 days</option>
+            <option value="0" selected="@(Model.Days == 0)">All time</option>
+        </select>
+    </form>
+</div>
+
+<nav class="act-tabs em-tabs" aria-label="Area">
+    @foreach (var t in IndexModel.Tabs)
+    {
+        <a asp-page="./Index" asp-route-tab="@(t.Key == "all" ? null : t.Key)">@t.Label</a>
+    }
+    <a asp-page="./Emails" class="is-on" aria-current="page">Emails</a>
+</nav>
+
+<div class="em-counts">
+    <a asp-route-days="@Model.Days" class="@(Model.StatusFilter is null ? "is-on" : "")"><small>ALL</small><b>@Model.Total</b></a>
+    @foreach (var s in new[] { BookingEmailStatus.Sent, BookingEmailStatus.Waiting, BookingEmailStatus.Failed, BookingEmailStatus.Skipped })
+    {
+        var n = Model.Counts.GetValueOrDefault(s);
+        <a asp-route-status="@s.ToString().ToLowerInvariant()" asp-route-days="@Model.Days" class="@(Model.StatusFilter == s ? "is-on" : "") @(s == BookingEmailStatus.Failed && n > 0 ? "is-bad" : "")"><small>@s.ToString().ToUpperInvariant()</small><b>@n</b></a>
+    }
+</div>
+
+@if (Model.Emails.Count == 0)
+{
+    <div class="koma-empty-card"><partial name="_Empty" model='new EmptyState("notebook", "No emails in this period", "Booking emails appear here when customers book, change or cancel.")' /></div>
+}
+else
+{
+    <div class="em-card">
+        <table class="em-table">
+            <thead><tr><th>Time</th><th>Customer</th><th>Email</th><th>Booking</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var e in Model.Emails)
+                {
+                    <tr class="@(e.Status == BookingEmailStatus.Failed ? "is-bad" : "")">
+                        <td class="em-when">@When(e.SentAt ?? e.CreatedAt)</td>
+                        <td><b>@e.ToName</b><small>@(e.ToEmail ?? e.Reservation?.Email ?? "—")</small></td>
+                        <td><span class="em-type"><i style="background:@(colors[e.Type])"></i>@Label(e.Type)</span></td>
+                        <td class="em-ref">
+                            @if (e.ReservationId is int rid)
+                            {
+                                <a asp-page="/Reservations/Details" asp-route-id="@rid">KOMA-B-@rid.ToString("D6")</a>
+                            }
+                        </td>
+                        <td>
+                            <span class="em-pill em-@e.Status.ToString().ToLowerInvariant()">@e.Status</span>
+                            @if (e.Status == BookingEmailStatus.Waiting)
+                            {
+                                <small>Sends @e.SendAfter.ToString("h:mm tt")@(e.Attempts > 0 ? $" · try {e.Attempts + 1} of 3" : "")</small>
+                            }
+                            else if (!string.IsNullOrEmpty(e.Note))
+                            {
+                                <small>@e.Note</small>
+                            }
+                        </td>
+                        <td class="em-act">
+                            @if (e.Status is BookingEmailStatus.Failed or BookingEmailStatus.Skipped && e.ReservationId is not null)
+                            {
+                                <form method="post" asp-page-handler="Resend" asp-route-id="@e.Id" asp-route-status="@Model.Status" asp-route-days="@Model.Days">
+                                    <button type="submit" class="em-resend @(e.Status == BookingEmailStatus.Skipped ? "is-quiet" : "")">
+                                        <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8M3 3v5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>Resend
+                                    </button>
+                                </form>
+                            }
+                            @if (e.Status != BookingEmailStatus.Skipped && e.ReservationId is not null)
+                            {
+                                <a asp-page-handler="View" asp-route-id="@e.Id" target="_blank" rel="noopener">View</a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

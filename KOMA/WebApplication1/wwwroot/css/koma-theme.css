@@ -2011,3 +2011,56 @@ td.sc-who { padding: 8px 12px; }
 .rp-key .k-hot { background: #c0492f; }
 .rp-key .k-line { width: 14px; height: 0; border-top: 2.5px solid var(--navy); border-radius: 0; }
 @media (max-width: 640px) { .rp-body { flex-direction: column; } }
+
+/* =====================================================================
+   Admin > Activity > Emails (Pages/Admin/Activity/Emails.cshtml) + reminder settings page
+   ===================================================================== */
+.em-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.em-head h1 { font: 400 30px Georgia, serif; }
+.em-range { margin: 0 0 0 auto; }
+.em-range select { appearance: none; border: 0; border-radius: 99px; padding: 8px 34px 8px 16px; background: var(--paper-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%2322343d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center / 13px; color: var(--ink); font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.em-tabs { margin-bottom: 16px; }
+.em-counts { display: flex; gap: 8px; margin-bottom: 16px; }
+.em-counts a { flex: 1; padding: 12px 16px; border-radius: 14px; background: var(--card); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); text-decoration: none; transition: box-shadow .15s; }
+.em-counts a:hover { box-shadow: inset 0 0 0 1px var(--navy); }
+.em-counts small { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .1em; color: var(--muted); }
+.em-counts b { font: 400 24px Georgia, serif; }
+.em-counts a.is-bad b { color: #c0492f; }
+.em-counts a.is-on { background: var(--navy); color: #f4f1e9; box-shadow: none; }
+.em-counts a.is-on small { color: rgba(244, 241, 233, .75); }
+.em-counts a.is-on.is-bad b { color: #f4f1e9; }
+.em-card { background: var(--card); border-radius: 18px; box-shadow: inset 0 0 0 1px var(--line); padding: 6px; overflow-x: auto; }
+.em-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+.em-table th { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); font-weight: 700; }
+.em-table td { padding: 10px 12px; border-bottom: 1px solid #ebe6db; font-size: 13px; vertical-align: middle; }
+.em-table tbody tr:last-child td { border-bottom: 0; }
+.em-table tr.is-bad { background: #fbf3f0; }
+.em-table td small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.em-when, .em-ref { color: var(--muted); font-size: 12.5px !important; white-space: nowrap; }
+.em-ref a { color: var(--muted); text-decoration: none; }
+.em-ref a:hover { color: var(--navy); text-decoration: underline; }
+.em-type { display: inline-flex; align-items: center; gap: 6px; }
+.em-type i { width: 8px; height: 8px; border-radius: 50%; }
+.em-pill { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 11.5px; font-weight: 700; }
+.em-sent { background: #dfe8d6; color: #42602d; }
+.em-waiting { background: #f1e6cf; color: #8b6a2e; }
+.em-failed { background: #f3dcd5; color: #a5381f; }
+.em-skipped { background: #ebe6db; color: var(--muted); }
+.em-act { text-align: right; white-space: nowrap; }
+.em-act form { display: inline; margin: 0 10px 0 0; }
+.em-act a { font-size: 12px; font-weight: 700; color: var(--navy); text-decoration: none; }
+.em-act a:hover { text-decoration: underline; }
+.em-resend { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 99px; padding: 5px 12px; background: var(--navy); color: #f4f1e9; font-size: 11.5px; font-weight: 700; cursor: pointer; }
+.em-resend.is-quiet { background: var(--paper-2); color: var(--ink); }
+
+.nt-box { max-width: 460px; margin: 60px auto; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 28px 30px; text-align: center; }
+.nt-box h1 { font: 400 26px Georgia, serif; margin: 0 0 10px; }
+.nt-box p { color: var(--muted); font-size: 14px; line-height: 1.55; }
+.nt-btn { border: 0; border-radius: 99px; padding: 10px 22px; background: var(--navy); color: #f4f1e9; font-weight: 700; font-size: 13px; cursor: pointer; }
+
+/* Confirm-your-email banner (Pages/Shared/_ConfirmEmailBanner.cshtml) */
+.ce-banner { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 14px; padding: 9px 16px; background: #f1e6cf; color: #5c4620; font-size: 13px; text-align: center; }
+.ce-banner.is-ok { background: #dfe8d6; color: #2f4720; }
+.ce-banner form { margin: 0; }
+.ce-banner button { border: 0; border-radius: 99px; padding: 5px 14px; background: #263b49; color: #f4f1e9; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ce-banner button:hover { background: #1d2f3b; }
