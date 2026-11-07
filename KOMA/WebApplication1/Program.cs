@@ -16,16 +16,27 @@ builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
     options.UseSqlServer(connectionString)
            .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
 
-builder.Services.AddDefaultIdentity<KOMA.Models.ApplicationUser>(options =>
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
         options.SignIn.RequireConfirmedAccount = false;   // turn on once email sending is wired up
         options.Password.RequireNonAlphanumeric = false;  // relaxed for coursework demo logins
     })
-    .AddRoles<IdentityRole>()
+    .AddTokenProvider<DataProtectorTokenProvider<ApplicationUser>>(TokenOptions.DefaultProvider)
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager<AuditSignInManager>();   // also logs admin/staff sign-ins to Admin > Activity
 
-builder.Services.AddRazorPages();
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/Identity/Account/Login";
+    options.LogoutPath = "/Identity/Account/Logout";
+    options.AccessDeniedPath = "/Identity/Account/AccessDenied";
+});
+builder.Services.AddTransient<IEmailSender, UnconfiguredEmailSender>();
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.AuthorizeAreaFolder("Identity", "/Account/Manage");
+    options.Conventions.AuthorizeAreaPage("Identity", "/Account/Logout");
+});
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<ReservationService>();
 builder.Services.AddScoped<TableSessionService>();

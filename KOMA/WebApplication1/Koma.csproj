@@ -16,7 +16,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.13" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="10.0.13" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.13" />
     <!-- Microsoft.VisualStudio.Web.CodeGeneration.Design (Visual Studio's "Add Scaffolded Item" wizard) was removed:
          it pulls in Roslyn 4.14, which clashes with the Roslyn 5.0 used by EF Core Design and makes
