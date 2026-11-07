@@ -47,12 +47,26 @@ else
         <a asp-page="./Index" class="acc-back">← All accounts</a>
         <h1 class="mb-0">@g.Title</h1>
         <span class="acc-sub">@Model.CountFor(g) @g.Subtitle</span>
-        <input type="search" id="acc-search" class="acc-search" placeholder="Search name, email or phone…" aria-label="Search @g.Title.ToLowerInvariant()" autocomplete="off" />
+        <input type="search" id="acc-search" class="acc-search" hidden="@Model.IsSchedule" aria-label="Search @g.Title.ToLowerInvariant()" autocomplete="off" />
     </div>
 
-    @if (!Model.Shown.Any())
+    @if (g.Role == "Staff")
     {
-        <p class="text-muted">No @g.Title.ToLowerInvariant() yet.</p>
+        @* Team (ID badges) | Schedule (duty schedule, _Schedule.cshtml) - same full-width switch as Orders *@
+        <nav class="ob-switch acc-switch" aria-label="Staff view">
+            <a asp-page="./Index" asp-route-group="staff" class="@(Model.IsSchedule ? "" : "is-on")"><b>Team</b><span>@Model.CountFor(g) staff</span></a>
+            <a asp-page="./Index" asp-route-group="staff" asp-route-view="schedule" class="@(Model.IsSchedule ? "is-on" : "")"><b>Schedule</b><span>@((Model.Schedule?.Month ?? DateOnly.FromDateTime(DateTime.Today)).ToString("MMMM"))</span></a>
+        </nav>
+    }
+    if (Model.IsSchedule && Model.Schedule is not null)
+    {
+        <div id="sc-wrap"><partial name="_Schedule" model="Model.Schedule" /></div>
+    }
+    else
+    {
+    if (!Model.Shown.Any())
+    {
+        <partial name="_Empty" model='new EmptyState("people", $"No {g.Title.ToLowerInvariant()} yet", g.Role == "Customer" ? "Customers appear here when they sign up." : null)' />
     }
     else
     {
@@ -62,7 +76,8 @@ else
                 var name = KOMA.Pages.Admin.Accounts.IndexModel.DisplayName(a);
                 var stats = Model.StatsFor(a.UserId);
                 var me = a.UserId == myId;
-                <article class="acc-badge" data-search="@($"{name} {a.Email} {a.Phone}".ToLowerInvariant())">
+                @* every badge opens the details panel (customer card, or the staff / admin card) *@
+                <article class="acc-badge" data-search="@($"{name} {a.Email} {a.Phone}".ToLowerInvariant())" data-id="@a.UserId" tabindex="0" role="button" aria-label="@("Open details for " + name)">
                     <div class="acc-badge-band">
                         <span class="acc-badge-kana" aria-hidden="true">こま</span>
                         <span class="acc-badge-role">@KOMA.Pages.Admin.Accounts.IndexModel.BadgeLabel(g)</span>
@@ -102,7 +117,11 @@ else
                 </article>
             }
         </div>
-        <p class="text-muted acc-none" id="acc-none" hidden>No one matches your search.</p>
+        <div class="acc-none" id="acc-none" hidden><partial name="_Empty" model='new EmptyState("search", "No one matches", "Try a name, email or phone number.")' /></div>
+        @* Details panel (slides in from the right). Filled by ?handler=Detail&id=... - _CustomerPanel.cshtml or _StaffPanel.cshtml *@
+        <div class="cp-veil" id="cp-veil" hidden></div>
+        <div class="cp-wrap" id="cp-wrap" style="--cp-band:@(g.Role == "Administrator" ? "#d0442b" : g.Role == "Staff" ? "#42602d" : "#c39143")" data-url="@Url.Page("./Index", "Detail", new { group = g.Key })"></div>
+    }
     }
 }
 
@@ -227,6 +246,299 @@ else
             document.body.appendChild(veil);
             setTimeout(() => veil.classList.add('is-gone'), 200);   // skeleton shows for at least 0.2 s
             setTimeout(() => veil.remove(), 450);
+        })();
+
+        // Account details: click (or Enter on) any badge and the panel slides in from the right.
+        // The page address gets &id=... so the open customer can be bookmarked or shared; Esc closes,
+        // ← → move to the previous / next customer (in the order shown, respecting the search box).
+        (() => {
+            const wrap = document.getElementById('cp-wrap');
+            const grid = document.getElementById('acc-badges');
+            if (!wrap || !grid) return;
+            const veil = document.getElementById('cp-veil');
+            const base = wrap.dataset.url;
+            let current = null, req = 0, lastFocus = null, tab = null;
+            const list = () => [...grid.querySelectorAll('.acc-badge[data-id]')].filter(b => !b.hidden);
+            const setUrl = id => {
+                const u = new URL(location.href);
+                if (id) u.searchParams.set('id', id); else u.searchParams.delete('id');
+                history.replaceState(null, '', u);
+            };
+            const sk = (w, h) => `<span class="cp-sk" style="display:block;width:${w};height:${h}px;margin-bottom:10px"></span>`;
+            const loading = `<aside class="cp"><div class="cp-head"><div class="cp-band"></div>`
+                + `<div style="padding:16px 24px">${sk('55%', 26)}${sk('35%', 12)}${sk('80%', 30)}</div></div>`
+                + `<div class="cp-body" style="padding-top:18px">${sk('100%', 72)}${sk('40%', 18)}${sk('100%', 64)}${sk('100%', 64)}${sk('40%', 18)}${sk('100%', 120)}</div></aside>`;
+
+            async function open(id) {
+                const n = ++req;
+                current = id;
+                setUrl(id);
+                if (!wrap.classList.contains('is-open')) {
+                    lastFocus = document.activeElement;
+                    wrap.innerHTML = loading;
+                    veil.hidden = false;
+                    document.documentElement.classList.add('cp-noscroll');
+                    requestAnimationFrame(() => { veil.classList.add('is-in'); wrap.classList.add('is-open'); });
+                } else {
+                    wrap.querySelector('[data-cp-body]')?.classList.add('is-dim');
+                }
+                try {
+                    const r = await fetch(base + '&id=' + encodeURIComponent(id), { credentials: 'same-origin' });
+                    if (!r.ok) throw new Error(r.status);
+                    const html = await r.text();
+                    if (n !== req) return;   // a newer request has started
+                    wrap.innerHTML = html;
+                    bind();
+                } catch (_) {
+                    if (n !== req) return;
+                    wrap.innerHTML = `<aside class="cp"><div class="cp-head"><div class="cp-band">`
+                        + `<div class="cp-band-tools"><button type="button" class="cp-close" data-cp-close aria-label="Close">×</button></div></div></div>`
+                        + `<div class="cp-body"><p class="cp-empty" style="padding-top:20px">Couldn't load this account. Try again.</p></div></aside>`;
+                    wrap.querySelector('[data-cp-close]').addEventListener('click', close);
+                }
+            }
+
+            function close() {
+                req++;
+                current = null;
+                setUrl(null);
+                wrap.classList.remove('is-open');
+                veil.classList.remove('is-in');
+                document.documentElement.classList.remove('cp-noscroll');
+                setTimeout(() => { if (!current) { wrap.innerHTML = ''; veil.hidden = true; } }, 300);
+                if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+            }
+
+            function step(d) {
+                const all = list();
+                const i = all.findIndex(b => b.dataset.id === current);
+                if (i < 0 || all.length < 2) return;
+                const next = all[(i + d + all.length) % all.length];
+                next.scrollIntoView({ block: 'nearest' });
+                open(next.dataset.id);
+            }
+
+            function bind() {
+                const all = list();
+                const i = all.findIndex(b => b.dataset.id === current);
+                const pos = wrap.querySelector('[data-cp-pos]');
+                if (pos) pos.textContent = i >= 0 ? `${i + 1} of ${all.length}` : '';
+                wrap.querySelector('[data-cp-close]')?.addEventListener('click', close);
+                wrap.querySelector('[data-cp-prev]')?.addEventListener('click', () => step(-1));
+                wrap.querySelector('[data-cp-next]')?.addEventListener('click', () => step(1));
+
+                // Icon tabs: one list at a time. The last tab used stays open when moving to the next customer.
+                const tabs = [...wrap.querySelectorAll('[data-cp-tab]')];
+                const show = id => tabs.forEach(t => {
+                    const on = t.dataset.cpTab === id;
+                    t.classList.toggle('is-on', on);
+                    t.setAttribute('aria-selected', on);
+                    const pane = wrap.querySelector('#' + t.dataset.cpTab);
+                    if (pane) pane.hidden = !on;
+                });
+                tabs.forEach(t => t.addEventListener('click', () => { tab = t.dataset.cpTab; show(tab); }));
+                if (tab && wrap.querySelector('#' + tab)) show(tab);
+
+                // Lock / unlock asks first.
+                wrap.querySelector('form.js-cp-lock')?.addEventListener('submit', e => {
+                    const f = e.currentTarget;
+                    if (!window.KomaConfirm) return;
+                    e.preventDefault();
+                    const locking = f.dataset.lock === '1';
+                    KomaConfirm.open({
+                        tone: locking ? 'danger' : 'warn', icon: 'shield',
+                        title: locking ? `Lock ${f.dataset.name}'s account?` : `Unlock ${f.dataset.name}'s account?`,
+                        text: locking ? 'They won\'t be able to sign in until you unlock it.' : 'They will be able to sign in again.',
+                        ok: locking ? 'Lock' : 'Unlock', no: 'Cancel',
+                        onOk: () => HTMLFormElement.prototype.submit.call(f)
+                    });
+                });
+                // Staff / Admin card: role switch asks first (you can't change your own; the server checks too).
+                const roleForm = wrap.querySelector('form.js-role-form');
+                roleForm?.querySelectorAll('[data-role]').forEach(btn => btn.addEventListener('click', () => {
+                    roleForm.querySelector('input[name="role"]').value = btn.dataset.role;
+                }));
+                roleForm?.addEventListener('submit', e => {
+                    const role = roleForm.querySelector('input[name="role"]').value;
+                    if (role === roleForm.dataset.current) { e.preventDefault(); return; }
+                    if (!window.KomaConfirm) return;
+                    e.preventDefault();
+                    const toAdmin = role === 'Administrator';
+                    KomaConfirm.open({
+                        tone: 'warn', icon: 'shield',
+                        title: toAdmin ? `Make ${roleForm.dataset.email} an Admin?` : `Change ${roleForm.dataset.email} to Staff?`,
+                        text: toAdmin ? 'Admins can change everything, including accounts.' : 'They will lose access to admin-only pages.',
+                        ok: 'Confirm', no: 'Cancel',
+                        onOk: () => HTMLFormElement.prototype.submit.call(roleForm)
+                    });
+                });
+
+                // Password reset link: made on the server, shown here to copy and pass on.
+                const resetForm = wrap.querySelector('form.js-cp-reset');
+                resetForm?.addEventListener('submit', async e => {
+                    e.preventDefault();
+                    const out = wrap.querySelector('.cp-reset-out');
+                    const btn = resetForm.querySelector('button');
+                    btn.disabled = true;
+                    try {
+                        const r = await fetch(resetForm.action, { method: 'POST', body: new FormData(resetForm), credentials: 'same-origin' });
+                        if (!r.ok) throw new Error(r.status);
+                        const data = await r.json();
+                        out.querySelector('input').value = data.url;
+                        out.hidden = false;
+                        out.querySelector('input').select();
+                    } catch (_) {
+                        btn.textContent = 'Couldn\'t make a link. Try again.';
+                    } finally { btn.disabled = false; }
+                });
+                wrap.querySelector('[data-cp-copy]')?.addEventListener('click', async e => {
+                    const input = wrap.querySelector('.cp-reset-out input');
+                    try { await navigator.clipboard.writeText(input.value); } catch (_) { input.select(); document.execCommand('copy'); }
+                    e.currentTarget.textContent = 'Copied';
+                });
+
+                wrap.querySelector('[data-cp-close]')?.focus({ preventScroll: true });
+            }
+
+            grid.addEventListener('click', e => {
+                const b = e.target.closest('.acc-badge[data-id]');
+                if (b && !e.target.closest('a, button, select, input, form')) open(b.dataset.id);
+            });
+            grid.addEventListener('keydown', e => {
+                const b = e.target.closest('.acc-badge[data-id]');
+                if (b && e.target === b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(b.dataset.id); }
+            });
+            veil.addEventListener('click', close);
+            document.addEventListener('keydown', e => {
+                if (!current) return;
+                if (document.querySelector('dialog[open], .koma-confirm.is-open')) return;   // a confirm pop-up is up
+                const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName);
+                if (e.key === 'Escape') { e.preventDefault(); close(); }
+                else if (!typing && e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+                else if (!typing && e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+            });
+
+            const startId = new URLSearchParams(location.search).get('id');
+            if (startId) open(startId);
+        })();
+        // Staff schedule: click a cell, pick a shift / Leave / Off. Saved straight away and the table is redrawn
+        // (?handler=Shift returns _Schedule.cshtml). Esc or a click elsewhere closes the menu.
+        (() => {
+            const wrap = document.getElementById('sc-wrap');
+            if (!wrap) return;
+            let cell = null;
+            const menu = () => wrap.querySelector('.sc-menu');
+            const hide = () => { const m = menu(); if (m) m.hidden = true; cell?.classList.remove('is-open'); cell = null; };
+
+            wrap.addEventListener('click', async e => {
+                const c = e.target.closest('.sc-cell');
+                const opt = e.target.closest('.sc-menu button');
+                if (c) {
+                    if (cell === c) { hide(); return; }
+                    hide();
+                    cell = c;
+                    c.classList.add('is-open');
+                    const m = menu(), box = wrap.querySelector('.sc').getBoundingClientRect(), r = c.getBoundingClientRect();
+                    m.hidden = false;
+                    m.style.left = Math.max(0, Math.min(r.left - box.left, box.width - m.offsetWidth)) + 'px';
+                    m.style.top = (r.bottom - box.top + 6) + 'px';
+                    m.querySelectorAll('button').forEach(b => b.classList.toggle('is-on', b.dataset.value === c.dataset.value));
+                    (m.querySelector('.is-on') || m.querySelector('button')).focus({ preventScroll: true });
+                    return;
+                }
+                if (opt && cell) {
+                    const sc = wrap.querySelector('.sc'), target = cell, value = opt.dataset.value;
+                    hide();
+                    if (value === target.dataset.value) { target.focus(); return; }
+                    const fd = new FormData();
+                    fd.append('userId', target.dataset.user);
+                    fd.append('date', target.dataset.date);
+                    fd.append('value', value);
+                    fd.append('m', sc.dataset.m);
+                    fd.append('__RequestVerificationToken', sc.querySelector('input[name="__RequestVerificationToken"]').value);
+                    sc.classList.add('is-busy');
+                    try {
+                        const r = await fetch(sc.dataset.post, { method: 'POST', body: fd, credentials: 'same-origin' });
+                        if (!r.ok) throw new Error(r.status);
+                        wrap.innerHTML = await r.text();
+                        initStrip();
+                        wrap.querySelector(`.sc-cell[data-user="${target.dataset.user}"][data-date="${target.dataset.date}"]`)?.focus({ preventScroll: true });
+                    } catch (_) {
+                        sc.classList.remove('is-busy');
+                        target.title = 'Couldn\'t save. Try again.';
+                    }
+                }
+            });
+
+            // Day strip slider: drag the navy window along the month; it snaps to whole weeks (Mon-Sun)
+            // and opens that week when you let go. Click a day or use ← → on the strip as well.
+            function initStrip() {
+                const strip = wrap.querySelector('.sc-days');
+                if (!strip) return;
+                const win = strip.querySelector('.sc-win');
+                const days = [...strip.querySelectorAll('.sc-day')];
+                const startWk = days.find(d => d.classList.contains('is-in'))?.dataset.wk;
+                let wk = startWk, dragging = false, moved = false, x0 = 0;
+                const weeks = [...new Set(days.map(d => d.dataset.wk))];
+                const show = key => {
+                    wk = key;
+                    const sel = days.filter(d => d.dataset.wk === key);
+                    days.forEach(d => d.classList.toggle('is-in', d.dataset.wk === key));
+                    if (!sel.length) { win.style.width = '0'; return; }
+                    const a = sel[0], b = sel[sel.length - 1];
+                    win.style.left = a.offsetLeft + 'px';
+                    win.style.width = (b.offsetLeft + b.offsetWidth - a.offsetLeft) + 'px';
+                };
+                const go = key => {
+                    const d = days.find(x => x.dataset.wk === key);
+                    if (key && d && key !== startWk) location.href = d.href; else show(startWk);
+                };
+                const dayAt = x => days.find(d => { const r = d.getBoundingClientRect(); return x >= r.left && x < r.right; })
+                    || (x < days[0].getBoundingClientRect().left ? days[0] : days[days.length - 1]);
+                show(startWk);
+                requestAnimationFrame(() => strip.classList.add('is-ready'));
+                window.addEventListener('resize', () => show(wk));
+
+                strip.addEventListener('pointerdown', e => {
+                    if (e.button !== 0) return;
+                    e.preventDefault();
+                    dragging = true; moved = false; x0 = e.clientX;
+                    strip.setPointerCapture(e.pointerId);
+                    strip.classList.add('is-drag');
+                    show(dayAt(e.clientX).dataset.wk);
+                });
+                strip.addEventListener('pointermove', e => {
+                    if (!dragging) return;
+                    if (Math.abs(e.clientX - x0) > 3) moved = true;
+                    show(dayAt(e.clientX).dataset.wk);
+                });
+                const end = () => { if (!dragging) return; dragging = false; strip.classList.remove('is-drag'); go(wk); };
+                strip.addEventListener('pointerup', end);
+                strip.addEventListener('pointercancel', () => { dragging = false; strip.classList.remove('is-drag'); show(startWk); });
+                strip.addEventListener('click', e => e.preventDefault());   // navigation happens on pointerup
+                strip.addEventListener('keydown', e => {
+                    const i = weeks.indexOf(wk);
+                    if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); show(weeks[i - 1]); go(wk); }
+                    else if (e.key === 'ArrowRight' && i < weeks.length - 1) { e.preventDefault(); show(weeks[i + 1]); go(wk); }
+                });
+            }
+            initStrip();
+            document.addEventListener('click', e => { if (cell && !e.target.closest('.sc-menu, .sc-cell')) hide(); });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape' && cell) { const c = cell; hide(); c.focus(); } });
+
+            // Copy last week asks first (it replaces this week's shifts).
+            wrap.addEventListener('submit', e => {
+                const f = e.target.closest('form.js-sc-copy');
+                if (!f || !window.KomaConfirm) return;
+                e.preventDefault();
+                KomaConfirm.open({
+                    tone: 'warn', icon: 'shield',
+                    title: 'Copy last week\'s shifts?',
+                    text: 'This week\'s shifts are replaced. Leave isn\'t copied.',
+                    ok: 'Copy', no: 'Cancel',
+                    onOk: () => HTMLFormElement.prototype.submit.call(f)
+                });
+            });
         })();
     </script>
 }

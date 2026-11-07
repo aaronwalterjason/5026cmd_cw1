@@ -10,7 +10,7 @@ using KOMA.Services;
 namespace KOMA.Pages.Admin.Accounts
 {
     [Authorize(Roles = "Administrator")]
-    public class IndexModel : PageModel
+    public partial class IndexModel : PageModel
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly AccountService _accounts;
@@ -45,6 +45,7 @@ namespace KOMA.Pages.Admin.Accounts
         {
             await LoadAccountsAsync();
             if (CurrentGroup is not null) await LoadStatsAsync();
+            if (IsSchedule) await LoadScheduleAsync();   // Staff > Schedule (Index.Schedule.cs)
         }
 
         // ---------- ID badges (one card per person) ----------
@@ -133,12 +134,315 @@ namespace KOMA.Pages.Admin.Accounts
             }
         }
 
+        // ---------- Customer details: the panel that slides in from the right ----------
+        // Opened by clicking a customer badge. The panel HTML comes from OnGetDetailAsync (?handler=Detail&id=...),
+        // and ?group=customers&id=... opens it straight away, so a customer can be bookmarked or shared.
+        [BindProperty(SupportsGet = true, Name = "id")] public string? OpenId { get; set; }
+
+        public record PanelBooking(int Id, DateTime Start, int Guests, string Table, string? Request, ReservationStatus Status, bool Attended);
+        public record PanelOrder(int Id, DateTime At, string Type, string Items, decimal Total, PaymentStatus Paid, bool Cancelled);
+        public record PanelAsk(string Text, int Count, DateTime Last, bool LastCancelled);
+        public record PanelDish(string Name, int Qty);
+
+        public class CustomerPanel
+        {
+            public string Id { get; set; } = "";
+            public string Name { get; set; } = "";
+            public string Initials { get; set; } = "?";
+            public string Email { get; set; } = "";
+            public bool EmailConfirmed { get; set; }
+            public string? Phone { get; set; }
+            public bool PhoneConfirmed { get; set; }
+            public bool TwoFactor { get; set; }
+            public bool Locked { get; set; }
+            public int FailedSignIns { get; set; }
+            public DateTime? Since { get; set; }
+            public string SinceFrom { get; set; } = "";
+            public DateTime? LastVisit { get; set; }
+
+            public int Visits { get; set; }
+            public decimal Spent { get; set; }
+            public int PaidOrders { get; set; }
+            public decimal? AvgPerVisit => Visits > 0 ? Math.Round(Spent / Visits, 2) : null;
+            public int PastBookings { get; set; }       // past, not cancelled
+            public int ShowedUp { get; set; }           // of those, checked in or ordered against
+            public int? ShowedPct => PastBookings > 0 ? (int)Math.Round(ShowedUp * 100.0 / PastBookings) : null;
+
+            public List<PanelBooking> Bookings { get; set; } = new();     // newest first
+            public List<PanelBooking> Upcoming { get; set; } = new();
+            public List<PanelBooking> Recent { get; set; } = new();
+            public List<PanelAsk> Asks { get; set; } = new();
+            public List<PanelOrder> Orders { get; set; } = new();         // newest first
+            public List<PanelDish> Dishes { get; set; } = new();
+            public string? UsualParty { get; set; }
+            public string? UsualTime { get; set; }
+            public string? FavouriteSpot { get; set; }
+            public string? PaysBy { get; set; }
+        }
+
+        public async Task<IActionResult> OnGetDetailAsync(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return NotFound();
+            var u = await _userManager.FindByIdAsync(id);
+            if (u is null) return NotFound();
+            var role = (await _userManager.GetRolesAsync(u)).FirstOrDefault() ?? "Customer";
+            if (role != "Customer")
+                return Partial("_StaffPanel", await BuildStaffPanelAsync(u, role));   // Staff / Admin card
+            var panel = await BuildPanelAsync(id);
+            return panel is null ? NotFound() : Partial("_CustomerPanel", panel);
+        }
+
+        private async Task<CustomerPanel?> BuildPanelAsync(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            var u = await _db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+            if (u is null) return null;
+            var now = DateTime.Now;
+
+            // A booking counts as "attended" when staff seated it (table session) or an order was placed against it.
+            var seated = await _db.TableServiceSessions.AsNoTracking()
+                .Where(s => s.ReservationId != null && s.Reservation!.CustomerUserId == id)
+                .Select(s => s.ReservationId!.Value).ToListAsync();
+            var ordered = await _db.Orders.AsNoTracking()
+                .Where(o => o.ReservationId != null && o.Reservation!.CustomerUserId == id && o.Status != OrderStatus.Cancelled)
+                .Select(o => o.ReservationId!.Value).ToListAsync();
+            var attended = seated.Concat(ordered).ToHashSet();
+
+            var bookings = (await _db.Reservations.AsNoTracking()
+                .Where(r => r.CustomerUserId == id)
+                .OrderByDescending(r => r.StartTime)
+                .Select(r => new { r.Id, r.StartTime, r.GuestCount, r.SpecialRequests, r.Status, r.CreatedAtUtc,
+                    Table = r.RestaurantTable.TableNumber, Area = r.RestaurantTable.DiningArea != null ? r.RestaurantTable.DiningArea.Name : null })
+                .ToListAsync());
+            var b = bookings.Select(r => new PanelBooking(r.Id, r.StartTime, r.GuestCount,
+                string.IsNullOrEmpty(r.Area) ? r.Table : $"{r.Table} · {r.Area}", r.SpecialRequests, r.Status, attended.Contains(r.Id))).ToList();
+
+            var orders = await _db.Orders.AsNoTracking()
+                .Where(o => o.CustomerId == id)
+                .OrderByDescending(o => o.OrderedAt)
+                .Select(o => new { o.Id, o.OrderedAt, o.OrderType, o.TotalAmount, o.PaymentStatus, o.PaymentMethod, o.Status,
+                    Items = o.Items.Select(i => new { i.ItemName, i.Quantity, Dish = i.MenuItem != null ? i.MenuItem.Name : null }).ToList() })
+                .ToListAsync();
+
+            var p = new CustomerPanel
+            {
+                Id = u.Id,
+                Name = !string.IsNullOrWhiteSpace(u.FullName) ? u.FullName! : (u.Email ?? u.UserName ?? "?").Split('@')[0],
+                Email = u.Email ?? u.UserName ?? "",
+                EmailConfirmed = u.EmailConfirmed,
+                Phone = u.PhoneNumber,
+                PhoneConfirmed = u.PhoneNumberConfirmed,
+                TwoFactor = u.TwoFactorEnabled,
+                Locked = u.LockoutEnd.HasValue && u.LockoutEnd.Value > DateTimeOffset.UtcNow,
+                FailedSignIns = u.AccessFailedCount,
+                Bookings = b,
+            };
+            p.Initials = Initials(new AccountRow(u.Id, p.Email, "Customer", p.Name));
+
+            var live = b.Where(x => x.Status != ReservationStatus.Cancelled).ToList();
+            var past = live.Where(x => x.Start <= now).ToList();
+            p.PastBookings = past.Count;
+            p.ShowedUp = past.Count(x => x.Attended);
+            p.Upcoming = live.Where(x => x.Start > now).OrderBy(x => x.Start).Take(3).ToList();
+            p.Recent = b.Where(x => x.Start <= now).Take(3).ToList();
+
+            // Things they ask for: the same special request (ignoring case/spaces) counted across bookings.
+            p.Asks = b.Where(x => !string.IsNullOrWhiteSpace(x.Request))
+                .GroupBy(x => x.Request!.Trim().TrimEnd('.').ToLowerInvariant())
+                .Select(g => { var last = g.OrderByDescending(x => x.Start).First();
+                    return new PanelAsk(last.Request!.Trim(), g.Count(), last.Start, last.Status == ReservationStatus.Cancelled); })
+                .OrderByDescending(a => a.Count).ThenByDescending(a => a.Last).Take(5).ToList();
+
+            var liveOrders = orders.Where(o => o.Status != OrderStatus.Cancelled).ToList();
+            p.Orders = orders.Select(o =>
+            {
+                var names = o.Items.Select(i => (Name: !string.IsNullOrWhiteSpace(i.ItemName) ? i.ItemName : i.Dish ?? "Item", i.Quantity)).ToList();
+                var text = string.Join(", ", names.Take(2).Select(n => n.Quantity > 1 ? $"{n.Name} ×{n.Quantity}" : n.Name));
+                if (names.Count > 2) text += $", +{names.Count - 2} more";
+                return new PanelOrder(o.Id, o.OrderedAt, o.OrderType.DisplayName(), text, o.TotalAmount, o.PaymentStatus, o.Status == OrderStatus.Cancelled);
+            }).ToList();
+            var paid = liveOrders.Where(o => o.PaymentStatus == PaymentStatus.Paid).ToList();
+            p.Spent = paid.Sum(o => o.TotalAmount);
+            p.PaidOrders = paid.Count;
+
+            // Visits: different days they came in (an attended booking or an order).
+            var visitDays = past.Where(x => x.Attended).Select(x => x.Start.Date)
+                .Concat(liveOrders.Select(o => o.OrderedAt.Date)).Distinct().ToList();
+            p.Visits = visitDays.Count;
+            p.LastVisit = visitDays.Count > 0 ? visitDays.Max() : null;
+
+            // Customer since: their first booking or order (accounts don't store a sign-up date).
+            var firstBooking = bookings.Count > 0 ? bookings.Min(x => x.CreatedAtUtc).ToLocalTime() : (DateTime?)null;
+            var firstOrder = orders.Count > 0 ? orders.Min(o => o.OrderedAt) : (DateTime?)null;
+            if (firstBooking is not null && (firstOrder is null || firstBooking <= firstOrder)) { p.Since = firstBooking; p.SinceFrom = "first booking"; }
+            else if (firstOrder is not null) { p.Since = firstOrder; p.SinceFrom = "first order"; }
+
+            // Habits
+            p.Dishes = liveOrders.SelectMany(o => o.Items)
+                .GroupBy(i => !string.IsNullOrWhiteSpace(i.ItemName) ? i.ItemName : i.Dish ?? "Item")
+                .Select(g => new PanelDish(g.Key, g.Sum(i => i.Quantity)))
+                .OrderByDescending(d => d.Qty).Take(3).ToList();
+            if (live.Count > 0)
+            {
+                var party = live.GroupBy(x => x.Guests).OrderByDescending(g => g.Count()).ThenBy(g => g.Key).First().Key;
+                p.UsualParty = party == 1 ? "1 person" : $"{party} people";
+                p.FavouriteSpot = live.GroupBy(x => x.Table).OrderByDescending(g => g.Count()).First().Key;
+            }
+            var times = live.Select(x => x.Start).Concat(liveOrders.Select(o => o.OrderedAt)).ToList();
+            if (times.Count > 0)
+            {
+                var days = times.GroupBy(t => t.DayOfWeek).OrderByDescending(g => g.Count()).Take(2)
+                    .OrderBy(g => ((int)g.Key + 6) % 7).Select(g => g.Key.ToString()[..3]);
+                var part = times.GroupBy(t => t.Hour < 15 ? "lunch" : t.Hour < 18 ? "afternoons" : "evenings")
+                    .OrderByDescending(g => g.Count()).First().Key;
+                p.UsualTime = $"{string.Join(", ", days)} · {part}";
+            }
+            var methods = paid.Where(o => o.PaymentMethod != null).ToList();
+            if (methods.Count > 0)
+            {
+                var top = methods.GroupBy(o => o.PaymentMethod!.Value).OrderByDescending(g => g.Count()).First();
+                p.PaysBy = $"{top.Key.DisplayName()} ({Math.Round(top.Count() * 100.0 / methods.Count)}%)";
+            }
+            return p;
+        }
+
+        // ---------- Staff / Admin details: same slide-in panel (pine band for Staff, vermilion for Admins) ----------
+        // Activity and sign-ins come from Admin > Activity (ActivityLogs for this user); help requests done from HelpRequests.DoneBy.
+        public record StaffAct(int Id, DateTime At, string Area, string Action, string Title, string? Summary, bool Reverted);
+        public record StaffSignIn(DateTime At, string Action, string? Device, bool Ok);
+
+        public class StaffPanel
+        {
+            public string Id { get; set; } = "";
+            public string Name { get; set; } = "";
+            public string Initials { get; set; } = "?";
+            public string Email { get; set; } = "";
+            public bool EmailConfirmed { get; set; }
+            public string? Phone { get; set; }
+            public string Role { get; set; } = "Staff";          // "Staff" | "Administrator"
+            public bool IsAdmin => Role == "Administrator";
+            public bool IsMe { get; set; }
+            public bool Locked { get; set; }
+            public bool TwoFactor { get; set; }
+            public int FailedSignIns { get; set; }
+            public DateTime? LastActive { get; set; }
+            public DateTime? FirstSeen { get; set; }
+            public int Changes7 { get; set; }
+            public int SignIns7 { get; set; }
+            public int HelpDone { get; set; }
+            public int AdminCount { get; set; }
+            public List<StaffAct> Activity { get; set; } = new();
+            public List<StaffSignIn> SignIns { get; set; } = new();
+            // Schedule tab (staff only, see Index.Schedule.cs)
+            public bool HasSchedule { get; set; }
+            public DateOnly SchedMonth { get; set; }
+            public List<PanelShiftDay> SchedDays { get; set; } = new();
+            public PanelShiftDay? NextShift { get; set; }
+            public int ShiftsMonth { get; set; }
+            public double HoursMonth { get; set; }
+            public int LeaveMonth { get; set; }
+        }
+
+        private async Task<StaffPanel?> BuildStaffPanelAsync(ApplicationUser u, string role)
+        {
+            var weekAgo = DateTime.Now.AddDays(-7);
+            var logs = _db.ActivityLogs.AsNoTracking().Where(l => l.UserId == u.Id);
+            var stats = await logs.GroupBy(l => 1).Select(g => new
+            {
+                Last = g.Max(l => (DateTime?)l.At),
+                First = g.Min(l => (DateTime?)l.At),
+                Changes = g.Count(l => l.At >= weekAgo && l.Area != ActivityLog.Areas.SignIns),
+                SignIns = g.Count(l => l.At >= weekAgo && l.Area == ActivityLog.Areas.SignIns && l.Action == "Signed in")
+            }).FirstOrDefaultAsync();
+            var activity = await logs.Where(l => l.Area != ActivityLog.Areas.SignIns).OrderByDescending(l => l.At).Take(25)
+                .Select(l => new StaffAct(l.Id, l.At, l.Area, l.Action, l.Title, l.Summary, l.RevertedById != null)).ToListAsync();
+            var signIns = await logs.Where(l => l.Area == ActivityLog.Areas.SignIns).OrderByDescending(l => l.At).Take(12)
+                .Select(l => new StaffSignIn(l.At, l.Action, l.Summary, l.Action == "Signed in")).ToListAsync();
+            var shortName = (u.UserName ?? u.Email ?? "").Split('@')[0];
+            int helpDone = 0;
+            try { helpDone = await _db.HelpRequests.CountAsync(h => h.DoneBy == shortName); } catch { /* table not created yet */ }
+
+            var p = new StaffPanel
+            {
+                Id = u.Id,
+                Name = !string.IsNullOrWhiteSpace(u.FullName) ? u.FullName! : (u.Email ?? u.UserName ?? "?").Split('@')[0],
+                Email = u.Email ?? u.UserName ?? "",
+                EmailConfirmed = u.EmailConfirmed,
+                Phone = u.PhoneNumber,
+                Role = role,
+                IsMe = u.Id == MyId,
+                Locked = u.LockoutEnd.HasValue && u.LockoutEnd.Value > DateTimeOffset.UtcNow,
+                TwoFactor = u.TwoFactorEnabled,
+                FailedSignIns = u.AccessFailedCount,
+                LastActive = stats?.Last, FirstSeen = stats?.First,
+                Changes7 = stats?.Changes ?? 0, SignIns7 = stats?.SignIns ?? 0, HelpDone = helpDone,
+                AdminCount = (await _userManager.GetUsersInRoleAsync("Administrator")).Count,
+                Activity = activity, SignIns = signIns
+            };
+            p.Initials = Initials(new AccountRow(u.Id, p.Email, role, p.Name));
+            if (!p.IsAdmin) await FillPanelScheduleAsync(p);
+            return p;
+        }
+
+        // A one-time link the admin can pass on so a staff member sets a new password
+        // (there is no email sending yet). Opens Identity's Reset password page.
+        public async Task<IActionResult> OnPostResetLinkAsync(string userId)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user is null) return NotFound();
+            var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault() ?? "Customer";
+            if (role == "Customer") return Forbid();
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var code = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(System.Text.Encoding.UTF8.GetBytes(token));
+            var url = Url.Page("/Account/ResetPassword", null, new { area = "Identity", code }, Request.Scheme);
+            return new JsonResult(new { url });
+        }
+
+        // Lock / unlock someone's sign-in from the panel. Never yourself, and never the last admin who can still sign in.
+        public async Task<IActionResult> OnPostLockAsync(string userId, bool lockIt)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user is null) return NotFound();
+            var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault() ?? "Customer";
+            if (user.Id == MyId) return Forbid();
+            var groupKey = Groups.FirstOrDefault(g => g.Role == role)?.Key ?? "customers";
+            if (lockIt && role == "Administrator")
+            {
+                var openAdmins = (await _userManager.GetUsersInRoleAsync("Administrator"))
+                    .Count(a => !(a.LockoutEnd.HasValue && a.LockoutEnd.Value > DateTimeOffset.UtcNow));
+                if (openAdmins <= 1)
+                {
+                    TempData["StatusMessage"] = "The last admin can't be locked.";
+                    return RedirectToPage(new { group = groupKey, id = user.Id });
+                }
+            }
+            if (lockIt)
+            {
+                await _userManager.SetLockoutEnabledAsync(user, true);
+                await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
+                await _userManager.UpdateSecurityStampAsync(user);   // signs them out on their next request check
+                TempData["StatusMessage"] = $"{user.Email} is locked and can't sign in.";
+            }
+            else
+            {
+                await _userManager.SetLockoutEndDateAsync(user, null);
+                await _userManager.ResetAccessFailedCountAsync(user);
+                TempData["StatusMessage"] = $"{user.Email} can sign in again.";
+            }
+            return RedirectToPage(new { group = groupKey, id = user.Id });
+        }
+
         public async Task<IActionResult> OnPostAsync(string userId, string role)
         {
             var user = await _userManager.FindByIdAsync(userId);
             if (user is not null)
             {
                 var oldRole = (await _userManager.GetRolesAsync(user)).FirstOrDefault() ?? "Customer";
+                if (user.Id == MyId && role != oldRole)
+                {
+                    TempData["StatusMessage"] = "You can't change your own role.";
+                    return RedirectToPage(new { group = CurrentGroup?.Key });
+                }
                 // Customers sign up themselves, so they are never promoted to Staff/Admin from here -
                 // a staff member gets their own work account instead.
                 var result = oldRole == "Customer" && role != "Customer"
@@ -153,6 +457,9 @@ namespace KOMA.Pages.Admin.Accounts
                 }
                 TempData["StatusMessage"] = $"{user.Email} is now {role}.";
                 if (oldRole != role) await LogRoleChangeAsync(_db, User, user, oldRole, role, null);
+                // Changed from the details panel: go to their new group with the panel open again.
+                if (Request.HasFormContentType && Request.Form.ContainsKey("panel"))
+                    return RedirectToPage(new { group = Groups.FirstOrDefault(g => g.Role == role)?.Key, id = user.Id });
             }
 
             return RedirectToPage(new { group = CurrentGroup?.Key });   // stay in the same group

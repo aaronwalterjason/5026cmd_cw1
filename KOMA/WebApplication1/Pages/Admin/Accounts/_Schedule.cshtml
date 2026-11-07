@@ -1,0 +1,115 @@
+@model KOMA.Pages.Admin.Accounts.IndexModel.ScheduleView
+@using KOMA.Pages.Admin.Accounts
+@*
+    Staff schedule (Admin > Accounts > Staff > Schedule). Drawn on the page and again by ?handler=Shift after each change.
+    Week table: staff down the side, Mon-Sun across. Click a cell -> menu (shifts from Settings, Leave, Off).
+    Day strip under it: the navy days are the week shown; red dot = a day short of people.
+*@
+@{
+    var s = Model;
+    var weekKey = s.WeekStart.ToString("yyyy-MM-dd");
+    var monthEnd = s.Month.AddMonths(1).AddDays(-1);
+    string WeekUrl(DateOnly d, DateOnly m) => Url.Page("/Admin/Accounts/Index", null, new { group = "staff", view = "schedule", week = IndexModel.MondayOf(d).ToString("yyyy-MM-dd"), m = m.ToString("yyyy-MM") })!;
+    var prevM = s.Month.AddMonths(-1);
+    var nextM = s.Month.AddMonths(1);
+    var publishText = s.PublishedAt is null ? "Publish" : s.Changed ? "Publish changes" : "Published";
+    var published = s.PublishedAt is not null && !s.Changed;
+}
+<div class="sc" id="sc" data-post="@Url.Page("/Admin/Accounts/Index", "Shift", new { group = "staff" })" data-m="@s.MonthKey">
+    @Html.AntiForgeryToken()
+    <div class="sc-head">
+        <h2>Schedule</h2>
+        <div class="sc-tools">
+            <form method="post" asp-page="/Admin/Accounts/Index" asp-page-handler="CopyWeek" asp-route-group="staff" class="js-sc-copy">
+                <input type="hidden" name="week" value="@weekKey" /><input type="hidden" name="m" value="@s.MonthKey" />
+                <button type="submit" class="sc-btn">Copy last week</button>
+            </form>
+            <form method="post" asp-page="/Admin/Accounts/Index" asp-page-handler="Publish" asp-route-group="staff">
+                <input type="hidden" name="week" value="@weekKey" /><input type="hidden" name="m" value="@s.MonthKey" />
+                <button type="submit" class="sc-btn is-solid @(published ? "is-done" : "")" disabled="@published" title="@(s.PublishedAt is null ? null : "Published " + s.PublishedAt.Value.ToString("d MMM, h:mm tt"))">
+                    @if (published)
+                    {
+                        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                    }
+                    @publishText
+                </button>
+            </form>
+        </div>
+    </div>
+
+    @if (s.People.Count == 0)
+    {
+        <partial name="_Empty" model='new EmptyState("people", "No staff yet", "Give an account the Staff role to plan their shifts.")' />
+    }
+    else
+    {
+        <div class="sc-card">
+            <table class="sc-table">
+                <thead>
+                    <tr>
+                        <th class="sc-who"></th>
+                        @foreach (var d in s.Days)
+                        {
+                            <th class="@(d == s.Today ? "is-today" : "")">
+                                <span class="sc-dow">@d.ToString("ddd").ToUpperInvariant()</span> <b>@d.Day</b>
+                                @if (s.ShortDays.Contains(d))
+                                {
+                                    <i class="sc-dot" title="Not enough people"></i>
+                                }
+                            </th>
+                        }
+                        <th class="sc-hrs">HOURS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in s.People)
+                    {
+                        <tr>
+                            <td class="sc-who"><span class="sc-person"><span class="sc-av">@p.Initials</span><span class="sc-name">@p.Name</span></span></td>
+                            @foreach (var d in s.Days)
+                            {
+                                var c = p.Cells[d];
+                                var sh = s.ShiftOf(c?.ShiftId);
+                                var cls = c is null ? "is-off" : c.Leave ? "is-leave" : sh is null ? "is-off" : "sh-c" + sh.Colour;
+                                var label = c is null ? "Off" : c.Leave ? "Leave" : sh?.Name ?? "Off";
+                                var val = c is null ? "off" : c.Leave ? "leave" : sh?.Id.ToString() ?? "off";
+                                <td><button type="button" class="sc-cell @cls" data-user="@p.Id" data-date="@d.ToString("yyyy-MM-dd")" data-value="@val" aria-label="@p.Name, @d.ToString("ddd d MMM"): @label">@label</button></td>
+                            }
+                            <td class="sc-hrs">@IndexModel.Hrs(p.Hours)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @* ---- day strip: month arrows + every day of the month; the navy window is the week in the table.
+         Drag the window (or click a day, or use ← → when it's focused) to change week. ---- *@
+    <div class="sc-strip">
+        <a class="sc-arrow" href="@WeekUrl(prevM, prevM)" aria-label="Previous month"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
+        <span class="sc-month">@s.Month.ToString("MMMM")@(s.Month.Year != s.Today.Year ? " " + s.Month.Year : "")</span>
+        <a class="sc-arrow" href="@WeekUrl(nextM, nextM)" aria-label="Next month"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
+        <div class="sc-days" tabindex="0" role="slider" aria-label="Week" aria-valuetext="@s.WeekStart.ToString("d MMM") – @s.WeekStart.AddDays(6).ToString("d MMM")">
+            <span class="sc-win" aria-hidden="true"></span>
+            @for (var d = s.Month; d <= monthEnd; d = d.AddDays(1))
+            {
+                var inWeek = d >= s.WeekStart && d <= s.WeekStart.AddDays(6);
+                var first = inWeek && (d == s.WeekStart || d == s.Month);
+                var last = inWeek && (d == s.WeekStart.AddDays(6) || d == monthEnd);
+                <a class="sc-day @(inWeek ? "is-in" : "") @(first ? "is-first" : "") @(last ? "is-last" : "") @(d == s.Today ? "is-today" : "")" href="@WeekUrl(d, s.Month)" data-wk="@IndexModel.MondayOf(d).ToString("yyyy-MM-dd")" tabindex="-1" draggable="false" aria-label="@d.ToString("ddd d MMM")">
+                    <small>@(d.ToString("ddd")[0])</small><b>@d.Day</b><i class="@(s.ShortDays.Contains(d) ? "sc-dot" : "")"></i>
+                </a>
+            }
+        </div>
+    </div>
+
+    @* cell menu (moved under the clicked cell by the script) *@
+    <div class="sc-menu" role="menu" hidden>
+        @foreach (var sh in s.Shifts)
+        {
+            <button type="button" role="menuitem" data-value="@sh.Id"><span class="sc-sw sh-c@(sh.Colour)"></span>@sh.Name</button>
+        }
+        <button type="button" role="menuitem" data-value="leave"><span class="sc-sw is-leave"></span>Leave</button>
+        <button type="button" role="menuitem" data-value="off"><span class="sc-sw is-off"></span>Off</button>
+    </div>
+</div>
