@@ -33,6 +33,7 @@ namespace KOMA.Data
         public DbSet<Shift> Shifts => Set<Shift>();                     // staff schedule: shift list (edited in Settings)
         public DbSet<ShiftAssignment> ShiftAssignments => Set<ShiftAssignment>();
         public DbSet<ScheduleWeek> ScheduleWeeks => Set<ScheduleWeek>();
+        public DbSet<BookingEmail> BookingEmails => Set<BookingEmail>();               // booking email outbox (Services/Email)
 
         // Engineer B: editable text/photo of the customer landing page (one row).
         public DbSet<LandingPageContent> LandingPageContents => Set<LandingPageContent>();
@@ -153,6 +154,14 @@ namespace KOMA.Data
             builder.Entity<HelpRequest>()
                 .HasOne(h => h.RestaurantTable).WithMany()
                 .HasForeignKey(h => h.RestaurantTableId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Booking emails: the worker reads waiting rows by time; a reminder is never queued twice.
+            builder.Entity<BookingEmail>().HasIndex(e => new { e.Status, e.SendAfter });
+            builder.Entity<BookingEmail>().HasIndex(e => e.DedupKey).IsUnique().HasFilter("[DedupKey] IS NOT NULL");
+            builder.Entity<BookingEmail>()
+                .HasOne(e => e.Reservation).WithMany()
+                .HasForeignKey(e => e.ReservationId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             // Staff schedule: one row per person per day (no row = Off). Two starter shifts; Settings will edit them.
