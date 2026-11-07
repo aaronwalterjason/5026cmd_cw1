@@ -32,6 +32,14 @@ builder.Services.AddScoped<ReservationService>();
 builder.Services.AddScoped<TableSessionService>();
 builder.Services.AddScoped<OrderWorkflowService>();
 builder.Services.AddScoped<MenuImageService>();
+// Booking emails (Services/Email): settings in appsettings "Email", the password in User Secrets (never in appsettings)
+builder.Services.Configure<KOMA.Services.Email.EmailOptions>(builder.Configuration.GetSection("Email"));
+builder.Services.AddSingleton<KOMA.Services.Email.MailKitSender>();
+builder.Services.AddSingleton<KOMA.Services.Email.IMailSender>(sp => sp.GetRequiredService<KOMA.Services.Email.MailKitSender>());
+builder.Services.AddSingleton<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>(sp => sp.GetRequiredService<KOMA.Services.Email.MailKitSender>());
+builder.Services.AddScoped<KOMA.Services.Email.BookingEmailService>();
+builder.Services.AddScoped<KOMA.Services.Email.AccountEmailService>();   // confirm email + password reset
+builder.Services.AddHostedService<KOMA.Services.Email.BookingEmailWorker>();
 // Re-check the signed-in user (role changes, locked accounts) at most once a minute.
 // Zero re-checked on EVERY request (4-6 extra queries each time), which slowed every page.
 builder.Services.Configure<SecurityStampValidatorOptions>(options =>
