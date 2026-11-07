@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace KOMA.Pages.Reservations;
 
 [Authorize(Roles = "Customer,Staff,Administrator")]
-public class PreOrderModel(ApplicationDbContext context) : PageModel
+public class PreOrderModel(ApplicationDbContext context, DiningOrderService dining) : PageModel
 {
     [BindProperty(SupportsGet = true)] public int Id { get; set; }
     [BindProperty] public Dictionary<int, int> Quantities { get; set; } = [];
@@ -30,7 +30,7 @@ public class PreOrderModel(ApplicationDbContext context) : PageModel
         Booking = booking;
         ExistingOrder = await context.Orders.Include(o => o.Items).ThenInclude(i => i.MenuItem)
             .SingleOrDefaultAsync(o => o.ReservationId == Id);
-        Menu = await context.MenuItems.AsNoTracking().Include(m => m.MenuCategory).Where(m => m.IsAvailable && m.MenuCategory!.IsActive)
+        Menu = await dining.Menu().AsNoTracking().Include(m => m.MenuCategory)
             .OrderBy(m => m.MenuCategoryId).ThenBy(m => m.Name).ToListAsync();
         CanEdit = booking.Status == ReservationStatus.Confirmed && booking.StartTime > ReservationRules.MalaysiaNow
             && (ExistingOrder == null || (ExistingOrder.Status == OrderStatus.AwaitingArrival && ExistingOrder.PaymentStatus == PaymentStatus.Unpaid));
@@ -50,12 +50,7 @@ public class PreOrderModel(ApplicationDbContext context) : PageModel
         await using var transaction = await context.Database.BeginTransactionAsync();
         try
         {
-            await context.Database.ExecuteSqlRawAsync("""
-                DECLARE @result int;
-                EXEC @result = sys.sp_getapplock @Resource = 'KOMA.ReservationWrites',
-                    @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000;
-                IF @result < 0 THROW 51000, 'Reservation service is busy. Please try again.', 1;
-                """);
+            await dining.LockAsync();
             var booking = await LoadAsync();
             if (booking == null) return NotFound();
             if (!CanEdit) { ModelState.AddModelError("", "This pre-order can no longer be changed."); return Page(); }
@@ -67,7 +62,8 @@ public class PreOrderModel(ApplicationDbContext context) : PageModel
             if (selected.Any(q => !Menu.Any(m => m.Id == q.Key)))
                 ModelState.AddModelError("", "One of your dishes is no longer available. Please review your selection.");
             if (!ModelState.IsValid) return Page();
-            var currentTotal = selected.Sum(q => Menu.Single(m => m.Id == q.Key).Price * q.Value);
+            var lines = OrderingMenu.BuildLines(Menu, Quantities);
+            var currentTotal = lines.Sum(i => i.LineTotal);
             if (ExpectedTotal.HasValue && ExpectedTotal.Value != currentTotal)
             {
                 ModelState.AddModelError("", "Menu prices have changed. Review your updated cart total before confirming again.");
@@ -82,12 +78,8 @@ public class PreOrderModel(ApplicationDbContext context) : PageModel
             };
             if (ExistingOrder == null) context.Orders.Add(order);
             else { context.OrderItems.RemoveRange(order.Items); order.Items.Clear(); }
-            foreach (var choice in selected)
-            {
-                var item = Menu.Single(m => m.Id == choice.Key);
-                order.Items.Add(new OrderItem { MenuItemId = item.Id, ItemName = item.Name, Quantity = choice.Value, UnitPrice = item.Price });
-            }
-            order.TotalAmount = order.Items.Sum(i => i.UnitPrice * i.Quantity);
+            foreach (var line in lines) order.Items.Add(line);
+            order.TotalAmount = currentTotal;
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
             TempData["SuccessMessage"] = "Pre-order saved. It is awaiting your arrival and has not been sent to the kitchen.";

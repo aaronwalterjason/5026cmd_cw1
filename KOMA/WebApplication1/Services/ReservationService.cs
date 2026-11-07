@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Security.Claims;
 using KOMA.Data;
@@ -41,14 +41,14 @@ public static class ReservationRules
             slots.Add(TimeOnly.FromTimeSpan(TimeSpan.FromMinutes(minute)));
         return slots;
     }
-    public static string? Validate(ReservationInput input, int capacity, RestaurantSettings settings, DateTime now)
+    public static string? Validate(ReservationInput input, int capacity, RestaurantSettings settings, DateTime now, bool keepActiveSlot = false)
     {
         var errors = new List<ValidationResult>();
         if (!Validator.TryValidateObject(input, new ValidationContext(input), errors, true))
             return errors[0].ErrorMessage;
         if (input.Date == default || input.Date == DateOnly.MaxValue) return "Choose a valid reservation date.";
-        if (input.Date.ToDateTime(input.Time) <= now) return "Choose a future date and time.";
-        if (!Slots(settings).Contains(input.Time)) return "Choose a one-hour slot within the restaurant's opening hours.";
+        if (!keepActiveSlot && input.Date.ToDateTime(input.Time) <= now) return "Choose a future date and time.";
+        if (!keepActiveSlot && !Slots(settings).Contains(input.Time)) return "Choose a one-hour slot within the restaurant's opening hours.";
         if (input.GuestCount > capacity) return $"This table seats at most {capacity} guests.";
         return null;
     }
@@ -81,15 +81,16 @@ public class ReservationService(ApplicationDbContext context)
             if (booking == null) return new(null, "Reservation not found.");
             if (!IsStaff(actor) && booking.CustomerUserId != userId) return new(null, "You cannot change this reservation.");
             if (booking.Status == ReservationStatus.Cancelled) return new(null, "Cancelled reservations cannot be edited.");
-            if (booking.StartTime <= ReservationRules.MalaysiaNow) return new(null, "Past or started reservations cannot be changed.");
+            if (booking.StartTime <= ReservationRules.MalaysiaNow &&
+                (!IsStaff(actor) || booking.EndTime <= ReservationRules.MalaysiaNow)) return new(null, "Past or started reservations cannot be changed.");
             if (Convert.ToBase64String(booking.RowVersion) != input.RowVersion) return new(null, "This booking changed. Reload the page before editing again.");
         }
         var settings = await _context.RestaurantSettings.FirstOrDefaultAsync();
         if (settings == null) return new(null, "Restaurant opening hours have not been configured.");
-        var error = ReservationRules.Validate(input, int.MaxValue, settings, ReservationRules.MalaysiaNow);
+        var error = ReservationRules.Validate(input, int.MaxValue, settings, ReservationRules.MalaysiaNow, IsStaff(actor) && booking?.StartTime == input.Date.ToDateTime(input.Time));
         if (error != null) return new(null, error);
         var start = input.Date.ToDateTime(input.Time);
-        var end = start.AddMinutes(ReservationRules.SlotMinutes);
+        var end = booking?.StartTime == start ? booking.EndTime : start.AddMinutes(ReservationRules.SlotMinutes);
         // Exclude tables occupied by either reservations or walk-ins.
         var available = _context.RestaurantTables
             .Include(t => t.DiningArea)
@@ -192,7 +193,7 @@ public class ReservationService(ApplicationDbContext context)
         }
 
         // Protect the table and time of a visit already linked to the booking.
-        if (linkedSession != null &&
+        if (linkedSession != null && !IsStaff(actor) &&
             (linkedSession.RestaurantTableId != table.Id ||
              linkedSession.StartTime != start ||
              linkedSession.EndTime != end))
@@ -218,6 +219,9 @@ public class ReservationService(ApplicationDbContext context)
         // Keep the linked visit's customer information up to date.
         if (linkedSession != null)
         {
+            linkedSession.StartTime = start;
+            linkedSession.EndTime = end;
+            linkedSession.RestaurantTableId = table.Id;
             linkedSession.CustomerName = booking.CustomerName;
             linkedSession.ContactNumber = booking.ContactNumber;
             linkedSession.GuestCount = booking.GuestCount;
@@ -226,15 +230,11 @@ public class ReservationService(ApplicationDbContext context)
         // Keep the customer's pre-order in sync with the booking.
         if (id.HasValue)
         {
-            var preOrder = await _context.Orders
-                .SingleOrDefaultAsync(o => o.ReservationId == id.Value);
-
-            if (preOrder != null &&
-                preOrder.Status == OrderStatus.AwaitingArrival)
-            {
-                preOrder.RestaurantTableId = table.Id;
-                preOrder.CustomerName = booking.CustomerName;
-            }
+            var sessionId = linkedSession?.Id;
+            await _context.Orders.Where(o => o.ReservationId == booking.Id ||
+                (sessionId.HasValue && o.TableServiceSessionId == sessionId))
+                .ExecuteUpdateAsync(u => u.SetProperty(o => o.RestaurantTableId, (int?)table.Id)
+                    .SetProperty(o => o.CustomerName, booking.CustomerName));
         }
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();

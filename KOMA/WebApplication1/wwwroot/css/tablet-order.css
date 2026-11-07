@@ -1,0 +1,6 @@
+.tablet-shell { max-width: 96rem; margin: auto; padding: clamp(1rem, 3vw, 3rem); }
+.tablet-heading { display:flex; justify-content:space-between; align-items:baseline; gap:.75rem; }
+.tablet-heading { align-items:center; margin-bottom:1.5rem; }
+.tablet-entry { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; margin-top:2rem; }
+.tablet-entry video { width:100%; margin-top:1rem; }
+@media(max-width:650px){.tablet-entry {grid-template-columns:1fr;} }

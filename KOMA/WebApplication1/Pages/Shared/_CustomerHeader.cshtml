@@ -8,6 +8,7 @@
     <nav class="customer-links" aria-label="Main navigation">
         <a asp-area="" asp-page="/Index" aria-current="@(isHome ? "page" : null)">Home</a>
         <a asp-area="" asp-page="/Reservations/Index" aria-current="@(isBooking ? "page" : null)">My Reservations</a>
+        <a asp-area="" asp-page="/Dining/Code">My dining QR</a>
     </nav>
     <nav class="customer-account" aria-label="Account">
         <span class="customer-greeting"><partial name="_AccountGreeting" /></span>
@@ -17,3 +18,4 @@
         </form>
     </nav>
 </header>
+

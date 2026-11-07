@@ -1,0 +1,26 @@
+@page
+@model KOMA.Pages.Dining.ActivateModel
+@{ Layout = "_TabletLayout"; ViewData["Title"] = "Table tablet"; }
+@if (Model.TableNumber == null)
+{
+    <h1>Tablet setup</h1><a asp-page="Setup" class="btn btn-primary">Staff sign-in and table setup</a>
+}
+else
+{
+    <h1>Table @Model.TableNumber</h1>
+    <div asp-validation-summary="All" class="text-danger" role="alert"></div>
+    <div class="tablet-entry">
+        <form method="post" asp-page-handler="Scan" id="scan-form" class="card card-body">
+            <h2>Have an account?</h2><p>Open My dining QR in your KOMA account.</p>
+            <input type="hidden" name="code" id="scan-code"/>
+            <button type="button" class="btn btn-primary" id="scan">Scan account QR</button>
+            <video id="camera" playsinline muted hidden></video><p id="camera-message" role="status"></p>
+        </form>
+        <form method="post" asp-page-handler="Guest" class="card card-body">
+            <h2>Guest</h2><p>Order without an account.</p><button class="btn btn-outline-primary">Continue as guest</button>
+        </form>
+    </div>
+}
+@section Scripts {
+<script src="~/lib/jsqr/jsQR.js" defer></script><script src="~/js/tablet-scan.js" defer asp-append-version="true"></script>
+}

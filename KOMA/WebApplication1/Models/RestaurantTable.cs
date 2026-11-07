@@ -8,6 +8,7 @@ namespace KOMA.Models
     public class RestaurantTable
     {
         public int Id { get; set; }
+        public Guid? TabletDeviceId { get; set; }
 
         [Required, StringLength(20)]
         public string TableNumber { get; set; } = string.Empty;
@@ -45,3 +46,4 @@ namespace KOMA.Models
         Counter = 4
     }
 }
+

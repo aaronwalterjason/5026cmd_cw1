@@ -1,4 +1,4 @@
-﻿using KOMA.Models;
+using KOMA.Models;
 
 namespace KOMA.Services;
 
@@ -8,10 +8,10 @@ public record TableSelection(
     bool IsNow,
     bool IsOpen)
 {
-    public bool CanCreate =>
-        !IsNow &&
-        IsOpen &&
-        Start > ReservationRules.MalaysiaNow;
+    // Keep the floor and popup on the same instant, even during the first second of a visit.
+    public string? SnapshotParameter => IsNow
+        ? Start.ToString("yyyy-MM-ddTHH:mm:ss.fffffff", System.Globalization.CultureInfo.InvariantCulture)
+        : null;
 
     public string Label => IsNow
         ? $"{Start:dd MMM yyyy} · As of {Start:HH:mm:ss} (Malaysia time)"

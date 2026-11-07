@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model KOMA.Pages.Staff.Reservations.IndexModel
 
 @{
@@ -10,18 +10,16 @@
       asp-append-version="true" />
 
 <div class="staff-reservations" id="table-workspace">
-    <header class="d-flex justify-content-between flex-wrap gap-2 align-items-center mb-4">
+    <header class="staff-page-header">
         <div>
             <h1>Table service</h1>
             <p class="text-muted">
-                Select a table to manage its booking and food orders.
+                Select a table to view reservation details and submitted food orders.
                 All times are Malaysia time.
             </p>
         </div>
 
-        <a asp-page="/Staff/Index" class="btn btn-outline-secondary">
-            Staff Dashboard
-        </a>
+
     </header>
 
     <form method="get"

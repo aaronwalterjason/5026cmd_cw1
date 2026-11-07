@@ -39,7 +39,9 @@ builder.Services.AddRazorPages(options =>
 });
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<ReservationService>();
-builder.Services.AddScoped<TableSessionService>();
+builder.Services.AddScoped<DiningOrderService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<TabletAccess>();
 builder.Services.AddScoped<OrderWorkflowService>();
 builder.Services.AddScoped<MenuImageService>();
 // Check role changes on the next request, rather than retaining old role claims.
@@ -75,4 +77,5 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
 

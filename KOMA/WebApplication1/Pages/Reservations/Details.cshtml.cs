@@ -41,3 +41,4 @@ public class DetailsModel(ApplicationDbContext context, ReservationService reser
         return RedirectToPage(new { id });
     }
 }
+

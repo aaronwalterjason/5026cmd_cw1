@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using KOMA.Data;
 using KOMA.Models;
 using Microsoft.EntityFrameworkCore;
@@ -238,6 +238,11 @@ public class OrderWorkflowService(ApplicationDbContext db)
             return "The order must contain valid dishes, quantities and prices.";
         }
 
+        if (expected == OrderStatus.AwaitingArrival && !order.TableServiceSessionId.HasValue)
+        {
+            var booking = await db.Reservations.SingleAsync(r => r.Id == order.ReservationId);
+            order.TableServiceSession = await DiningOrderService.BookingSessionAsync(db, booking);
+        }
         order.Status = next.Value;
 
         await db.SaveChangesAsync();
@@ -274,6 +279,16 @@ public class OrderWorkflowService(ApplicationDbContext db)
                 + "Refresh its details.";
         }
 
+        RecordPayment(order, method);
+
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return null;
+    }
+
+    internal static void RecordPayment(Order order, PaymentMethod method)
+    {
         order.PaymentStatus = PaymentStatus.Paid;
         order.PaymentMethod = method;
         order.PaidAt = ReservationRules.MalaysiaNow;
@@ -282,11 +297,6 @@ public class OrderWorkflowService(ApplicationDbContext db)
         {
             order.Status = OrderStatus.Completed;
         }
-
-        await db.SaveChangesAsync();
-        await transaction.CommitAsync();
-
-        return null;
     }
 
     public async Task<string?> CancelAsync(

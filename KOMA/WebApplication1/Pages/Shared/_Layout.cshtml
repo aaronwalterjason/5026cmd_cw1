@@ -1,3 +1,6 @@
+@{
+    var staffWorkspace = Context.Request.Path.StartsWithSegments("/Staff") || ViewContext.RouteData.Values["page"] as string == "/Dining/Setup";
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,6 +15,10 @@
     <link rel="stylesheet" href="~/css/koma-theme.css" asp-append-version="true" />
     <meta name="theme-color" content="#263b49" />
     <link rel="stylesheet" href="~/css/customer-header.css" asp-append-version="true" />
+    @if (staffWorkspace)
+    {
+        <link rel="stylesheet" href="~/css/staff-workspace.css" asp-append-version="true" />
+    }
 </head>
 <body>
     @if (User.IsInRole("Customer"))
@@ -24,42 +31,39 @@
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light koma-topbar mb-3">
             @* Full width: logo and links start at the left edge (above the admin rail) instead of being centred. *@
             <div class="container-fluid koma-topbar-inner">
-                <a class="navbar-brand koma-brand" asp-area="" asp-page="/Index" aria-label="KOMA home"><span aria-hidden="true">こま</span>KOMA</a>
+                @{
+                    var brandPage = User.IsInRole("Administrator")
+                        ? "/Admin/Dashboard"
+                        : User.IsInRole("Staff") ? "/Staff/Index" : "/Index";
+                }
+                <a class="navbar-brand koma-brand" asp-area="" asp-page="@brandPage" aria-label="KOMA"><span aria-hidden="true">こま</span>KOMA</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
-                        </li>
                         @if (User.IsInRole("Administrator"))
                         {
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-area="" asp-page="/Admin/Dashboard">Admin</a>
                             </li>
                         }
-                        @if (User.IsInRole("Customer"))
+                        else if (User.IsInRole("Staff"))
                         {
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-page="/Reservations/Index">My Reservations</a>
+                                <a class="nav-link text-dark" asp-area="" asp-page="/Staff/Index">Staff</a>
                             </li>
                         }
-                        <!-- Staff Dashboard Link -->
-                        @if (User.IsInRole("Staff"))
+                        else
                         {
                             <li class="nav-item">
-                                <a class="nav-link text-dark"
-                                   asp-area=""
-                                   asp-page="/Staff/Index">
-                                    Staff Dashboard
-                                </a>
+                                <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
                             </li>
                         }
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
+                        </li>
                     </ul>
                     <partial name="_LoginPartial" />
                 </div>
@@ -74,6 +78,15 @@
             <partial name="~/Pages/Admin/Shared/_AdminNav.cshtml" />
             <main role="main" class="admin-main pb-3">
                 @RenderBody()
+            </main>
+        </div>
+    }
+    else if (staffWorkspace)
+    {
+        <div class="admin-shell">
+            <partial name="~/Pages/Staff/Shared/_StaffNav.cshtml" />
+            <main role="main" class="admin-main pb-3">
+                <div class="staff-workspace">@RenderBody()</div>
             </main>
         </div>
     }

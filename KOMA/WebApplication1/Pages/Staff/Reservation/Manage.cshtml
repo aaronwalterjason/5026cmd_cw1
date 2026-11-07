@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model KOMA.Pages.Staff.Reservations.ManageModel
 @using KOMA.Models
 
@@ -6,14 +6,10 @@
     ViewData["Title"] = "Manage reservations";
 }
 
-<link rel="stylesheet"
-      href="~/css/staff-workspace.css"
-      asp-append-version="true" />
 
-<div class="staff-workspace">
     <header class="staff-page-header">
         <div>
-            <h1>Manage bookings</h1>
+            <h1>Reservations</h1>
             <p class="text-muted">
                 Search reservations and review guest details.
                 All times are Malaysia time.
@@ -26,24 +22,7 @@
         </a>
     </header>
 
-<nav class="d-flex flex-wrap gap-2 mb-4"
-     aria-label="Reservation navigation">
-    <a asp-page="/Staff/Index"
-       class="btn btn-outline-secondary btn-sm">
-        Staff dashboard
-    </a>
 
-    <a asp-page="Index"
-       class="btn btn-outline-secondary btn-sm">
-        Table availability
-    </a>
-
-    <a asp-page="Manage"
-       class="btn btn-dark btn-sm"
-       aria-current="page">
-        Manage reservations
-    </a>
-</nav>
 
 <div class="reservation-summary mb-4"
      aria-label="Booking counts for the date range and search, across all statuses">
@@ -205,6 +184,9 @@
                                 <div class="small">
                                     @booking.ContactNumber
                                 </div>
+                                <div class="small text-muted">
+                                    @booking.Email
+                                </div>
 
                                 @if (!string.IsNullOrWhiteSpace(booking.SpecialRequests))
                                 {
@@ -303,4 +285,4 @@
         }
     }
 }
-</div>
+

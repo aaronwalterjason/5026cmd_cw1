@@ -33,13 +33,11 @@ public class IndexModel(ApplicationDbContext context) : PageModel
 
     public bool ValidSlot => Selection != null;
 
-    public bool FutureSlot => Selection?.CanCreate == true;
-
     public object PanelContext => new
     {
         Date = Date?.ToString("yyyy-MM-dd"),
         Time = Time?.ToString("HH:mm"),
-        At = Now ? Selection?.Start.ToString("s") : null
+        At = Selection?.SnapshotParameter
     };
 
     public async Task OnGetAsync()

@@ -1,0 +1,7 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>@ViewData["Title"] · KOMA</title>
+<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css"/>
+<link rel="stylesheet" href="~/css/koma-theme.css" asp-append-version="true"/>
+<link rel="stylesheet" href="~/css/tablet-order.css" asp-append-version="true"/></head>
+<body><main class="tablet-shell"><form method="post" asp-page="/Dining/Activate" asp-page-handler="Exit" class="text-end"><button class="btn btn-outline-secondary" type="submit" aria-label="Log out of tablet mode" title="Exit tablet mode and sign in as staff"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H4v16h5m6-13 5 5-5 5M8 12h12"/></svg></button></form>@RenderBody()</main>@await RenderSectionAsync("Scripts", required:false)</body></html>
