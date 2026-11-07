@@ -25,3 +25,6 @@ Thumbs.db
 
 KOMA/_merge_backup/
 KOMA/_prototypes/
+
+# Saved emails when no mail server is set (Services/Email)
+KOMA/WebApplication1/App_Data/
