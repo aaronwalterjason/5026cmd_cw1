@@ -153,7 +153,6 @@ namespace KOMA.Pages.Admin.Accounts
             public bool EmailConfirmed { get; set; }
             public string? Phone { get; set; }
             public bool PhoneConfirmed { get; set; }
-            public bool TwoFactor { get; set; }
             public bool Locked { get; set; }
             public int FailedSignIns { get; set; }
             public DateTime? Since { get; set; }
@@ -232,7 +231,6 @@ namespace KOMA.Pages.Admin.Accounts
                 EmailConfirmed = u.EmailConfirmed,
                 Phone = u.PhoneNumber,
                 PhoneConfirmed = u.PhoneNumberConfirmed,
-                TwoFactor = u.TwoFactorEnabled,
                 Locked = u.LockoutEnd.HasValue && u.LockoutEnd.Value > DateTimeOffset.UtcNow,
                 FailedSignIns = u.AccessFailedCount,
                 Bookings = b,
@@ -323,7 +321,6 @@ namespace KOMA.Pages.Admin.Accounts
             public bool IsAdmin => Role == "Administrator";
             public bool IsMe { get; set; }
             public bool Locked { get; set; }
-            public bool TwoFactor { get; set; }
             public int FailedSignIns { get; set; }
             public DateTime? LastActive { get; set; }
             public DateTime? FirstSeen { get; set; }
@@ -372,7 +369,6 @@ namespace KOMA.Pages.Admin.Accounts
                 Role = role,
                 IsMe = u.Id == MyId,
                 Locked = u.LockoutEnd.HasValue && u.LockoutEnd.Value > DateTimeOffset.UtcNow,
-                TwoFactor = u.TwoFactorEnabled,
                 FailedSignIns = u.AccessFailedCount,
                 LastActive = stats?.Last, FirstSeen = stats?.First,
                 Changes7 = stats?.Changes ?? 0, SignIns7 = stats?.SignIns ?? 0, HelpDone = helpDone,

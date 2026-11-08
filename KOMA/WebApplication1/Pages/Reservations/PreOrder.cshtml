@@ -5,6 +5,12 @@
 @{ ViewData["Title"] = "Your KOMA menu"; }
 <link rel="stylesheet" href="~/css/preorder.css" asp-append-version="true" />
 <section class="po">
+    <div class="text-end">
+        <a asp-page="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary" aria-label="Back to reservation details" title="Back to reservation details">
+            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H4v16h5m6-13 5 5-5 5M8 12h12"/></svg>
+        </a>
+    </div>
+    @if (TempData["ErrorMessage"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
     <header class="po-header">
         <div><a class="po-back" asp-page="Details" asp-route-id="@Model.Id">← Reservation R-@Model.Id.ToString("D5")</a>
         <p class="po-eyebrow">YOUR TABLE. YOUR FAVOURITES.</p><h1>A little taste of <em>what’s to come.</em></h1>
@@ -22,10 +28,19 @@
     @if (Model.CanEdit)
     {
         <form method="post" id="preorder-form">
+            <input type="hidden" asp-for="ReviewToken" />
+            <input type="hidden" asp-for="BookingVersion" />
             <div asp-validation-summary="All" class="text-danger" role="alert"></div>
             <input type="hidden" name="ExpectedTotal" id="expected-total" />
-            <partial name="_OrderingMenu" model="new KOMA.Services.OrderingMenu(Model.Menu, Model.Quantities, Model.Id)" />
+            <partial name="_OrderingMenu" model="new KOMA.Services.OrderingMenu(Model.Menu, Model.Quantities, Model.Id, CanRemovePreOrder: Model.ExistingOrder != null)" />
         </form>
+        @if (Model.ExistingOrder != null)
+        {
+            <form method="post" asp-page-handler="Remove" id="remove-preorder-form">
+                <input type="hidden" name="ReviewToken" value="@Model.ReviewToken" />
+                <input type="hidden" name="BookingVersion" value="@Model.BookingVersion" />
+            </form>
+        }
     }
     else { <p>This pre-order is no longer editable.</p><a asp-page="Details" asp-route-id="@Model.Id">Back to reservation</a> }
 </section>

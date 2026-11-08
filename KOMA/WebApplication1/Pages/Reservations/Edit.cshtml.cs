@@ -30,6 +30,13 @@ public class EditModel(ApplicationDbContext context, ReservationService reservat
         {
             var booking = await context.Reservations.AsNoTracking().Include(r => r.RestaurantTable).ThenInclude(t => t.DiningArea).SingleOrDefaultAsync(r => r.Id == Id.Value);
             if (booking == null || (!IsStaff && booking.CustomerUserId != User.FindFirstValue(ClaimTypes.NameIdentifier))) return NotFound();
+            if (!IsStaff && (booking.Status == KOMA.Models.ReservationStatus.Cancelled ||
+                booking.StartTime <= ReservationRules.MalaysiaNow ||
+                await context.TableServiceSessions.AnyAsync(s => s.ReservationId == booking.Id)))
+            {
+                TempData["ErrorMessage"] = "This reservation can no longer be edited. Please contact staff.";
+                return RedirectToPage("Details", new { id = booking.Id });
+            }
             Input = new ReservationInput
             {
                 RestaurantTableId = booking.RestaurantTableId,

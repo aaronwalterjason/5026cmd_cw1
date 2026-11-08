@@ -17,16 +17,26 @@ builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
     options.UseSqlServer(connectionString)
            .AddInterceptors(sp.GetRequiredService<AuditInterceptor>(), sp.GetRequiredService<RequestTimingInterceptor>()));
 
-builder.Services.AddDefaultIdentity<KOMA.Models.ApplicationUser>(options =>
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
         options.SignIn.RequireConfirmedAccount = false;   // turn on once email sending is wired up
         options.Password.RequireNonAlphanumeric = false;  // relaxed for coursework demo logins
     })
-    .AddRoles<IdentityRole>()
+    .AddTokenProvider<DataProtectorTokenProvider<ApplicationUser>>(TokenOptions.DefaultProvider)
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager<AuditSignInManager>();   // also logs admin/staff sign-ins to Admin > Activity
 
-builder.Services.AddRazorPages();
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/Identity/Account/Login";
+    options.LogoutPath = "/Identity/Account/Logout";
+    options.AccessDeniedPath = "/Identity/Account/AccessDenied";
+});
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.AuthorizeAreaFolder("Identity", "/Account/Manage");
+    options.Conventions.AuthorizeAreaPage("Identity", "/Account/Logout");
+});
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<ReservationService>();
 builder.Services.AddScoped<DiningOrderService>();
@@ -38,7 +48,7 @@ builder.Services.AddScoped<MenuImageService>();
 builder.Services.Configure<KOMA.Services.Email.EmailOptions>(builder.Configuration.GetSection("Email"));
 builder.Services.AddSingleton<KOMA.Services.Email.MailKitSender>();
 builder.Services.AddSingleton<KOMA.Services.Email.IMailSender>(sp => sp.GetRequiredService<KOMA.Services.Email.MailKitSender>());
-builder.Services.AddSingleton<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>(sp => sp.GetRequiredService<KOMA.Services.Email.MailKitSender>());
+builder.Services.AddSingleton<KOMA.Services.IEmailSender>(sp => sp.GetRequiredService<KOMA.Services.Email.MailKitSender>());
 builder.Services.AddScoped<KOMA.Services.Email.BookingEmailService>();
 builder.Services.AddScoped<KOMA.Services.Email.AccountEmailService>();   // confirm email + password reset
 builder.Services.AddHostedService<KOMA.Services.Email.BookingEmailWorker>();

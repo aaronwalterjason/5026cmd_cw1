@@ -34,3 +34,25 @@
 .food-card .eyebrow{font-size:9px;letter-spacing:1.3px}
 .order-button{min-height:36px;padding:8px 14px;gap:16px;font-size:11px}
 @media(max-width:700px){.food-card{flex-basis:min(230px,85%)}.dish-photo{height:145px}.food-toolbar h3{font-size:23px}.food-section{padding-top:36px}.carousel-controls{gap:6px}}
+
+/* Promotion pictures share the food gallery's card sizes and scrolling layout. */
+.promotion-card{padding:0;border:0;cursor:pointer;text-align:left;color:inherit}
+.promotion-card .dish-photo{display:block;width:100%}
+.promotion-card .dish-photo img{object-fit:cover;object-position:center}
+.promotion-card:hover .dish-photo img{transform:none}
+.promotion-card:focus-visible{outline-offset:-3px}
+body.promotion-open{overflow:hidden}
+.promotion-dialog{width:min(720px,calc(100% - 32px));max-height:90vh;max-height:90dvh;margin:auto;padding:0;border:1px solid var(--line);border-radius:20px;background:var(--paper);color:var(--ink);overflow:auto;box-shadow:0 24px 80px #0005}
+.promotion-dialog::backdrop{background:rgba(12,27,35,.7)}
+.promotion-dialog-header{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 20px;background:var(--paper);border-bottom:1px solid var(--line)}
+.promotion-close{display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--ink);font-size:28px;cursor:pointer}
+.promotion-close:hover{background:var(--sand)}
+.promotion-detail-image{display:block;width:100%;max-height:45vh;object-fit:contain;background:#ded3bd}
+.promotion-details{padding:28px;overflow-wrap:anywhere}
+.promotion-details>p{margin-top:16px;line-height:1.8;color:var(--muted)}
+.promotion-facts{margin:24px 0 0}
+.promotion-facts>div{display:grid;grid-template-columns:70px 1fr;gap:16px;padding:12px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.6}
+.promotion-facts dt{font-weight:bold}
+.promotion-facts dd{margin:0}
+.promotion-dishes{padding-left:20px;font-size:14px;line-height:1.9}
+@media(max-width:700px){.promotion-details{padding:20px}.promotion-details h2{font-size:28px}.promotion-facts>div{grid-template-columns:55px 1fr;gap:12px}}

@@ -19,6 +19,7 @@
     var promos = Under("/Admin/Promotions");
     var website = Under("/Admin/LandingPage");
     var activity = Under("/Admin/Activity");
+    var feedback = Under("/Admin/Feedback");
     var reports = Under("/Admin/Reports");
     var accounts = Under("/Admin/Accounts");
     var settings = Under("/Admin/Settings");
@@ -96,6 +97,13 @@
 
         <li class="admin-rail-divider" aria-hidden="true"></li>
 
+        <li class="admin-rail-group @Current(feedback)">
+            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Feedback/Index" aria-current="@Aria(feedback)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V5a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/><path d="M7 8h10M7 12h7"/></svg>
+                <span class="admin-rail-label">Feedback</span>
+            </a>
+            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Feedback</div>
+        </li>
         <li class="admin-rail-group @Current(activity)">
             <a class="admin-rail-btn" asp-area="" asp-page="/Admin/Activity/Index" aria-current="@Aria(activity)">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>

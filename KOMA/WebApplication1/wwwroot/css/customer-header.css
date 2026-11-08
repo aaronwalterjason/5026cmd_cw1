@@ -8,7 +8,8 @@
 .customer-greeting { overflow-wrap:anywhere; max-width:260px; }
 .customer-links a { padding:12px 0; }
 .customer-links a[aria-current=page] { box-shadow:0 2px #974535; }
-.customer-header .customer-account-icon { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:50%; }
+.customer-account-icon { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; width:44px; height:44px; border-radius:50%; color:#263b49; text-decoration:none; }
+.customer-account-icon:focus-visible { outline:3px solid #974535; outline-offset:3px; }
 .customer-account-icon:hover,.customer-account-icon[aria-current=page] { background:#eee7db; }
 .customer-header .customer-logout { background:#263b49; color:#fff; border:0; border-radius:999px; padding:12px 24px; min-height:44px; font:600 14px Arial,Helvetica,sans-serif; cursor:pointer; }
 .customer-header .customer-logout:hover { background:#405768; }

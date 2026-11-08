@@ -2,4 +2,10 @@
 @media(min-width:1400px){.po-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.po-layout{grid-template-columns:minmax(0,1fr) 350px}}
 @media(max-width:1000px){.po-layout{grid-template-columns:minmax(0,1fr) 300px;gap:18px}.po-grid{grid-template-columns:1fr}.po-tools{align-items:start;flex-direction:column}}
 @media(max-width:700px){.po-header{flex-direction:column}.po-visit{align-self:start}.po-layout{grid-template-columns:1fr}.po-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.po-cart{position:static}.po-dish-body{padding:12px}.po-dish-bottom{align-items:start;flex-direction:column}.po-dish h3{font-size:18px}.po-search,.po-search input{max-width:none;width:100%}.po-review-actions{flex-direction:column}}
+.po-cart-line .po-stepper button{background:transparent;color:var(--navy);flex:0 0 35px}
+.po-cart-line .po-stepper>span{min-width:32px;padding:0 4px;text-align:center;flex-shrink:0;font-variant-numeric:tabular-nums}
+.po-remove-preorder{margin-top:20px;padding-top:18px;border-top:1px dashed var(--line)}
+.po-remove-preorder label{display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.6;margin-bottom:14px}
+.po-remove-preorder input{margin-top:4px;flex-shrink:0}
+.po-remove-preorder button{width:100%;font-size:13px}
 @media(prefers-reduced-motion:reduce){.po-dish{transition:none}}
