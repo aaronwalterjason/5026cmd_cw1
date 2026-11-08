@@ -19,8 +19,10 @@ public class ActivateModel(TabletAccess tablet, DiningOrderService service, Appl
         TableNumber = await db.RestaurantTables.Where(t => t.Id == id).Select(t => t.TableNumber).SingleOrDefaultAsync();
         return Page();
     }
-    public async Task<IActionResult> OnPostExitAsync()
+    public async Task<IActionResult> OnPostExitAsync(string? pin)
     {
+        var error = tablet.CheckExitPin(await tablet.TableAsync(HttpContext), pin);
+        if (error != null) return new ContentResult { StatusCode = 403, Content = error, ContentType = "text/plain" };
         var grant = await tablet.VisitAsync(HttpContext);
         if (grant.HasValue) await service.EndAsync(grant.Value.Visit);
         tablet.End(HttpContext);

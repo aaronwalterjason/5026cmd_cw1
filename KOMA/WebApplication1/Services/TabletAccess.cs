@@ -42,6 +42,25 @@ public sealed class TabletAccess(ApplicationDbContext db, IMemoryCache cache, ID
         End(http);
         return true;
     }
+    private const string StaffExitPin = "123456";
+
+    public string? CheckExitPin(int? tableId, string? pin)
+    {
+        var key = "tablet-exit-attempts:" + tableId;
+        lock (Gate)
+        {
+            var attempts = cache.Get<int>(key);
+            if (attempts >= 5) return "Too many attempts. Try again in one minute.";
+            if (pin == StaffExitPin)
+            {
+                cache.Remove(key);
+                return null;
+            }
+            cache.Set(key, attempts + 1, TimeSpan.FromMinutes(1));
+            return "Incorrect staff PIN.";
+        }
+    }
+
     public string Issue(string customer)
     {
         var code = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));

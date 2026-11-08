@@ -4,4 +4,18 @@
 <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css"/>
 <link rel="stylesheet" href="~/css/koma-theme.css" asp-append-version="true"/>
 <link rel="stylesheet" href="~/css/tablet-order.css" asp-append-version="true"/></head>
-<body><main class="tablet-shell"><form method="post" asp-page="/Dining/Activate" asp-page-handler="Exit" class="text-end"><button class="btn btn-outline-secondary" type="submit" aria-label="Log out of tablet mode" title="Exit tablet mode and sign in as staff"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H4v16h5m6-13 5 5-5 5M8 12h12"/></svg></button></form>@RenderBody()</main>@await RenderSectionAsync("Scripts", required:false)</body></html>
+<body><main class="tablet-shell"><div class="text-end"><button id="open-tablet-exit" class="btn btn-outline-secondary" type="button" aria-label="Log out of tablet mode" title="Exit tablet mode and sign in as staff"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H4v16h5m6-13 5 5-5 5M8 12h12"/></svg></button></div>
+<dialog id="tablet-exit" aria-labelledby="tablet-exit-title" class="rounded-3 border p-4">
+    <form method="post" asp-page="/Dining/Activate" asp-page-handler="Exit">
+        <h2 id="tablet-exit-title" class="h5">Exit tablet mode</h2>
+        <label for="exit-pin" class="form-label">Staff PIN</label>
+        <input id="exit-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" class="form-control" required autofocus />
+        <p class="text-danger mb-0" role="alert"></p>
+        <div class="d-flex gap-2 mt-3">
+            <button type="button" id="cancel-tablet-exit" class="btn btn-outline-secondary">Cancel</button>
+            <button type="submit" class="btn btn-primary">Exit</button>
+        </div>
+    </form>
+</dialog>
+<script src="~/js/tablet-exit.js" defer asp-append-version="true"></script>
+@RenderBody()</main>@await RenderSectionAsync("Scripts", required:false)</body></html>
