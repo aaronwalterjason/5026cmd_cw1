@@ -3,7 +3,7 @@
 @{ ViewData["Title"] = "My reservations"; }
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>My reservations</h1>
-    @if (User.IsInRole("Customer")) { <a asp-page="/Dining/Code" class="btn btn-outline-primary">My dining QR</a> }
+    @if (User.IsInRole("Customer")) { <partial name="_DiningQrLink" /> }
     <a asp-page="Edit" class="btn btn-primary">Make a reservation</a>
 </div>
 @if (!Model.Bookings.Any())
@@ -26,17 +26,16 @@ else
                     <td>@booking.GuestCount</td><td>@booking.Status</td>
                     <td>
                         <div class="d-flex flex-wrap gap-2">
+                            @if (Model.EditableIds.Contains(booking.Id))
+                            {
+                                <a asp-page="Edit" asp-route-id="@booking.Id" class="btn btn-outline-primary btn-sm">Edit reservation</a>
+                            }
                             <a asp-page="/Reservations/Details"
                                asp-route-id="@booking.Id"
                                class="btn btn-outline-secondary btn-sm">
                                 View details
                             </a>
 
-                            <a asp-page="/Reservations/PreOrder"
-                               asp-route-id="@booking.Id"
-                               class="btn btn-primary btn-sm">
-                                Pre-order food / view order
-                            </a>
                         </div>
                     </td>
                 </tr>

@@ -615,5 +615,8 @@ button.live-table:hover, button.live-table:focus-visible { box-shadow: 0 0 0 3px
 .latest-item .latest-num { color: var(--bs-link-color, #0d6efd); }
 .latest-list li { padding: .15rem 0; }
 
+.reservation-food-image { width:64px; height:64px; object-fit:cover; border-radius:10px; flex-shrink:0; }
+.reservation-food-placeholder { display:flex; align-items:center; justify-content:center; background:#eee7db; color:#52616a; font-size:11px; }
+
 /* Popup band for finished orders */
 .pop-band.is-done { --c: #0f766e; --bg: #e3f1ef; --line: #c5e3de; }

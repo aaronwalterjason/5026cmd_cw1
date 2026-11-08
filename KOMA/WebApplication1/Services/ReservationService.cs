@@ -80,6 +80,8 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
             booking = await _context.Reservations.SingleOrDefaultAsync(r => r.Id == id.Value);
             if (booking == null) return new(null, "Reservation not found.");
             if (!IsStaff(actor) && booking.CustomerUserId != userId) return new(null, "You cannot change this reservation.");
+            if (!IsStaff(actor) && await _context.TableServiceSessions.AnyAsync(s => s.ReservationId == id.Value))
+                return new(null, "This reservation has already been checked in. Please contact staff to make changes.");
             if (booking.Status == ReservationStatus.Cancelled) return new(null, "Cancelled reservations cannot be edited.");
             if (booking.StartTime <= ReservationRules.MalaysiaNow &&
                 (!IsStaff(actor) || booking.EndTime <= ReservationRules.MalaysiaNow)) return new(null, "Past or started reservations cannot be changed.");
@@ -205,7 +207,8 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
         }
         // Booking emails (Services/Email): remember the old details so the Updated email can show old -> new.
         var isNew = booking == null;
-        var before = booking == null ? null : new { booking.StartTime, booking.GuestCount, booking.RestaurantTableId };
+        var before = booking == null ? null : new { booking.StartTime, booking.GuestCount, booking.RestaurantTableId,
+            booking.CustomerName, booking.ContactNumber, booking.Email, booking.SpecialRequests };
         if (booking == null)
         {
             booking = new Reservation { CreatedByUserId = userId, CustomerUserId = actor.IsInRole("Customer") ? userId : null, Status = ReservationStatus.Confirmed };
@@ -243,6 +246,10 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
         else if (before != null)
         {
             var changes = new Dictionary<string, (string, string)>();
+            if (before.CustomerName != booking.CustomerName) changes["Name"] = (before.CustomerName, booking.CustomerName);
+            if (before.ContactNumber != booking.ContactNumber) changes["Contact number"] = (before.ContactNumber, booking.ContactNumber);
+            if (before.Email != booking.Email) changes["Email"] = (before.Email ?? "None", booking.Email ?? "None");
+            if (before.SpecialRequests != booking.SpecialRequests) changes["Special requests"] = (before.SpecialRequests ?? "None", booking.SpecialRequests ?? "None");
             if (before.StartTime.Date != booking.StartTime.Date)
                 changes["Date"] = (KOMA.Services.Email.BookingEmailTemplates.Day(before.StartTime), KOMA.Services.Email.BookingEmailTemplates.Day(booking.StartTime));
             if (before.StartTime.TimeOfDay != booking.StartTime.TimeOfDay)
@@ -275,6 +282,8 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
         if (Convert.ToBase64String(booking.RowVersion) != version) return "This booking changed. Review its latest details and try again.";
         if (booking.StartTime <= ReservationRules.MalaysiaNow) return "Past or started reservations cannot be changed.";
         if (booking.Status == ReservationStatus.Cancelled) return "This reservation is already cancelled.";
+        if (!IsStaff(actor) && await _context.TableServiceSessions.AnyAsync(s => s.ReservationId == id))
+            return "This reservation has already been checked in. Please contact staff.";
         if (confirm && booking.Status != ReservationStatus.Pending) return "Only pending reservations can be confirmed.";
         if (!confirm)
         {

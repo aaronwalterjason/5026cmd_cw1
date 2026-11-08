@@ -15,12 +15,18 @@ public class DetailsModel(ApplicationDbContext context, ReservationService reser
     public KOMA.Models.Reservation Booking { get; set; } = null!;
     public bool IsStaff => User.IsInRole("Staff") || User.IsInRole("Administrator");
     public string BackPage => IsStaff ? "/Staff/Reservation/Index" : "/Reservations/Index";
-    public bool CanChange => Booking.Status != ReservationStatus.Cancelled && Booking.StartTime > ReservationRules.MalaysiaNow;
+    public bool HasVisit { get; private set; }
+    public Order? PreOrder { get; private set; }
+    public bool CanChange => (IsStaff || !HasVisit) && Booking.Status != ReservationStatus.Cancelled && Booking.StartTime > ReservationRules.MalaysiaNow;
+    public bool CanEditPreOrder => !HasVisit && Booking.Status == ReservationStatus.Confirmed && Booking.StartTime > ReservationRules.MalaysiaNow
+        && (PreOrder == null || (PreOrder.Status == OrderStatus.AwaitingArrival && PreOrder.PaymentStatus == PaymentStatus.Unpaid));
     public async Task<IActionResult> OnGetAsync(int id)
     {
         var booking = await context.Reservations.AsNoTracking().Include(r => r.RestaurantTable).ThenInclude(t => t.DiningArea).SingleOrDefaultAsync(r => r.Id == id);
         if (booking == null || (!IsStaff && booking.CustomerUserId != User.FindFirstValue(ClaimTypes.NameIdentifier))) return NotFound();
         Booking = booking;
+        HasVisit = await context.TableServiceSessions.AnyAsync(s => s.ReservationId == id);
+        PreOrder = await context.Orders.AsNoTracking().Include(o => o.Items).ThenInclude(i => i.MenuItem).SingleOrDefaultAsync(o => o.ReservationId == id);
         return Page();
     }
     public Task<IActionResult> OnPostConfirmAsync(int id, string rowVersion) => ChangeAsync(id, rowVersion, true);

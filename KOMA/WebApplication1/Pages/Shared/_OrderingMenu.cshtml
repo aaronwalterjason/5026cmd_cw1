@@ -46,6 +46,14 @@
                     <noscript><p>Enable JavaScript to see your live cart, or save the quantities entered beside each dish.</p><button type="submit">Save selected dishes</button></noscript>
                     @if (!Model.Tablet) { <a class="po-later" asp-page="Details" asp-route-id="@Model.Id">I’ll choose my food later</a>
                     <div class="po-arrival">Prepared after arrival<span>Your pre-order waits until you reach the restaurant.</span></div> }
+                    @if (!Model.Tablet && Model.CanRemovePreOrder)
+                    {
+                        <div class="po-remove-preorder">
+                            <p class="po-caption">Remove all pre-ordered dishes and keep your table reservation.</p>
+                            <label><input type="checkbox" name="confirmRemove" value="true" required form="remove-preorder-form" /> <span>I confirm I want to remove this pre-order.</span></label>
+                            <button type="submit" form="remove-preorder-form" class="btn btn-outline-danger">Remove pre-order</button>
+                        </div>
+                    }
                 </aside>
             </div>
             <dialog id="review-dialog" class="po-review" aria-labelledby="review-title">

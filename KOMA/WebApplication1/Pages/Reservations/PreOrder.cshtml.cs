@@ -19,6 +19,8 @@ public class PreOrderModel(ApplicationDbContext context, DiningOrderService dini
     public bool CanEdit { get; set; }
     public Reservation? Booking { get; set; }
     [BindProperty] public decimal? ExpectedTotal { get; set; }
+    [BindProperty] public string? ReviewToken { get; set; }
+    [BindProperty] public string? BookingVersion { get; set; }
     private bool IsStaff => User.IsInRole("Staff") || User.IsInRole("Administrator");
 
     private async Task<Reservation?> LoadAsync()
@@ -32,7 +34,8 @@ public class PreOrderModel(ApplicationDbContext context, DiningOrderService dini
             .SingleOrDefaultAsync(o => o.ReservationId == Id);
         Menu = await dining.Menu().AsNoTracking().Include(m => m.MenuCategory)
             .OrderBy(m => m.MenuCategoryId).ThenBy(m => m.Name).ToListAsync();
-        CanEdit = booking.Status == ReservationStatus.Confirmed && booking.StartTime > ReservationRules.MalaysiaNow
+        var hasVisit = await context.TableServiceSessions.AnyAsync(s => s.ReservationId == Id);
+        CanEdit = !hasVisit && booking.Status == ReservationStatus.Confirmed && booking.StartTime > ReservationRules.MalaysiaNow
             && (ExistingOrder == null || (ExistingOrder.Status == OrderStatus.AwaitingArrival && ExistingOrder.PaymentStatus == PaymentStatus.Unpaid));
         return booking;
     }
@@ -40,6 +43,8 @@ public class PreOrderModel(ApplicationDbContext context, DiningOrderService dini
     public async Task<IActionResult> OnGetAsync()
     {
         if (await LoadAsync() == null) return NotFound();
+        BookingVersion = Convert.ToBase64String(Booking!.RowVersion);
+        ReviewToken = ExistingOrder == null ? "" : OrderWorkflowService.ReviewToken(ExistingOrder);
         if (ExistingOrder != null)
             Quantities = ExistingOrder.Items.Where(i => i.MenuItemId.HasValue).ToDictionary(i => i.MenuItemId!.Value, i => i.Quantity);
         return Page();
@@ -54,6 +59,7 @@ public class PreOrderModel(ApplicationDbContext context, DiningOrderService dini
             var booking = await LoadAsync();
             if (booking == null) return NotFound();
             if (!CanEdit) { ModelState.AddModelError("", "This pre-order can no longer be changed."); return Page(); }
+            if (!MatchesReview()) { ModelState.AddModelError("", "This booking or pre-order changed. Reload before making changes."); return Page(); }
             if (!ModelState.IsValid) return Page();
             if (Quantities.Any(q => q.Value < 0 || q.Value > 99))
                 ModelState.AddModelError("", "Enter quantities between 0 and 99.");
@@ -89,5 +95,51 @@ public class PreOrderModel(ApplicationDbContext context, DiningOrderService dini
         }
         catch (Microsoft.Data.SqlClient.SqlException) { ModelState.AddModelError("", "Unable to save right now. Please reload and try again."); return Page(); }
         catch (DbUpdateException) { ModelState.AddModelError("", "Unable to save your pre-order. Please reload and review it before retrying."); return Page(); }
+    }
+    private bool MatchesReview() =>
+        BookingVersion == Convert.ToBase64String(Booking!.RowVersion) &&
+        (ReviewToken ?? "") == (ExistingOrder == null ? "" : OrderWorkflowService.ReviewToken(ExistingOrder));
+
+    public async Task<IActionResult> OnPostRemoveAsync(bool confirmRemove)
+    {
+        if (!confirmRemove)
+        {
+            TempData["ErrorMessage"] = "Confirm that you want to remove the pre-order.";
+            return RedirectToPage(new { id = Id });
+        }
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        try
+        {
+            await dining.LockAsync();
+            var booking = await LoadAsync();
+            if (booking == null) return NotFound();
+            if (!CanEdit || ExistingOrder == null || !MatchesReview())
+            {
+                TempData["ErrorMessage"] = "The pre-order changed or can no longer be removed. Review its latest details.";
+                return RedirectToPage(new { id = Id });
+            }
+            var oldTotal = ExistingOrder.TotalAmount;
+            // Preserve the cancelled order for staff history and allow a new pre-order later.
+            ExistingOrder.Status = OrderStatus.Cancelled;
+            ExistingOrder.ReservationId = null;
+            var note = $"Pre-order removed from reservation R-{Id:D5}. {ExistingOrder.Notes}";
+            ExistingOrder.Notes = note.Length > 300 ? note[..300] : note;
+            await emails.QueueUpdatedAsync(booking,
+                new Dictionary<string, (string, string)> { ["Pre-order"] = ($"RM {oldTotal:0.00}", "None") },
+                byCustomer: !IsStaff);
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            TempData["SuccessMessage"] = "Pre-order removed. Your reservation is still confirmed.";
+            return RedirectToPage("Details", new { id = Id });
+        }
+        catch (Microsoft.Data.SqlClient.SqlException)
+        {
+            TempData["ErrorMessage"] = "Unable to remove the pre-order right now. Please try again.";
+        }
+        catch (DbUpdateException)
+        {
+            TempData["ErrorMessage"] = "The pre-order could not be removed. Reload and try again.";
+        }
+        return RedirectToPage(new { id = Id });
     }
 }
