@@ -35,13 +35,12 @@
             </div>
 
             <div class="col-md-4">
-                <label asp-for="Time" class="form-label">Time slot</label>
+                <label asp-for="Time" class="form-label">Availability slot</label>
                 <select asp-for="Time" class="form-select">
                     @foreach (var slot in Model.Slots)
                     {
                         <option value="@slot.ToString("HH:mm")">
-                            @slot.ToString("HH:mm") –
-                            @slot.AddHours(1).ToString("HH:mm")
+                            @slot.ToString("HH:mm") – @slot.AddMinutes(KOMA.Services.ReservationRules.SlotMinutes).ToString("HH:mm")
                         </option>
                     }
                 </select>

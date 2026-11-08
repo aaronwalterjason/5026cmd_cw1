@@ -21,7 +21,7 @@
         <dt class="col-sm-3">Contact number</dt><dd class="col-sm-9">@booking.ContactNumber</dd>
         <dt class="col-sm-3">Email</dt><dd class="col-sm-9">@(booking.Email ?? "Not provided")</dd>
         <dt class="col-sm-3">Table</dt><dd class="col-sm-9">@booking.RestaurantTable.TableNumber · @booking.RestaurantTable.DiningArea?.Name</dd>
-        <dt class="col-sm-3">Date and time</dt><dd class="col-sm-9">@booking.StartTime.ToString("dd MMM yyyy, HH:mm") – @booking.EndTime.ToString("HH:mm") (Malaysia)</dd>
+        <dt class="col-sm-3">Date and time</dt><dd class="col-sm-9">@booking.StartTime.ToString("dd MMM yyyy, HH:mm") (Malaysia)</dd>
         <dt class="col-sm-3">Guests</dt><dd class="col-sm-9">@booking.GuestCount / capacity @booking.RestaurantTable.Capacity</dd>
         <dt class="col-sm-3">Requests / preferences</dt><dd class="col-sm-9" style="white-space:pre-wrap">@(string.IsNullOrWhiteSpace(booking.SpecialRequests) ? "None" : booking.SpecialRequests)</dd>
     </dl>

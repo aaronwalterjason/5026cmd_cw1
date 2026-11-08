@@ -2,7 +2,7 @@
 @model KOMA.Pages.Reservations.EditModel
 @{ ViewData["Title"] = Model.Id.HasValue ? "Edit reservation" : "Create reservation"; }
 <h1>@ViewData["Title"]</h1>
-<p class="text-muted">Bookings last one hour. Reservations on the same table start at least two hours apart. All times are Malaysia time. Availability is checked again when you save.</p>
+<p class="text-muted">Choose your arrival time. All times are Malaysia time.</p>
 <form data-slots-url="@Url.Page("Edit", "Slots", new { id = Model.Id })" method="post" class="card card-body">
     <div asp-validation-summary="All" class="text-danger" role="alert"></div>
     <input asp-for="Input.RowVersion" type="hidden" />
@@ -21,7 +21,7 @@
         }
         <div class="col-md-6"><label asp-for="Input.GuestCount" class="form-label"></label><input asp-for="Input.GuestCount" class="form-control" /><span asp-validation-for="Input.GuestCount" class="text-danger"></span></div>
         <div class="col-md-6"><label asp-for="Input.Date" class="form-label"></label><input asp-for="Input.Date" type="date" class="form-control" /><span asp-validation-for="Input.Date" class="text-danger"></span></div>
-        <div class="col-md-6"><label asp-for="Input.Time" class="form-label"></label><select asp-for="Input.Time" class="form-select">@foreach (var slot in Model.Slots) { <option value="@slot.ToString("HH:mm")">@slot.ToString("HH:mm") – @slot.AddHours(1).ToString("HH:mm")</option> }</select><span asp-validation-for="Input.Time" class="text-danger"></span></div>
+        <div class="col-md-6"><label asp-for="Input.Time" class="form-label">Booking time</label><select asp-for="Input.Time" class="form-select">@foreach (var slot in Model.Slots) { <option value="@slot.ToString("HH:mm")">@slot.ToString("HH:mm")</option> }</select><span asp-validation-for="Input.Time" class="text-danger"></span></div>
         <div class="col-md-6"><label asp-for="Input.CustomerName" class="form-label"></label><input asp-for="Input.CustomerName" class="form-control" /><span asp-validation-for="Input.CustomerName" class="text-danger"></span></div>
         <div class="col-md-6"><label asp-for="Input.ContactNumber" class="form-label"></label><input asp-for="Input.ContactNumber" class="form-control" /><span asp-validation-for="Input.ContactNumber" class="text-danger"></span></div>
         <div class="col-12"><label asp-for="Input.Email" class="form-label">Email (optional)</label><input asp-for="Input.Email" class="form-control" /><span asp-validation-for="Input.Email" class="text-danger"></span></div>

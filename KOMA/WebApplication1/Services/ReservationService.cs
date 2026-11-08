@@ -68,18 +68,26 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
     private readonly ApplicationDbContext _context = context;
     private static bool IsStaff(ClaimsPrincipal actor) => actor.IsInRole("Staff") || actor.IsInRole("Administrator");
 
-    internal static IQueryable<RestaurantTable> AvailableTables(ApplicationDbContext db, int guests,
-        int? excludeId, DateTime scheduled, DateTime occupiedFrom, DateTime diningEnd)
+    internal static IQueryable<Reservation> BlockingReservations(ApplicationDbContext db, int? excludeId, DateTime scheduled, DateTime occupiedFrom, DateTime diningEnd)
     {
         var earliest = scheduled.AddMinutes(-ReservationRules.SpacingMinutes);
         var latest = scheduled.AddMinutes(ReservationRules.SpacingMinutes);
         var ready = diningEnd.AddMinutes(ReservationRules.TurnaroundMinutes);
         var previousEnd = occupiedFrom.AddMinutes(-ReservationRules.TurnaroundMinutes);
+        return db.Reservations.Where(r => r.Id != (excludeId ?? 0) &&
+                r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
+                ((r.StartTime > earliest && r.StartTime < latest) || (r.StartTime < ready && r.EndTime > previousEnd)));
+    }
+
+    internal static IQueryable<RestaurantTable> AvailableTables(ApplicationDbContext db, int guests,
+        int? excludeId, DateTime scheduled, DateTime occupiedFrom, DateTime diningEnd)
+    {
+        var blockers = BlockingReservations(db, excludeId, scheduled, occupiedFrom, diningEnd);
+        var ready = diningEnd.AddMinutes(ReservationRules.TurnaroundMinutes);
+        var previousEnd = occupiedFrom.AddMinutes(-ReservationRules.TurnaroundMinutes);
         return db.RestaurantTables.Include(t => t.DiningArea)
             .Where(t => t.IsActive && t.DiningArea!.IsActive && t.Capacity >= guests)
-            .Where(t => !db.Reservations.Any(r => r.RestaurantTableId == t.Id && r.Id != (excludeId ?? 0) &&
-                r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
-                ((r.StartTime > earliest && r.StartTime < latest) || (r.StartTime < ready && r.EndTime > previousEnd))))
+            .Where(t => !blockers.Any(r => r.RestaurantTableId == t.Id))
             .Where(t => !db.TableServiceSessions.Any(s => s.RestaurantTableId == t.Id && s.ReservationId == null &&
                 s.StartTime < ready && s.EndTime > previousEnd));
     }

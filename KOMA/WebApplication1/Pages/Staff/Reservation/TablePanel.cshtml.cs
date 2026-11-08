@@ -117,6 +117,17 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining,
             .OrderBy(s => s.StartTime)
             .ToListAsync();
 
+        if (!selection.IsNow && Bookings.Count == 0 && WalkIns.Count == 0)
+        {
+            var neighbor = await ReservationService.BlockingReservations(db, null, start, start, end)
+                .AsNoTracking().Where(r => r.RestaurantTableId == TableId)
+                .OrderBy(r => r.StartTime > start)
+                .ThenBy(r => EF.Functions.DateDiffSecond(start, r.StartTime) < 0
+                    ? EF.Functions.DateDiffSecond(r.StartTime, start) : EF.Functions.DateDiffSecond(start, r.StartTime))
+                .ThenBy(r => r.Id).FirstOrDefaultAsync();
+            if (neighbor != null) Bookings.Add(neighbor);
+        }
+
         if (BookingId.HasValue && SessionId.HasValue)
             return false;
 
@@ -210,6 +221,7 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining,
 
     private static IActionResult ConflictResultForBill() =>
         new ConflictObjectResult("The bill changed. Reopen Food orders and review it before settling.");
+
 
     public async Task<IActionResult> OnGetAsync()
     {
