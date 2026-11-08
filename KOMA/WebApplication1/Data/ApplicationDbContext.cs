@@ -23,6 +23,7 @@ namespace KOMA.Data
         public DbSet<Promotion> Promotions => Set<Promotion>();
         public DbSet<RestaurantSettings> RestaurantSettings => Set<RestaurantSettings>();
         public DbSet<Reservation> Reservations => Set<Reservation>();
+        public DbSet<Feedback> Feedbacks => Set<Feedback>();
 
         // Engineer B: customer orders and their line items.
         public DbSet<Order> Orders => Set<Order>();
@@ -44,6 +45,10 @@ namespace KOMA.Data
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+            builder.Entity<Feedback>().HasIndex(f => f.ReservationId).IsUnique().HasFilter("[ReservationId] IS NOT NULL");
+            builder.Entity<Feedback>().HasIndex(f => f.TableServiceSessionId).IsUnique().HasFilter("[TableServiceSessionId] IS NOT NULL");
+            builder.Entity<Feedback>().HasOne(f => f.Reservation).WithMany().HasForeignKey(f => f.ReservationId).OnDelete(DeleteBehavior.Restrict);
+            builder.Entity<Feedback>().HasOne(f => f.TableServiceSession).WithMany().HasForeignKey(f => f.TableServiceSessionId).OnDelete(DeleteBehavior.Restrict);
 
             // Each visit belongs to one restaurant table.
             builder.Entity<TableServiceSession>()

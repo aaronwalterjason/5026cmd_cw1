@@ -14,4 +14,6 @@
     <input type="hidden" name="ExpectedTotal" id="expected-total"/>
     <partial name="_OrderingMenu" model="new KOMA.Services.OrderingMenu(Model.Dishes, Model.Quantities, 0, true, Model.Preorder)" />
 </form></section>
+<link rel="stylesheet" href="~/css/feedback.css" asp-append-version="true" />
+<section class="feedback-box" aria-label="Dining feedback"><iframe src="@Url.Page("/Feedback", new { tablet = true })" title="Dining feedback" loading="lazy"></iframe></section>
 @section Scripts { <script src="~/js/preorder.js" asp-append-version="true"></script> }

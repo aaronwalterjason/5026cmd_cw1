@@ -63,6 +63,13 @@
         }
     </div>
 </section>
+@if (Model.CanGiveFeedback)
+{
+    <link rel="stylesheet" href="~/css/feedback.css" asp-append-version="true" />
+    <section class="feedback-box" aria-label="Reservation feedback">
+        <iframe src="@Url.Page("/Feedback", new { reservationId = booking.Id })" title="Reservation feedback" loading="lazy"></iframe>
+    </section>
+}
 <div class="d-flex flex-wrap gap-2 mb-3">
     @if (Model.CanChange)
     {

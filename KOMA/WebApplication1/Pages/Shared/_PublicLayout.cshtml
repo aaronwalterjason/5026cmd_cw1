@@ -8,6 +8,7 @@
     <title>@ViewData["Title"] — KOMA</title>
     <link rel="stylesheet" href="~/css/koma-home.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/customer-header.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/feedback.css" asp-append-version="true" />
 </head>
 <body>
     <a class="skip" href="#main">Skip to content</a>
@@ -49,7 +50,16 @@
     </header>
     }
     <main id="main" tabindex="-1">@RenderBody()</main>
-    <footer class="footer"><a class="brand" asp-area="" asp-page="/Index">KOMA</a><div>© @DateTime.Now.Year KOMA · <a asp-area="" asp-page="/Privacy">Privacy</a></div></footer>
+    <footer class="footer footer-feedback">
+        <a class="brand" asp-area="" asp-page="/Index">KOMA</a>
+        <button type="button" class="feedback-link" data-feedback-open="landing-feedback">Share your feedback</button>
+        <div>© @DateTime.Now.Year KOMA · <a asp-area="" asp-page="/Privacy">Privacy</a></div>
+    </footer>
+    <dialog id="landing-feedback" class="feedback-dialog" aria-label="Share your feedback">
+        <button type="button" class="feedback-close" data-feedback-close>Close</button>
+        <iframe src="@Url.Page("/Feedback")" title="Feedback form" loading="lazy"></iframe>
+    </dialog>
+    <script src="~/js/feedback.js" asp-append-version="true" defer></script>
     <script src="~/js/koma-home.js" asp-append-version="true" defer></script>
 </body>
 </html>

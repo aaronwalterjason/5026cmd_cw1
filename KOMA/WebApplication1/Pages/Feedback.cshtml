@@ -1,0 +1,39 @@
+@page
+@model KOMA.Pages.FeedbackModel
+@{ Layout = null; }
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Share your feedback — KOMA</title><link rel="stylesheet" href="~/css/feedback.css" asp-append-version="true" /></head>
+<body class="feedback-form">
+@if (Model.Submitted)
+{
+    <section class="feedback-success" role="status">
+        <span class="feedback-success-icon" aria-hidden="true">✓</span>
+        <h1>Thank you for your feedback!</h1>
+        <p>We’ve received your feedback. Your thoughts help our team make your next KOMA visit even better.</p>
+        @if (Model.Tablet || Model.ReservationId.HasValue)
+        {
+            <a asp-page="/Feedback" asp-route-reservationId="@Model.ReservationId" asp-route-tablet="@Model.Tablet">Edit your feedback</a>
+        }
+        else
+        {
+            <p>You can now close this window.</p>
+        }
+    </section>
+}
+else
+{
+<h1>Share your experience</h1><p>How was your visit? Your feedback goes privately to our team.</p>
+<form method="post">
+    <input type="hidden" asp-for="ReservationId" /><input type="hidden" asp-for="Tablet" />
+    <div asp-validation-summary="All" role="alert"></div>
+    <fieldset><legend>Your rating</legend><div class="feedback-stars">
+    @for (var rating = 1; rating <= 5; rating++) { <label><input asp-for="Input.Rating" type="radio" value="@rating" id="rating-@rating" required /> <span>@rating ★</span></label> }
+    </div></fieldset>
+    <label asp-for="Input.Comment">Your feedback</label><textarea asp-for="Input.Comment" rows="4" maxlength="2000" required placeholder="Tell us what you enjoyed or what we could improve…"></textarea>
+    @if (Model.Visitor) {
+        <label asp-for="Input.Name">Name (optional)</label><input asp-for="Input.Name" maxlength="100" autocomplete="name" />
+        <label asp-for="Input.Email">Email (optional)</label><input asp-for="Input.Email" maxlength="256" autocomplete="email" />
+    }
+    <button type="submit">Save feedback</button>
+</form>
+}
+</body></html>

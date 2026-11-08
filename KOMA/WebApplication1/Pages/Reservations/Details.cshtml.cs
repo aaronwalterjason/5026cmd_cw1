@@ -16,6 +16,7 @@ public class DetailsModel(ApplicationDbContext context, ReservationService reser
     public bool IsStaff => User.IsInRole("Staff") || User.IsInRole("Administrator");
     public string BackPage => IsStaff ? "/Staff/Reservation/Index" : "/Reservations/Index";
     public bool HasVisit { get; private set; }
+    public bool CanGiveFeedback { get; private set; }
     public Order? PreOrder { get; private set; }
     public bool CanChange => (IsStaff || !HasVisit) && Booking.Status != ReservationStatus.Cancelled && Booking.StartTime > ReservationRules.MalaysiaNow;
     public bool CanEditPreOrder => !HasVisit && Booking.Status == ReservationStatus.Confirmed && Booking.StartTime > ReservationRules.MalaysiaNow
@@ -26,6 +27,8 @@ public class DetailsModel(ApplicationDbContext context, ReservationService reser
         if (booking == null || (!IsStaff && booking.CustomerUserId != User.FindFirstValue(ClaimTypes.NameIdentifier))) return NotFound();
         Booking = booking;
         HasVisit = await context.TableServiceSessions.AnyAsync(s => s.ReservationId == id);
+        CanGiveFeedback = !IsStaff && booking.Status == ReservationStatus.Confirmed && booking.EndTime <= ReservationRules.MalaysiaNow
+            && await context.TableServiceSessions.AnyAsync(s => s.ReservationId == id && s.EndTime <= ReservationRules.MalaysiaNow);
         PreOrder = await context.Orders.AsNoTracking().Include(o => o.Items).ThenInclude(i => i.MenuItem).SingleOrDefaultAsync(o => o.ReservationId == id);
         return Page();
     }
