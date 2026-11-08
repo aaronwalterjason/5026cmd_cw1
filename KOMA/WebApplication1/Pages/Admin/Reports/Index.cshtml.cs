@@ -131,7 +131,7 @@ namespace KOMA.Pages.Admin.Reports
             };
 
             // ---------- Order: most / least ordered dishes ----------
-            var dishes = items.GroupBy(i => i.Name ?? "(removed item)").Select(g => (Name: g.Key, Qty: g.Sum(x => x.Quantity))).OrderByDescending(x => x.Qty).ToList();
+            var dishes = KOMA.Services.DishPopularity.Rank(items.Select(i => ((string?)i.Name, i.Quantity)));
             Order = new Part("order", "Order", $"{dishes.Sum(d => d.Qty):N0} dishes", "Menu", "/Admin/MenuItems/Index", dishes.Count == 0)
             {
                 Bars = dishes.Take(6).Select(d => new Bar(d.Name, d.Qty, d.Qty.ToString("N0"))).ToList(),

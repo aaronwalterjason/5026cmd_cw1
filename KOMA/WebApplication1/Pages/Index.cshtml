@@ -27,7 +27,7 @@
     @foreach (var (isRecommended, category) in new[] { (true, c.RecommendedTitle), (false, c.SeasonalTitle) })
     {
         if (isRecommended ? !c.ShowRecommended : !c.ShowSeasonal) { continue; }
-        var dishes = Model.Dishes.Where(dish => isRecommended ? dish.IsRecommended : dish.IsSeasonal).ToList();
+        var dishes = isRecommended ? Model.RecommendedDishes : Model.Dishes.Where(dish => dish.IsSeasonal).ToList();
         var galleryId = isRecommended ? "recommended" : "seasonal";
         <section class="food-gallery" aria-labelledby="@(galleryId)-title" aria-roledescription="carousel">
             <div class="food-toolbar">
@@ -51,7 +51,7 @@
                         <span class="photo-placeholder">Photo coming soon</span>
                     }
                 </div>
-                <div class="food-card-body"><p class="eyebrow">@(dish.IsRecommended && dish.IsSeasonal ? "KOMA PICKS / SEASONAL" : dish.IsRecommended ? "KOMA PICKS" : "SEASONAL SPOTLIGHT")</p><h3>@dish.Name</h3><p>@dish.Description</p>
+                <div class="food-card-body"><p class="eyebrow">@((isRecommended || dish.IsRecommended) && dish.IsSeasonal ? "KOMA PICKS / SEASONAL" : isRecommended || dish.IsRecommended ? "KOMA PICKS" : "SEASONAL SPOTLIGHT")</p><h3>@dish.Name</h3><p>@dish.Description</p>
                     @if (User.Identity?.IsAuthenticated != true)
                     {
                         <a class="button order-button" asp-area="Identity" asp-page="/Account/Login" asp-route-returnUrl="@Url.Page("/Reservations/Edit", new { area = "" })" aria-label="Order @dish.Name now">Order Now <span aria-hidden="true">↗</span></a>
