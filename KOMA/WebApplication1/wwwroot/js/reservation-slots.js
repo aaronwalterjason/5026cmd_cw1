@@ -1,7 +1,7 @@
 (() => {
     const form = document.querySelector("[data-slots-url]");
+    if (!form) return;
     const { Input_Date: date, Input_Time: time, Input_GuestCount: guests, Input_PreferredZone: zone, Input_RestaurantTableId: table } = form.elements;
-    const slots = [...time.options].map(option => option.cloneNode(true));
     let request = 0;
     async function refresh() {
         const sequence = ++request;
@@ -16,7 +16,7 @@
             const available = await response.json();
             if (request !== sequence) return;
             const previous = time.value;
-            time.replaceChildren(...slots.filter(o => available.includes(o.value)).map(o => o.cloneNode(true)));
+            time.replaceChildren(...available.map(value => new Option(value, value)));
             if (available.includes(previous)) time.value = previous;
             if (!time.options.length) time.add(new Option("No available times", ""));
             time.required = true;

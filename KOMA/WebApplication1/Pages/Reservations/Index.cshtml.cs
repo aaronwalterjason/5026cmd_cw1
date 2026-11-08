@@ -19,9 +19,11 @@ public class IndexModel(ApplicationDbContext context) : PageModel
             return RedirectToPage("/Staff/Reservation/Index");
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId == null) return Challenge();
-        Bookings = await context.Reservations.AsNoTracking().Include(r => r.RestaurantTable)
-            .Where(r => r.CustomerUserId == userId).OrderByDescending(r => r.StartTime).ToListAsync();
         var now = KOMA.Services.ReservationRules.MalaysiaNow;
+        var historyStart = now.Date.AddMonths(-3);
+        Bookings = await context.Reservations.AsNoTracking().Include(r => r.RestaurantTable)
+            .Where(r => r.CustomerUserId == userId && r.StartTime >= historyStart)
+            .OrderByDescending(r => r.StartTime).ToListAsync();
         EditableIds = (await context.Reservations.Where(r => r.CustomerUserId == userId &&
             r.Status != KOMA.Models.ReservationStatus.Cancelled && r.StartTime > now &&
             !context.TableServiceSessions.Any(s => s.ReservationId == r.Id))

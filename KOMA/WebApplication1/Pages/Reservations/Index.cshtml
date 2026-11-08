@@ -8,11 +8,11 @@
 </div>
 @if (!Model.Bookings.Any())
 {
-    <p>You have no reservations yet. Make a reservation to plan your visit.</p>
+    <p>You have no upcoming reservations or reservations from the last three months.</p>
 }
 else
 {
-    <p>All times are Malaysia time.</p>
+    <p>Showing upcoming reservations and the last three months. All times are Malaysia time.</p>
     <div class="table-responsive">
         <table class="table table-striped">
             <thead><tr><th>Reference</th><th>Date and time</th><th>Table</th><th>Guests</th><th>Status</th><th>Action</th></tr></thead>

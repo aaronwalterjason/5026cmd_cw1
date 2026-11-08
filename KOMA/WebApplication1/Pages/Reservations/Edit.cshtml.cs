@@ -50,6 +50,12 @@ public class EditModel(ApplicationDbContext context, ReservationService reservat
                 SpecialRequests = booking.SpecialRequests,
                 RowVersion = Convert.ToBase64String(booking.RowVersion)
             };
+            // Keep the saved values visible even if restaurant choices changed after booking.
+            Slots = Slots.Append(Input.Time).Distinct().OrderBy(t => t).ToList();
+            if (Input.PreferredZone != null && !Zones.Any(z => z.Value == Input.PreferredZone))
+                Zones.Add(new SelectListItem(Input.PreferredZone, Input.PreferredZone));
+            if (!Tables.Any(t => t.Value == Input.RestaurantTableId.ToString()))
+                Tables.Add(new SelectListItem($"{booking.RestaurantTable.DiningArea?.Name} / {booking.RestaurantTable.TableNumber}", Input.RestaurantTableId.ToString()));
         }
         else
         {
@@ -111,7 +117,9 @@ public class EditModel(ApplicationDbContext context, ReservationService reservat
             if ((start > ReservationRules.MalaysiaNow && await choices.AnyAsync()) || start == own?.StartTime)
                 result.Add(slot.ToString("HH:mm"));
         }
-        return new JsonResult(result);
+        if (own != null && DateOnly.FromDateTime(own.StartTime) == date)
+            result.Add(own.StartTime.ToString("HH:mm"));
+        return new JsonResult(result.Distinct().OrderBy(t => t).ToList());
     }
 
     private async Task LoadChoicesAsync()
