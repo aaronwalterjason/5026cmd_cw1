@@ -95,6 +95,25 @@ public class EditModel(ApplicationDbContext context, ReservationService reservat
         catch (DbUpdateException) { ModelState.AddModelError("", "The reservation could not be saved. Reload the page and check table availability."); return Page(); }
     }
 
+    public async Task<IActionResult> OnGetSlotsAsync(DateOnly date, int guests, int? table, string? zone)
+    {
+        if (date == default || date.Year > 9998 || guests < 1 || guests > 20) return new JsonResult(Array.Empty<string>());
+        var own = Id.HasValue ? await context.Reservations.AsNoTracking().SingleOrDefaultAsync(r => r.Id == Id) : null;
+        if (own != null && !IsStaff && own.CustomerUserId != User.FindFirstValue(ClaimTypes.NameIdentifier)) return Forbid();
+        var settings = await context.RestaurantSettings.FirstAsync();
+        var result = new List<string>();
+        foreach (var slot in ReservationRules.Slots(settings))
+        {
+            var start = date.ToDateTime(slot);
+            var choices = ReservationService.AvailableTables(context, guests, own?.Id, start, start, start.AddMinutes(ReservationRules.SlotMinutes));
+            if (IsStaff && table.HasValue) choices = choices.Where(t => t.Id == table);
+            if (!IsStaff && !string.IsNullOrWhiteSpace(zone)) choices = choices.Where(t => t.DiningArea!.Zone == zone);
+            if ((start > ReservationRules.MalaysiaNow && await choices.AnyAsync()) || start == own?.StartTime)
+                result.Add(slot.ToString("HH:mm"));
+        }
+        return new JsonResult(result);
+    }
+
     private async Task LoadChoicesAsync()
     {
         Zones = await context.DiningAreas.AsNoTracking().Where(a => a.IsActive)
@@ -107,4 +126,3 @@ public class EditModel(ApplicationDbContext context, ReservationService reservat
         if (settings != null) Slots = ReservationRules.Slots(settings);
     }
 }
-

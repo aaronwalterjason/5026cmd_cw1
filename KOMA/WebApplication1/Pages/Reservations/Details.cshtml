@@ -14,7 +14,8 @@
 }
 @if (TempData["SuccessMessage"] is string success) { <div class="alert alert-success" role="status">@success</div> }
 @if (TempData["ErrorMessage"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
-<div class="card mb-4"><div class="card-header"><strong>@booking.Status</strong></div><div class="card-body">
+<div class="card mb-4"><div class="card-header"><strong>@(booking.Status == ReservationStatus.NoShow ? "No-show" : booking.Status.ToString())</strong></div><div class="card-body">
+    @if (booking.ExpectedArrival.HasValue && booking.Status == ReservationStatus.Confirmed) { <p>Agreed arrival: @booking.ExpectedArrival.Value.ToString("dd MMM yyyy, HH:mm") (Malaysia time)</p> }
     <dl class="row mb-0">
         <dt class="col-sm-3">Customer</dt><dd class="col-sm-9">@booking.CustomerName</dd>
         <dt class="col-sm-3">Contact number</dt><dd class="col-sm-9">@booking.ContactNumber</dd>

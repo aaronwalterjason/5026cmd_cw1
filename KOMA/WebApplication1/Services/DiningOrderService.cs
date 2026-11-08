@@ -28,7 +28,8 @@ public class DiningOrderService(ApplicationDbContext db)
         var now = ReservationRules.MalaysiaNow;
         if (!await db.RestaurantTables.AnyAsync(t => t.Id == tableId && t.IsActive && t.DiningArea!.IsActive))
             return (null, "Ask Staff to pair this tablet again.");
-        var bookings = await db.Reservations.Where(r => r.Status != ReservationStatus.Cancelled &&
+        await ArrivalService.ExpireAsync(db, now);
+        var bookings = await db.Reservations.Where(r => r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
             r.StartTime <= now && now < r.EndTime && (r.RestaurantTableId == tableId ||
             (customer != null && r.CustomerUserId == customer))).ToListAsync();
         var booking = bookings.FirstOrDefault(r => customer != null && r.CustomerUserId == customer && r.RestaurantTableId == tableId && r.Status == ReservationStatus.Confirmed);
@@ -40,10 +41,14 @@ public class DiningOrderService(ApplicationDbContext db)
         {
             if (await ActiveVisits().AnyAsync(s => s.RestaurantTableId == tableId))
                 return (null, "This table has an active visit. Finish the current visit before starting another.");
-            var next = await db.Reservations.Where(r => r.RestaurantTableId == tableId && r.Status != ReservationStatus.Cancelled && r.StartTime > now)
+            var next = await db.Reservations.Where(r => r.RestaurantTableId == tableId && r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow && r.StartTime > now)
                 .Select(r => (DateTime?)r.StartTime).MinAsync();
             var end = now.AddMinutes(ReservationRules.SlotMinutes);
-            if (next < end) end = next.Value;
+            if (next.HasValue && next.Value.AddMinutes(-ReservationRules.TurnaroundMinutes) < end)
+                end = next.Value.AddMinutes(-ReservationRules.TurnaroundMinutes);
+            if (end <= now || await db.TableServiceSessions.AnyAsync(s => s.RestaurantTableId == tableId && s.EndTime <= now && s.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)) || await db.Reservations.AnyAsync(r => r.RestaurantTableId == tableId &&
+                r.Status == ReservationStatus.Confirmed && r.EndTime <= now && r.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)))
+                return (null, "This table is being prepared. Ask staff for another table.");
             var name = customer == null ? "Guest" : await db.Users.Where(u => u.Id == customer).Select(u => u.FullName).SingleAsync();
             visit = new TableServiceSession { RestaurantTableId = tableId, CustomerName = string.IsNullOrWhiteSpace(name) ? "Guest" : name,
                 StartTime = now, EndTime = end, GuestCount = 1 };

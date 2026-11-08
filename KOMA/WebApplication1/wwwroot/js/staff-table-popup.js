@@ -159,14 +159,20 @@
         if (button) openTable(tableId, button.dataset.booking, button.dataset.session);
     });
     body.addEventListener("submit", async event => {
-        const form = event.target.closest(".payment-form, .walk-in-move");
+        const form = event.target.closest(".payment-form, .walk-in-move, .arrival-form");
         if (!form) return;
         event.preventDefault();
         const data = new FormData(form);
-        const submit = form.querySelector("button");
+        const submit = event.submitter;
+        if (submit.name) data.set(submit.name, submit.value);
         submit.disabled = true;
         try {
             const response = await fetch(form.action, { method: "POST", body: data });
+            if (form.matches(".arrival-form")) {
+                if (!response.ok || response.redirected) throw new Error(response.status === 409 ? await response.text() : "Could not update arrival.");
+                location.reload();
+                return;
+            }
             if (form.matches(".walk-in-move")) {
                 if (!response.ok || response.redirected) throw new Error("Could not move the guest. Reopen the table to check availability.");
                 location.reload();
@@ -182,5 +188,17 @@
         }
     });
     modalEl.addEventListener("hide.bs.modal", () => { ++requestNumber; });
+    async function refreshLiveFloor() {
+        const board = host.querySelector('.floor-board[data-live="true"]');
+        if (!board) return;
+        try {
+            if (!document.hidden && !modalEl.classList.contains("show")) {
+                const html = await getHtml(board.dataset.refreshUrl);
+                if (!modalEl.classList.contains("show")) { host.innerHTML = html; drawChairs(); }
+            }
+        } catch { outsideError.textContent = "Unable to refresh availability. Use Now to retry."; }
+        finally { setTimeout(refreshLiveFloor, 15000); }
+    }
+    setTimeout(refreshLiveFloor, 15000);
     drawChairs();
 })();

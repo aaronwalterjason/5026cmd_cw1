@@ -1,8 +1,8 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace KOMA.Models;
 
-public enum ReservationStatus { Pending, Confirmed, Cancelled }
+public enum ReservationStatus { Pending, Confirmed, Cancelled, NoShow }
 
 public class Reservation
 {
@@ -16,6 +16,9 @@ public class Reservation
     [Required, StringLength(30)] public string ContactNumber { get; set; } = "";
     [StringLength(256)] public string? Email { get; set; }
     public DateTime StartTime { get; set; }
+    public DateTime? HoldUntil { get; set; }
+    public DateTime? ExpectedArrival { get; set; }
+    public DateTime? ContactAttemptAt { get; set; }
     public DateTime EndTime { get; set; }
     [Range(1, 20)] public int GuestCount { get; set; }
     [StringLength(500)] public string? SpecialRequests { get; set; }

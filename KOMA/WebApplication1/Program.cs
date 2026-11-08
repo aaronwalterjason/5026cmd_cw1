@@ -40,6 +40,8 @@ builder.Services.AddRazorPages(options =>
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<ReservationService>();
 builder.Services.AddScoped<DiningOrderService>();
+builder.Services.AddScoped<ArrivalService>();
+builder.Services.AddHostedService<ArrivalWorker>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<TabletAccess>();
 builder.Services.AddScoped<OrderWorkflowService>();
@@ -104,5 +106,3 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
-
-

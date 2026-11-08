@@ -2,8 +2,8 @@
 @model KOMA.Pages.Reservations.EditModel
 @{ ViewData["Title"] = Model.Id.HasValue ? "Edit reservation" : "Create reservation"; }
 <h1>@ViewData["Title"]</h1>
-<p class="text-muted">Bookings last one hour. All times are Malaysia time. Availability is checked again when you save.</p>
-<form method="post" class="card card-body">
+<p class="text-muted">Bookings last one hour. Reservations on the same table start at least two hours apart. All times are Malaysia time. Availability is checked again when you save.</p>
+<form data-slots-url="@Url.Page("Edit", "Slots", new { id = Model.Id })" method="post" class="card card-body">
     <div asp-validation-summary="All" class="text-danger" role="alert"></div>
     <input asp-for="Input.RowVersion" type="hidden" />
     <div class="form-check mb-3">
@@ -38,4 +38,4 @@
     }
     <div class="d-flex gap-2 mt-4"><button class="btn btn-primary" type="submit">Save reservation</button><a asp-page="@Model.BackPage" asp-route-date="@Model.Input.Date.ToString("yyyy-MM-dd")" asp-route-time="@Model.Input.Time.ToString("HH:mm")" class="btn btn-outline-secondary">@(Model.IsStaff ? "Back to layout" : "My reservations")</a></div>
 </form>
-@section Scripts { <partial name="_ValidationScriptsPartial" /> }
+@section Scripts { <partial name="_ValidationScriptsPartial" /><script src="~/js/reservation-slots.js" asp-append-version="true"></script> }
