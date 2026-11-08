@@ -20,12 +20,17 @@
         <link rel="stylesheet" href="~/css/staff-workspace.css" asp-append-version="true" />
     }
 </head>
-<body>
+@{
+    // Admin pages use the navy side menu (Pages/Admin/Shared/_AdminNav.cshtml) instead of the website top bar.
+    var isAdmin = Context.Request.Path.StartsWithSegments("/Admin");
+}
+<body class="@(isAdmin ? "is-admin" : null)">
     @if (User.IsInRole("Customer"))
     {
         <partial name="_CustomerHeader" />
+        <partial name="_ConfirmEmailBanner" />
     }
-    else
+    else if (!isAdmin)
     {
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light koma-topbar mb-3">
@@ -71,12 +76,17 @@
         </nav>
     </header>
     }
-    @if (Context.Request.Path.StartsWithSegments("/Admin"))
+    @if (isAdmin)
     {
-        @* Admin pages: icon rail on the left (Pages/Admin/Shared/_AdminNav.cshtml) + full-width content. *@
+        @* Admin pages: navy side menu on the left (Pages/Admin/Shared/_AdminNav.cshtml) + full-width content
+           with a slim bar on top: where you are, a link to the customer website and your initials. *@
         <div class="admin-shell">
             <partial name="~/Pages/Admin/Shared/_AdminNav.cshtml" />
             <main role="main" class="admin-main pb-3">
+                <div class="admin-topbar">
+                    <span>Admin</span><span aria-hidden="true">›</span><b>@ViewData["Title"]</b>
+                    <a class="admin-topbar-site" asp-area="" asp-page="/Index" target="_blank" rel="noopener">View website ↗</a>
+                </div>
                 @RenderBody()
             </main>
         </div>
@@ -99,11 +109,14 @@
         </div>
     }
 
+    @if (!isAdmin)
+    {
     <footer class="border-top footer text-muted">
         <div class="container">
             &copy; 2026 - KOMA - <a asp-area="" asp-page="/Privacy">Privacy</a>
         </div>
     </footer>
+    }
 
     <partial name="_ConfirmDialog" />
 
@@ -111,7 +124,7 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="~/js/koma-confirm.js" asp-append-version="true"></script>
-    @if (Context.Request.Path.StartsWithSegments("/Admin"))
+    @if (isAdmin)
     {
         <script src="~/js/admin-rail.js" asp-append-version="true"></script>
     }

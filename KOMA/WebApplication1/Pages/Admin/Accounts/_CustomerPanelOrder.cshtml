@@ -1,0 +1,15 @@
+@model KOMA.Pages.Admin.Accounts.IndexModel.PanelOrder
+@* One order line inside the customer panel (_CustomerPanel.cshtml). *@
+@{
+    var tag = Model.Cancelled ? "Cancelled" : Model.Paid.ToString();
+    var cls = tag switch { "Paid" => "ok", "Cancelled" or "Refunded" => "bad", _ => "mid" };
+}
+<a class="cp-order" asp-page="/Admin/Orders/Details" asp-route-id="@Model.Id">
+    <span class="cp-order-main">
+        <span><b>KOMA-@Model.Id.ToString("D6")</b> · @Model.At.ToString("ddd d MMM") · @Model.Type</span>
+        <small>@(string.IsNullOrEmpty(Model.Items) ? "No items" : Model.Items)</small>
+    </span>
+    <b class="cp-order-total">RM @Model.Total.ToString("#,0.00")</b>
+    <span class="cp-tag @cls">@tag</span>
+    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+</a>

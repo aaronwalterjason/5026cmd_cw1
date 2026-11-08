@@ -59,7 +59,7 @@ public static class ReservationRules
 public record BookingResult(int? Id, string? Error, string? SuggestedZone = null);
 
 // Shared business rules. Page handlers do not write reservations directly.
-public class ReservationService(ApplicationDbContext context)
+public class ReservationService(ApplicationDbContext context, KOMA.Services.Email.BookingEmailService emails)
 {
     private readonly ApplicationDbContext _context = context;
     private static bool IsStaff(ClaimsPrincipal actor) => actor.IsInRole("Staff") || actor.IsInRole("Administrator");
@@ -203,6 +203,9 @@ public class ReservationService(ApplicationDbContext context)
                 "This booking has a linked dining visit. " +
                 "Its table and time cannot be changed here.");
         }
+        // Booking emails (Services/Email): remember the old details so the Updated email can show old -> new.
+        var isNew = booking == null;
+        var before = booking == null ? null : new { booking.StartTime, booking.GuestCount, booking.RestaurantTableId };
         if (booking == null)
         {
             booking = new Reservation { CreatedByUserId = userId, CustomerUserId = actor.IsInRole("Customer") ? userId : null, Status = ReservationStatus.Confirmed };
@@ -235,6 +238,24 @@ public class ReservationService(ApplicationDbContext context)
                 (sessionId.HasValue && o.TableServiceSessionId == sessionId))
                 .ExecuteUpdateAsync(u => u.SetProperty(o => o.RestaurantTableId, (int?)table.Id)
                     .SetProperty(o => o.CustomerName, booking.CustomerName));
+        }
+        if (isNew) await emails.QueueConfirmedAsync(booking);
+        else if (before != null)
+        {
+            var changes = new Dictionary<string, (string, string)>();
+            if (before.StartTime.Date != booking.StartTime.Date)
+                changes["Date"] = (KOMA.Services.Email.BookingEmailTemplates.Day(before.StartTime), KOMA.Services.Email.BookingEmailTemplates.Day(booking.StartTime));
+            if (before.StartTime.TimeOfDay != booking.StartTime.TimeOfDay)
+                changes["Time"] = (KOMA.Services.Email.BookingEmailTemplates.Time(before.StartTime), KOMA.Services.Email.BookingEmailTemplates.Time(booking.StartTime));
+            if (before.GuestCount != booking.GuestCount)
+                changes["Guests"] = (before.GuestCount.ToString(), booking.GuestCount.ToString());
+            if (before.RestaurantTableId != booking.RestaurantTableId)
+            {
+                var oldTable = await _context.RestaurantTables.Include(t => t.DiningArea).FirstOrDefaultAsync(t => t.Id == before.RestaurantTableId);
+                static string Seat(RestaurantTable? t) => t == null ? "—" : (t.DiningArea == null ? "" : t.DiningArea.Name + " · ") + "Table " + t.TableNumber;
+                changes["Seating"] = (Seat(oldTable), Seat(table));
+            }
+            await emails.QueueUpdatedAsync(booking, changes, byCustomer: !IsStaff(actor));
         }
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
@@ -276,6 +297,9 @@ public class ReservationService(ApplicationDbContext context)
             if (preOrder != null && preOrder.Status == OrderStatus.AwaitingArrival)
                 preOrder.Status = OrderStatus.Cancelled;
         }
+        // Booking emails: confirmed by staff, or cancelled (by the customer or by staff)
+        if (confirm) await emails.QueueConfirmedAsync(booking);
+        else await emails.QueueCancelledAsync(booking, byCustomer: !IsStaff(actor));
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
         return null;

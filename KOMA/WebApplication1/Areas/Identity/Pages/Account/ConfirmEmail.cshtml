@@ -1,0 +1,30 @@
+@page
+@model ConfirmEmailModel
+@{
+    ViewData["Title"] = "Confirm email";
+    Layout = "/Pages/Shared/_Layout.cshtml";
+}
+<link rel="stylesheet" href="~/css/koma-login.css" asp-append-version="true" />
+<div class="koma-login">
+    <div class="koma-login-shell">
+        <partial name="_AuthBrand" />
+        <section class="koma-login-form-panel" aria-labelledby="ce-title">
+            <div class="koma-login-form-content">
+                <p class="koma-login-eyebrow">YOUR ACCOUNT</p>
+                @if (Model.Ok)
+                {
+                    <h2 id="ce-title">Email confirmed</h2>
+                    <p class="koma-login-intro">Thank you. You'll get booking updates at this address, and you can reset your password if you ever forget it.</p>
+                    <a asp-area="" asp-page="/Reservations/Index" class="koma-login-submit">My reservations <span aria-hidden="true">↗</span></a>
+                }
+                else
+                {
+                    <h2 id="ce-title">This link has expired</h2>
+                    <p class="koma-login-intro">The link may be old or already used. Sign in and use “Resend email” on the banner to get a new one.</p>
+                    <a asp-page="./Login" class="koma-login-submit">Log in <span aria-hidden="true">↗</span></a>
+                }
+                <a asp-area="" asp-page="/Index" class="koma-login-back">← Back to home</a>
+            </div>
+        </section>
+    </div>
+</div>

@@ -12,9 +12,10 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 // AuditInterceptor writes an Admin > Activity entry whenever an admin/staff member saves a change.
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AuditInterceptor>();
+builder.Services.AddSingleton<RequestTimingInterceptor>();   // speed check (see Services/RequestTiming.cs)
 builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
     options.UseSqlServer(connectionString)
-           .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
+           .AddInterceptors(sp.GetRequiredService<AuditInterceptor>(), sp.GetRequiredService<RequestTimingInterceptor>()));
 
 builder.Services.AddDefaultIdentity<KOMA.Models.ApplicationUser>(options =>
 {
@@ -33,9 +34,18 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped<TabletAccess>();
 builder.Services.AddScoped<OrderWorkflowService>();
 builder.Services.AddScoped<MenuImageService>();
-// Check role changes on the next request, rather than retaining old role claims.
+// Booking emails (Services/Email): settings in appsettings "Email", the password in User Secrets (never in appsettings)
+builder.Services.Configure<KOMA.Services.Email.EmailOptions>(builder.Configuration.GetSection("Email"));
+builder.Services.AddSingleton<KOMA.Services.Email.MailKitSender>();
+builder.Services.AddSingleton<KOMA.Services.Email.IMailSender>(sp => sp.GetRequiredService<KOMA.Services.Email.MailKitSender>());
+builder.Services.AddSingleton<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>(sp => sp.GetRequiredService<KOMA.Services.Email.MailKitSender>());
+builder.Services.AddScoped<KOMA.Services.Email.BookingEmailService>();
+builder.Services.AddScoped<KOMA.Services.Email.AccountEmailService>();   // confirm email + password reset
+builder.Services.AddHostedService<KOMA.Services.Email.BookingEmailWorker>();
+// Re-check the signed-in user (role changes, locked accounts) at most once a minute.
+// Zero re-checked on EVERY request (4-6 extra queries each time), which slowed every page.
 builder.Services.Configure<SecurityStampValidatorOptions>(options =>
-    options.ValidationInterval = TimeSpan.Zero);
+    options.ValidationInterval = TimeSpan.FromMinutes(1));
 
 var app = builder.Build();
 
@@ -49,6 +59,24 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 // Serve photos uploaded after the application was built.
 app.UseStaticFiles();
+
+// Speed check: time every page request and its database queries (Output window + DevTools Server Timing).
+app.Use(async (ctx, next) =>
+{
+    var sw = System.Diagnostics.Stopwatch.StartNew();
+    ctx.Response.OnStarting(() =>
+    {
+        var db = RequestTimingInterceptor.Of(ctx);
+        ctx.Response.Headers.Append("Server-Timing",
+            $"total;desc=\"server total\";dur={sw.Elapsed.TotalMilliseconds:0}, sql;desc=\"{db.Count} queries\";dur={db.Ms:0}");
+        return Task.CompletedTask;
+    });
+    await next();
+    var s = RequestTimingInterceptor.Of(ctx);
+    if (!Path.HasExtension(ctx.Request.Path.Value))   // pages and handlers only, not css/js/images
+        app.Logger.LogWarning("KOMA timing  {Method} {Path}{Query}  {Ms:0} ms  ·  {Count} queries, {DbMs:0} ms",
+            ctx.Request.Method, ctx.Request.Path, ctx.Request.QueryString, sw.Elapsed.TotalMilliseconds, s.Count, s.Ms);
+});
 
 app.UseRouting();
 

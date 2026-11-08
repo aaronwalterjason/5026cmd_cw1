@@ -10,7 +10,7 @@ namespace KOMA.Areas.Identity.Pages.Account;
 
 // Override Identity's default register page so a public signup always has a Customer profile.
 [AllowAnonymous]
-public class RegisterModel(AccountService accounts, SignInManager<ApplicationUser> signIn) : PageModel
+public class RegisterModel(AccountService accounts, SignInManager<ApplicationUser> signIn, KOMA.Services.Email.AccountEmailService emails) : PageModel
 {
     [BindProperty] public InputModel Input { get; set; } = new();
     [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
@@ -42,6 +42,9 @@ public class RegisterModel(AccountService accounts, SignInManager<ApplicationUse
             return Page();
         }
         await signIn.SignInAsync(user, isPersistent: false);
+        // "Confirm your email" - they can use the site straight away; a banner reminds them until they confirm.
+        await emails.SendConfirmAsync(user, code =>
+            Url.Page("/Account/ConfirmEmail", null, new { area = "Identity", userId = user.Id, code }, Request.Scheme)!);
         return LocalRedirect(Url.IsLocalUrl(ReturnUrl) ? ReturnUrl! : "/");
     }
 }

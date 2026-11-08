@@ -3,9 +3,6 @@
 @using KOMA.Pages.Admin.Orders
 @{
     ViewData["Title"] = "Orders";
-    string? from = Model.From?.ToString("yyyy-MM-dd");
-    string? to = Model.To?.ToString("yyyy-MM-dd");
-    var sel = Model.Selected;
 }
 
 @if (TempData["StatusMessage"] is string status)
@@ -13,179 +10,503 @@
     <div class="alert alert-success ord-flash" role="status">@status</div>
 }
 
-<div class="ord-shell">
-
-    @* =================== LEFT: list =================== *@
-    <aside class="ord-side">
-        <div class="ord-side-head">
-            <h1 class="mb-0">Orders</h1>
-            <a class="small" asp-page="/Admin/Revenue/Index">Revenue →</a>
-        </div>
-
-        <form method="get" class="ord-filters" id="ord-filters">
-            @if (Model.Show is not null) { <input type="hidden" name="show" value="@Model.ShowKey" /> }
-            @if (Model.Type.HasValue) { <input type="hidden" name="type" value="@Model.Type" /> }
-            <label class="visually-hidden" for="search">Search orders</label>
-            <input type="search" id="search" name="search" value="@Model.Search" class="form-control ord-search"
-                   placeholder="Search order no., customer or table" />
-            <div class="ord-dates">
-                <label class="small text-muted" for="from">From</label>
-                <input type="date" id="from" name="from" value="@from" class="form-control form-control-sm" data-autosubmit />
-                <label class="small text-muted" for="to">to</label>
-                <input type="date" id="to" name="to" value="@to" class="form-control form-control-sm" data-autosubmit />
-                @if (from is not null || to is not null || !string.IsNullOrWhiteSpace(Model.Search) || Model.Type.HasValue || Model.Show is not null)
-                {
-                    <a asp-page="./Index" class="small ms-auto">Clear</a>
-                }
-            </div>
-        </form>
-
-        <nav class="ord-chips" aria-label="Show">
-            @foreach (var c in Model.Chips)
-            {
-                var chipRoute = Model.Route(null, show: c.Key == "all" ? null : c.Key);
-                <a asp-page="./Index" asp-all-route-data="chipRoute"
-                   class="ord-chip @(Model.ShowKey == c.Key ? "is-on" : "")" aria-current="@(Model.ShowKey == c.Key ? "true" : null)">
-                    @c.Label <span>@c.Count</span>
-                </a>
-            }
-        </nav>
-
-        <nav class="ord-types" aria-label="Order type">
-            @foreach (var t in Model.TypeSummaries)
-            {
-                var on = Model.Type == t.Type;
-                <a asp-page="./Index" asp-all-route-data="Model.Route(null, type: on ? null : t.Type.ToString())"
-                   class="ord-type @(on ? "is-on" : "")" aria-pressed="@(on ? "true" : "false")"
-                   title="RM @t.Sales.ToString("N2") paid">
-                    <span class="ord-dot @IndexModel.TypeTone(t.Type)"></span>
-                    <span class="ord-type-name">@t.Type.DisplayName()</span>
-                    <strong>@t.Count</strong>
-                </a>
-            }
-        </nav>
-
-        <div class="card ord-list" id="ord-list">
-            @if (Model.InProgress.Any())
-            {
-                <div class="ord-group">In progress</div>
-                @foreach (var o in Model.InProgress)
-                {
-                    var isSel = sel?.Id == o.Id;
-                    <a asp-page="./Index" asp-all-route-data="Model.Route(o.Id)" class="ord-row @(isSel ? "is-selected" : "")"
-                       aria-current="@(isSel ? "true" : null)">
-                        <span class="ord-tile">@(o.RestaurantTable?.TableNumber ?? "—")</span>
-                        <span class="ord-row-main">
-                            <span class="ord-row-name">@IndexModel.CustomerName(o)</span>
-                            <span class="ord-row-sub"><span class="ord-dot @IndexModel.TypeTone(o.OrderType)"></span>@o.OrderType.DisplayName() · @o.OrderedAt.ToString("h:mm tt")</span>
-                        </span>
-                        <span class="ord-row-end">
-                            <span class="ord-row-total">RM @o.TotalAmount.ToString("N2")</span>
-                            <span class="ord-pill @IndexModel.StatusTone(o.Status)">@o.Status.DisplayName()</span>
-                        </span>
-                    </a>
-                }
-            }
-            @if (Model.Earlier.Any())
-            {
-                <div class="ord-group is-muted">Finished</div>
-                @foreach (var o in Model.Earlier)
-                {
-                    var isSel = sel?.Id == o.Id;
-                    <a asp-page="./Index" asp-all-route-data="Model.Route(o.Id)" class="ord-row is-done @(isSel ? "is-selected" : "")"
-                       aria-current="@(isSel ? "true" : null)">
-                        <span class="ord-tile">@(o.RestaurantTable?.TableNumber ?? "—")</span>
-                        <span class="ord-row-main">
-                            <span class="ord-row-name">@IndexModel.CustomerName(o)</span>
-                            <span class="ord-row-sub">@o.OrderedAt.ToString("d MMM, h:mm tt")@(o.Status == OrderStatus.Cancelled ? " · Cancelled" : "")</span>
-                        </span>
-                        <span class="ord-row-end"><span class="ord-row-total">RM @o.TotalAmount.ToString("N2")</span></span>
-                    </a>
-                }
-            }
-            @if (Model.ShownOrders == 0)
-            {
-                <p class="text-muted small m-3">No orders match these filters.</p>
-            }
-            @if (Model.IsTruncated)
-            {
-                <p class="text-muted small m-3">Showing the newest @Model.ShownOrders of @Model.MatchingOrders. Narrow the dates to see older ones.</p>
-            }
-        </div>
-    </aside>
-
-    @* =================== RIGHT: selected order (swapped in place by the script below) =================== *@
-    <div id="ord-detail-slot" class="ord-detail-slot" aria-live="polite">
-        <partial name="_OrderDetail" model="Model" />
-    </div>
+@* ====== Top: title, search and the Today | All orders switch (both views) ====== *@
+<div class="ob-head">
+    <h1 class="mb-0">Orders</h1>
+    @if (!Model.IsAll)
+    {
+        <input type="search" id="ob-search" class="ob-search" aria-label="Search tables, names or dishes" autocomplete="off" />
+    }
+    <a class="koma-go @(Model.IsAll ? "ms-auto" : "")" asp-page="/Admin/Revenue/Index">Revenue<span class="koma-go-disc" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
 </div>
+<nav class="ob-switch" aria-label="Orders view">
+    <a asp-page="./Index" class="@(Model.IsAll ? "" : "is-on")" aria-current="@(Model.IsAll ? null : "page")">
+        <b>Today</b><span id="ob-sw-today">● live</span>
+    </a>
+    <a asp-page="./Index" asp-route-view="all" class="@(Model.IsAll ? "is-on" : "")" aria-current="@(Model.IsAll ? "page" : null)">
+        <b>All orders</b><span>@Model.AllCount.ToString("N0") orders · RM @Model.AllPaid.ToString("N0")</span>
+    </a>
+</nav>
 
-<script>
-    // Dates submit straight away; keep the selected order visible in the list after a reload.
-    document.querySelectorAll('[data-autosubmit]').forEach(el =>
-        el.addEventListener('change', () => document.getElementById('ord-filters').submit()));
-    document.querySelector('.ord-row.is-selected')?.scrollIntoView({ block: 'nearest' });
-
-    // Make the page fill the window below the top bar so the detail card can be centred in it
-    // (same gap above and below the card).
+@if (!Model.IsAll)
+{
+    @* ====== Today board: pipeline bar, one tile per seated table, side panel, help pop-ups ======
+       Drawn by the script below from the JSON in #ob-data (refreshed every 5 s from ?handler=Board). *@
+    <div class="ob" id="ob">
+        <div class="ob-pipe" id="ob-pipe" role="group" aria-label="Filter by dish stage"></div>
+        <div class="ob-showing" id="ob-showing" hidden></div>
+        <div class="ob-body">
+            <div class="ob-grid" id="ob-grid"></div>
+            <aside class="ob-panel" id="ob-panel" hidden aria-live="polite"></aside>
+        </div>
+    </div>
+    <div class="ob-toasts" id="ob-toasts" aria-live="polite"></div>
+    <template id="ob-empty-board"><partial name="_Empty" model='new EmptyState("table", "No tables seated right now", "Tables appear here as soon as guests are seated or order.")' /></template>
+    <template id="ob-empty-search"><partial name="_Empty" model='new EmptyState("search", "No table matches", "Try a table number, a name or a dish.")' /></template>
+    <div hidden id="ob-token">@Html.AntiForgeryToken()</div>
+    <script type="application/json" id="ob-data">@Html.Raw(Model.BoardJson)</script>
+    <script type="application/json" id="ob-meta">@Html.Raw(Model.MetaJson)</script>
+    <script>
     (() => {
-        const shell = document.querySelector('.ord-shell');
-        if (!shell) return;
-        const bar = document.querySelector('.koma-topbar');
-        const root = document.documentElement;
-        const fit = () => {
-            if (window.innerWidth < 992) { shell.style.removeProperty('--ord-h'); return; }
-            const top = shell.getBoundingClientRect().top + window.scrollY;            // where the page content starts
-            const barBottom = bar ? bar.getBoundingClientRect().bottom + window.scrollY : 0;
-            const pad = Math.max(top - barBottom, 16);                                 // space under the top bar, repeated at the bottom
-            let h = window.innerHeight - top - pad;
-            shell.style.setProperty('--ord-h', h + 'px');
-            // Anything below the shell (footer, padding) would still make the page scroll - take that off too.
-            const overflow = root.scrollHeight - window.innerHeight;
-            if (overflow > 0) { h -= overflow; shell.style.setProperty('--ord-h', h + 'px'); }
-        };
-        fit();
-        window.addEventListener('resize', fit);
-    })();
+        const $ = id => document.getElementById(id);
+        let B = JSON.parse($('ob-data').textContent);
+        const M = JSON.parse($('ob-meta').textContent);
+        const token = document.querySelector('#ob-token input')?.value || '';
+        const grid = $('ob-grid'), panel = $('ob-panel'), pipe = $('ob-pipe'), showing = $('ob-showing'), toasts = $('ob-toasts'), search = $('ob-search');
+        let stage = null, openKey = null, q = '', busy = false;
+        let seen = new Set(B.help.map(h => h.id));
+        let offset = Date.now() - Date.parse(B.now);      // server clock vs this computer
 
-    // Clicking an order loads only its detail panel (Index?handler=Detail) instead of the whole page.
-    (() => {
-        const list = document.getElementById('ord-list');
-        const slot = document.getElementById('ord-detail-slot');
-        if (!list || !slot) return;
-        const cache = new Map();
-        const detailUrl = href => { const u = new URL(href, location.href); u.searchParams.set('handler', 'Detail'); return u.toString(); };
-        const load = href => {
-            const url = detailUrl(href);
-            if (!cache.has(url)) {
-                cache.set(url, fetch(url, { headers: { 'X-Requested-With': 'fetch' } })
-                    .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
-                    .catch(err => { cache.delete(url); throw err; }));
-            }
-            return cache.get(url);
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const rm = n => 'RM ' + Number(n).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const mins = s => Math.max(0, Math.floor((Date.now() - offset - Date.parse(s)) / 60000));
+        const tone = m => m < 15 ? 'ok' : m < 25 ? 'mid' : 'bad';
+        const cnt = (t, st) => t.dishes.filter(d => d.st === st).length;
+        const allServed = t => t.dishes.length > 0 && t.dishes.every(d => d.st === 2);
+        const toPay = t => allServed(t) && t.unpaid > 0;
+        const ICON = {
+            clock: '<path d="M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2"/>',
+            0: '<path d="M8 13V5a1.5 1.5 0 013 0v6M11 11V4a1.5 1.5 0 013 0v7M14 11V5.5a1.5 1.5 0 013 0V14a6 6 0 01-6 6h-1a6 6 0 01-5-3l-2-3.5a1.5 1.5 0 012.5-1.5L8 14"/>',
+            1: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/>',
+            2: '<path d="M12 3s6 7 6 11a6 6 0 01-12 0c0-4 6-11 6-11z"/>',
+            3: '<path d="M4 5h16v11H9l-5 4z"/>',
+            check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>', tab: '<path d="M6 3h12v18H6zM11 18h2"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>'
         };
-        // Start loading as soon as the pointer rests on a row, so the click feels instant.
-        list.addEventListener('pointerover', e => {
-            const a = e.target.closest('a.ord-row');
-            if (a && !a.classList.contains('is-selected')) load(a.href).catch(() => {});
-        });
-        list.addEventListener('click', async e => {
-            const a = e.target.closest('a.ord-row');
-            if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
-            e.preventDefault();
-            list.querySelectorAll('.ord-row.is-selected').forEach(r => { r.classList.remove('is-selected'); r.removeAttribute('aria-current'); });
-            a.classList.add('is-selected');
-            a.setAttribute('aria-current', 'true');
-            slot.classList.add('is-loading');
+        const ic = (k, s = 14) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true">${ICON[k]}</svg>`;
+
+        // ---------- pipeline bar (dish stages; tap one to show only those tables) ----------
+        const STAGES = [['prep', 'preparing', t => cnt(t, 0) > 0, ts => ts.reduce((s, t) => s + cnt(t, 0), 0)],
+                        ['ready', 'ready to serve', t => cnt(t, 1) > 0, ts => ts.reduce((s, t) => s + cnt(t, 1), 0)],
+                        ['served', 'served', t => cnt(t, 2) > 0, ts => ts.reduce((s, t) => s + cnt(t, 2), 0)],
+                        ['pay', 'to pay', toPay, ts => ts.filter(toPay).length]];
+        function drawPipe() {
+            pipe.innerHTML = STAGES.map(([k, label, , count]) => {
+                const n = count(B.tiles);
+                return `<button type="button" class="ob-stage ob-stage-${k} ${stage === k ? 'is-on' : ''} ${stage && stage !== k ? 'is-dim' : ''}" data-stage="${k}" style="flex:${Math.max(n, .6)}" aria-pressed="${stage === k}">`
+                     + `<span class="ob-stage-bar"></span><span class="ob-stage-text"><b>${n}</b>${label}</span></button>`;
+            }).join('');
+        }
+
+        // ---------- tiles ----------
+        function ring(t) {
+            const n = t.dishes.length || 1, r = 34, L = 2 * Math.PI * r;
+            const sv = L * cnt(t, 2) / n, rd = L * cnt(t, 1) / n;
+            return `<svg class="ob-ring" viewBox="0 0 84 84" aria-hidden="true"><circle cx="42" cy="42" r="${r}" class="ob-ring-bg"/>`
+                 + `<circle cx="42" cy="42" r="${r}" class="ob-ring-sv" stroke-dasharray="${sv.toFixed(1)} ${L.toFixed(1)}" transform="rotate(-90 42 42)"/>`
+                 + `<circle cx="42" cy="42" r="${r}" class="ob-ring-rd" stroke-dasharray="${rd.toFixed(1)} ${L.toFixed(1)}" stroke-dashoffset="${(-sv).toFixed(1)}" transform="rotate(-90 42 42)"/></svg>`;
+        }
+        const matchQ = t => !q || [t.label, t.name, t.area, ...t.dishes.map(d => d.n), ...t.orders.map(o => o.no)].join(' ').toLowerCase().includes(q);
+        function tileHtml(t, dim) {
+            const n = t.dishes.length, sv = cnt(t, 2), rd = cnt(t, 1), m = mins(t.since);
+            const btn = rd ? `<button type="button" class="ob-tbtn" data-serve="${t.key}">Serve ${rd} ready</button>`
+                      : toPay(t) ? `<button type="button" class="ob-tbtn is-pay" data-open="${t.key}">Take payment</button>` : '';
+            const help = t.help ? `<span class="ob-thelp" title="${esc(t.help.typeName)}">${ic(t.help.type, 13)}</span>` : '';
+            return `<div class="ob-tile ${openKey === t.key ? 'is-open' : ''} ${dim ? 'is-dim' : ''}" data-open="${t.key}" role="button" tabindex="0" aria-label="Table ${esc(t.label)}, ${esc(t.name)}">${help}`
+                 + `<span class="ob-tnum">${ring(t)}<span>${esc(t.label)}</span></span>`
+                 + `<span class="ob-tname">${esc(t.name)}</span><span class="ob-tsub">${sv}/${n} served${rd ? ` · ${rd} ready` : ''}</span>`
+                 + `<span class="ob-time is-${tone(m)}">${ic('clock', 13)}${m} min</span>${btn}</div>`;
+        }
+        function drawGrid() {
+            const want = stage ? STAGES.find(s => s[0] === stage)[2] : null;
+            const tiles = B.tiles.filter(matchQ);
+            const on = want ? tiles.filter(want) : tiles, off = want ? tiles.filter(t => !want(t)) : [];
+            grid.innerHTML = on.concat(off).map(t => tileHtml(t, off.includes(t))).join('')
+                || $(q ? 'ob-empty-search' : 'ob-empty-board').innerHTML;
+            showing.hidden = !stage;
+            if (stage) showing.innerHTML = `Showing <b>${STAGES.find(s => s[0] === stage)[1]}</b> · ${on.length} table${on.length === 1 ? '' : 's'} <button type="button" data-stage="${stage}">Show all ✕</button>`;
+        }
+
+        // ---------- side panel (one table, every dish) ----------
+        function dishRow(d) {
+            const act = d.st === 0 ? `<button type="button" class="ob-dbtn" data-dish="${d.id}" data-to="1">Ready</button>`
+                      : d.st === 1 ? `<button type="button" class="ob-dbtn is-serve" data-dish="${d.id}" data-to="2">Serve</button>`
+                      : `<button type="button" class="ob-dvia" data-dish="${d.id}" data-to="1" title="Undo (back to ready)">${ic(d.via === 'Tablet' ? 'tab' : 'check', 12)}${d.via === 'Tablet' ? 'Tablet' : 'Staff'}</button>`;
+            return `<div class="ob-dish is-st${d.st}"><span class="ob-ddot"></span><span class="ob-dname">${d.q} × ${esc(d.n)}</span>${act}</div>`;
+        }
+        function drawPanel() {
+            const t = B.tiles.find(x => x.key === openKey);
+            panel.hidden = !t;
+            document.getElementById('ob').classList.toggle('has-panel', !!t);
+            if (!t) return;
+            const rd = t.dishes.filter(d => d.st === 1).map(d => d.id), m = mins(t.since);
+            const seg = t.dishes.map(d => `<span class="is-st${d.st}"></span>`).join('');
+            const help = t.help ? `<div class="ob-phelp">${ic(t.help.type, 16)}<b>${esc(t.help.typeName)}</b><span>${esc(t.help.note || '')}</span>`
+                + `<button type="button" data-help="${t.help.id}" data-act="done">Done</button></div>` : '';
+            const pays = t.orders.filter(o => o.pay === 0).map(o =>
+                `<form method="post" action="?handler=Pay&id=${o.id}" class="ob-pay"><input type="hidden" name="__RequestVerificationToken" value="${esc(token)}" />`
+              + `<input type="hidden" name="orderId" value="${o.id}" /><span>${o.no} · <b>${rm(o.total)}</b></span>`
+              + `<select name="method" aria-label="Payment method">${M.payMethods.map(p => `<option value="${p.v}">${esc(p.name)}</option>`).join('')}</select>`
+              + `<button type="submit">Take payment</button></form>`).join('');
+            const cancels = t.orders.filter(o => o.status !== 3).map(o =>
+                `<form method="post" action="?handler=Cancel&id=${o.id}" data-confirm-title="Cancel order ${o.no}?" data-confirm-text="${o.pay === 1 ? 'It was already paid, so it will be marked as refunded.' : 'It moves to Cancelled and stays in the order history.'}" data-confirm-ok="Confirm" data-confirm-no="Back" data-confirm-icon="x">`
+              + `<input type="hidden" name="__RequestVerificationToken" value="${esc(token)}" /><input type="hidden" name="orderId" value="${o.id}" /><input type="hidden" name="expectedStatus" value="${o.status}" />`
+              + `<button type="submit" class="ob-cancel">Cancel ${o.no}</button></form>`).join('');
+            const notes = t.orders.filter(o => o.notes).map(o => `<p class="ob-pnote">“${esc(o.notes)}”</p>`).join('');
+            const test = M.dev && t.tableId ? `<button type="button" class="ob-test" data-test="${t.tableId}">Test help request</button>` : '';
+            panel.innerHTML = `<div class="ob-phead"><span class="ob-pnum">${esc(t.label)}</span><div><div class="ob-pname">${esc(t.name)}</div>`
+                + `<div class="ob-pmeta">${esc(t.type)}${t.area ? ' · ' + esc(t.area) : ''} · <span class="ob-time is-${tone(m)}">${m} min</span></div></div>`
+                + `<button type="button" class="ob-pclose" data-close aria-label="Close">${ic('x', 15)}</button></div>`
+                + `<div class="ob-pnos">${t.orders.map(o => o.no).join(' · ')}</div>${help}${notes}`
+                + `<div class="ob-dishes">${t.dishes.map(dishRow).join('') || '<p class="ob-empty">No dishes.</p>'}</div>`
+                + `<div class="ob-seg">${seg}</div><div class="ob-psum"><span><b>${cnt(t, 2)}/${t.dishes.length}</b> served${rd.length ? ` · <b>${rd.length} ready</b>` : ''}</span><span>Unpaid <b>${rm(t.unpaid)}</b></span></div>`
+                + `<div class="ob-pfoot">${rd.length ? `<button type="button" class="ob-big" data-serve="${t.key}">Serve ${rd.length} ready</button>` : ''}${pays}<div class="ob-cancels">${cancels}${test}</div></div>`;
+        }
+
+        // ---------- help pop-ups (bottom-right, newest first, at most 3) ----------
+        function drawToasts() {
+            const list = B.help.slice().reverse();
+            const fresh = list.filter(h => !seen.has(h.id));
+            if (fresh.length) chime();
+            seen = new Set(B.help.map(h => h.id));
+            const shown = list.slice(0, 3), more = list.length - shown.length;
+            toasts.innerHTML = shown.map(h => {
+                const m = Math.min(1, mins(h.at) / 5), r = 21, L = 2 * Math.PI * r;
+                return `<div class="ob-toast t${h.type} ${fresh.includes(h) ? 'is-new' : ''}">`
+                    + `<span class="ob-toast-num"><svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="${r}" class="bg"/><circle cx="26" cy="26" r="${r}" class="fg" stroke-dasharray="${(L * m).toFixed(1)} ${L.toFixed(1)}" transform="rotate(-90 26 26)"/></svg><span>${esc(h.table || '—')}</span></span>`
+                    + `<span class="ob-toast-mid"><b>${ic(h.type, 15)}${esc(h.typeName)}</b><span>${esc(h.note || '')}</span></span>`
+                    + `<span class="ob-toast-act">${h.takenBy ? `<small>${esc(h.takenBy)} is on it</small>` : `<button type="button" class="take" data-help="${h.id}" data-act="take">I’ll take it</button>`}`
+                    + `<button type="button" class="done" data-help="${h.id}" data-act="done">Done</button></span></div>`;
+            }).join('') + (more > 0 ? `<div class="ob-toast-more">+${more} more</div>` : '');
+            const badge = document.querySelector('.admin-rail-badge');
+            if (badge) { badge.textContent = B.help.length; badge.hidden = !B.help.length; }
+        }
+        let audio;
+        function chime() {
             try {
-                slot.innerHTML = await load(a.href);
-                history.replaceState(null, '', a.href);
-                if (window.innerWidth < 992) slot.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            } catch {
-                location.href = a.href;   // fall back to a normal page load
-            } finally {
-                slot.classList.remove('is-loading');
-            }
+                audio ??= new (window.AudioContext || window.webkitAudioContext)();
+                const o = audio.createOscillator(), g = audio.createGain();
+                o.frequency.value = 880; g.gain.setValueAtTime(.0001, audio.currentTime);
+                g.gain.exponentialRampToValueAtTime(.12, audio.currentTime + .02); g.gain.exponentialRampToValueAtTime(.0001, audio.currentTime + .5);
+                o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + .5);
+            } catch { }
+        }
+
+        function render() {
+            const ready = B.tiles.reduce((s, t) => s + cnt(t, 1), 0);
+            $('ob-sw-today').textContent = `● live · ${B.tiles.length} table${B.tiles.length === 1 ? '' : 's'} · ${ready} ready`;
+            drawPipe(); drawGrid(); drawPanel(); drawToasts();
+        }
+
+        // ---------- talking to the server ----------
+        async function post(handler, data) {
+            if (busy) return; busy = true;
+            const fd = new FormData();
+            Object.entries(data).forEach(([k, v]) => Array.isArray(v) ? v.forEach(x => fd.append(k, x)) : fd.append(k, v));
+            try {
+                const r = await fetch(`?handler=${handler}`, { method: 'POST', body: fd, headers: { 'RequestVerificationToken': token } });
+                if (r.ok) { B = await r.json(); offset = Date.now() - Date.parse(B.now); render(); }
+                else if (window.KomaConfirm) KomaConfirm.open({ title: 'That didn’t work', text: 'Refresh the page and try again.', tone: 'warn', icon: 'info' });
+            } finally { busy = false; }
+        }
+        async function poll() {
+            if (busy || document.hidden || panel.contains(document.activeElement) && document.activeElement.tagName === 'SELECT') return;
+            try {
+                const r = await fetch(`?handler=Board&v=${B.version}`, { cache: 'no-store' });
+                if (r.status === 200) { B = await r.json(); offset = Date.now() - Date.parse(B.now); render(); }
+            } catch { }
+        }
+        setInterval(poll, 5000);
+        setInterval(() => { drawGrid(); drawToasts(); }, 60000);   // keep the minutes ticking
+
+        // ---------- clicks ----------
+        document.addEventListener('click', e => {
+            const el = e.target.closest('[data-stage],[data-serve],[data-dish],[data-help],[data-close],[data-test],[data-open]');
+            if (!el || !(grid.contains(el) || panel.contains(el) || pipe.contains(el) || showing.contains(el) || toasts.contains(el))) return;
+            if (el.dataset.stage) { stage = stage === el.dataset.stage ? null : el.dataset.stage; render(); return; }
+            if (el.dataset.serve) { const t = B.tiles.find(x => x.key === el.dataset.serve); post('ServeReady', { ids: t.dishes.filter(d => d.st === 1).map(d => d.id) }); return; }
+            if (el.dataset.dish) { post('Dish', { itemId: el.dataset.dish, to: el.dataset.to }); return; }
+            if (el.dataset.help) { post('Help', { id: el.dataset.help, act: el.dataset.act }); return; }
+            if (el.dataset.test) { post('TestHelp', { tableId: el.dataset.test, type: Math.floor(Math.random() * 3), note: ['Could we get more napkins?', 'Paying by card', '2 glasses, no ice'][Math.floor(Math.random() * 3)] }); return; }
+            if (el.hasAttribute('data-close')) { openKey = null; render(); return; }
+            if (el.dataset.open) { openKey = openKey === el.dataset.open && !el.classList.contains('ob-tbtn') ? null : el.dataset.open; render(); }
         });
+        grid.addEventListener('keydown', e => { const t = e.target.closest('.ob-tile'); if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); t.click(); } });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && openKey && !document.querySelector('dialog[open]')) { openKey = null; render(); } });
+        search?.addEventListener('input', () => { q = search.value.trim().toLowerCase(); drawGrid(); });
+
+        // Coming back from Take payment / Cancel (?id=order): reopen that table.
+        if (M.open) openKey = B.tiles.find(t => t.orders.some(o => o.id === M.open))?.key ?? null;
+        render();
     })();
-</script>
+    </script>
+}
+
+@if (Model.IsAll)
+{
+    <div class="ob-all">
+    @* Quick lookup: the orders arrive once as data (below) and the script builds the list and the detail panel.
+       Searching, the chips, the type filter and switching orders all happen in the browser with no request.
+       Keys: / search · ↑ ↓ move · Enter open · Esc clear. Actions (advance, pay, cancel) still post to the server. *@
+    <div class="ord-shell">
+
+        @* =================== LEFT: list =================== *@
+        <aside class="ord-side">
+            <div class="ord-side-head">
+                <h1 class="mb-0">Orders</h1>
+            </div>
+
+            <form method="get" class="ord-filters" id="ord-filters" onsubmit="return false">
+                <label class="visually-hidden" for="search">Search orders</label>
+                <input type="search" id="search" name="search" value="@Model.Search" class="form-control ord-search" autocomplete="off" />
+                <div class="ord-dates">
+                    <label class="small text-muted" for="from">From</label>
+                    <input type="date" id="from" name="from" value="@(Model.From?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />
+                    <label class="small text-muted" for="to">to</label>
+                    <input type="date" id="to" name="to" value="@(Model.To?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />
+                    <a href="#" class="small ms-auto" id="ord-clear" hidden>Clear</a>
+                </div>
+            </form>
+
+            <nav class="ord-chips" aria-label="Show" id="ord-chips"></nav>
+            <nav class="ord-types" aria-label="Order type" id="ord-types"></nav>
+
+            <div class="card ord-list" id="ord-list" role="listbox" aria-label="Orders"></div>
+            <template id="ord-empty"><partial name="_Empty" model='new EmptyState("search", "No orders match", "Change the filters or search older orders.", null, null, true)' /></template>
+        </aside>
+
+        @* =================== RIGHT: selected order =================== *@
+        <div id="ord-detail-slot" class="ord-detail-slot" aria-live="polite"></div>
+    </div>
+
+    <div hidden id="ord-token">@Html.AntiForgeryToken()</div>
+    <script type="application/json" id="ord-data">@Html.Raw(Model.LookupJson)</script>
+    <script type="application/json" id="ord-meta">@Html.Raw(Model.MetaJson)</script>
+
+    <script>
+        // Make the page fill the window below the top bar so the detail card can be centred in it
+        // (same gap above and below the card).
+        (() => {
+            const shell = document.querySelector('.ord-shell');
+            if (!shell) return;
+            const bar = document.querySelector('.admin-topbar') || document.querySelector('.koma-topbar');
+            const root = document.documentElement;
+            const fit = () => {
+                if (window.innerWidth < 992) { shell.style.removeProperty('--ord-h'); return; }
+                const top = shell.getBoundingClientRect().top + window.scrollY;            // where the page content starts
+                const barBottom = bar ? bar.getBoundingClientRect().bottom + window.scrollY : 0;
+                const pad = Math.max(top - barBottom, 16);                                 // space under the top bar, repeated at the bottom
+                let h = window.innerHeight - top - pad;
+                shell.style.setProperty('--ord-h', h + 'px');
+                // Anything below the shell (footer, padding) would still make the page scroll - take that off too.
+                const overflow = root.scrollHeight - window.innerHeight;
+                if (overflow > 0) { h -= overflow; shell.style.setProperty('--ord-h', h + 'px'); }
+            };
+            fit();
+            window.addEventListener('resize', fit);
+        })();
+
+        // ---------------- Quick lookup ----------------
+        (() => {
+            let data = JSON.parse(document.getElementById('ord-data').textContent);
+            const meta = JSON.parse(document.getElementById('ord-meta').textContent);
+            const token = document.querySelector('#ord-token input')?.value || '';
+            const $ = id => document.getElementById(id);
+            const list = $('ord-list'), slot = $('ord-detail-slot'), box = $('search'), fromBox = $('from'), toBox = $('to');
+
+            const st = { show: meta.state.show || 'all', type: meta.state.type, search: meta.state.search || '',
+                         from: meta.state.from || '', to: meta.state.to || '', id: meta.state.id };
+            let shown = [], older = [], olderFor = null;
+
+            const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const rm = n => 'RM ' + Number(n).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const d = s => new Date(s);
+            const fmt = (s, o) => d(s).toLocaleString('en-GB', o).replace(/\b(am|pm)\b/i, m => m.toUpperCase());
+            const time = s => fmt(s, { hour: 'numeric', minute: '2-digit', hour12: true });
+            const dayTime = s => fmt(s, { day: 'numeric', month: 'short' }) + ', ' + time(s);
+            const fullDay = s => fmt(s, { weekday: 'short', day: 'numeric', month: 'short' }) + ', ' + time(s);
+            const elapsed = s => { const m = Math.floor((Date.now() - d(s)) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' min'; };
+            const CANCELLED = 5, COMPLETED = 4, SERVED = 3, AWAITING = 7, PAID = 1, UNPAID = 0, REFUNDED = 2;
+
+            // Text each order can be found by: number (with or without KOMA- and zeros), name, email, table, dishes.
+            const hay = o => (o._h ??= [o.no, String(o.id), o.name, o.email, o.table, o.area, ...o.items.map(i => i.n)].join(' ').toLowerCase());
+            const terms = () => st.search.trim().toLowerCase().replace(/^koma-0*/, '').split(/\s+/).filter(Boolean);
+            const mark = (text) => {
+                let h = esc(text);
+                for (const t of terms()) h = h.replace(new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig'), '<mark>$1</mark>');
+                return h;
+            };
+            const inDates = o => (!st.from || o.at.slice(0, 10) >= st.from) && (!st.to || o.at.slice(0, 10) <= st.to);
+            const matchSearch = o => terms().every(t => hay(o).includes(t));
+            const showOk = (o, key) => key === 'active' ? o.active
+                : key === 'unpaid' ? o.pay === UNPAID && o.status !== CANCELLED
+                : key === 'completed' ? o.status === COMPLETED
+                : key === 'cancelled' ? o.status === CANCELLED : true;
+
+            // ---- URL keeps the current view, so a reload or a shared link opens the same thing ----
+            function syncUrl() {
+                const u = new URL(location.href);
+                const set = (k, v) => v ? u.searchParams.set(k, v) : u.searchParams.delete(k);
+                set('show', st.show !== 'all' ? st.show : ''); set('type', st.type != null ? String(st.type) : '');
+                set('search', st.search.trim()); set('from', st.from); set('to', st.to); set('id', st.id || '');
+                history.replaceState(null, '', u);
+                $('ord-clear').hidden = !(st.show !== 'all' || st.type != null || st.search || st.from || st.to);
+            }
+            const route = id => { const u = new URL(location.href); u.searchParams.set('id', id); return u.search.slice(1); };
+
+            // ---- chips + type strip (counts follow the search and dates) ----
+            function renderFilters(base) {
+                const typed = base.filter(o => st.type == null || o.type === st.type);
+                const chips = [['all', 'All'], ['active', 'In progress'], ['unpaid', 'Unpaid'], ['completed', 'Completed'], ['cancelled', 'Cancelled']];
+                $('ord-chips').innerHTML = chips.map(([k, label]) =>
+                    `<a href="#" class="ord-chip ${st.show === k ? 'is-on' : ''}" data-show="${k}" ${st.show === k ? 'aria-current="true"' : ''}>${label} <span>${typed.filter(o => showOk(o, k)).length}</span></a>`).join('');
+                $('ord-types').innerHTML = meta.types.map(t => {
+                    const rows = base.filter(o => o.type === t.v), on = st.type === t.v;
+                    const sales = rows.filter(o => o.pay === PAID).reduce((s, o) => s + o.total, 0);
+                    return `<a href="#" class="ord-type ${on ? 'is-on' : ''}" data-type="${t.v}" aria-pressed="${on}" title="${rm(sales)} paid">`
+                        + `<span class="ord-dot ${t.tone}"></span><span class="ord-type-name">${esc(t.name)}</span><strong>${rows.length}</strong></a>`;
+                }).join('');
+            }
+
+            // ---- the list ----
+            function row(o) {
+                const sel = o.id === st.id;
+                const sub = o.active
+                    ? `<span class="ord-dot ${o.tone}"></span>${esc(o.typeName)} · ${time(o.at)}`
+                    : `${dayTime(o.at)}${o.status === CANCELLED ? ' · Cancelled' : ''}`;
+                return `<a href="?${esc(route(o.id))}" class="ord-row ${o.active ? '' : 'is-done'} ${sel ? 'is-selected' : ''}" data-id="${o.id}" role="option" aria-selected="${sel}">`
+                    + `<span class="ord-tile">${o.table ? mark(o.table) : '—'}</span>`
+                    + `<span class="ord-row-main"><span class="ord-row-name">${mark(o.name)}</span><span class="ord-row-sub">${sub}</span></span>`
+                    + `<span class="ord-row-end"><span class="ord-row-total">${rm(o.total)}</span>${o.active ? `<span class="ord-pill ${o.statusTone}">${esc(o.statusName)}</span>` : ''}</span></a>`;
+            }
+            function render() {
+                const base = data.orders.filter(o => inDates(o) && matchSearch(o));
+                renderFilters(base);
+                shown = base.filter(o => (st.type == null || o.type === st.type) && showOk(o, st.show));
+                const active = shown.filter(o => o.active), done = shown.filter(o => !o.active);
+                let html = '';
+                if (active.length) html += `<div class="ord-group">In progress</div>` + active.map(row).join('');
+                if (done.length) html += `<div class="ord-group is-muted">Finished</div>` + done.map(row).join('');
+                if (!shown.length) html += document.getElementById('ord-empty').innerHTML;
+                // Older than the loaded window: searched on the server only when asked.
+                if (st.search.trim() && !st.from) {
+                    if (olderFor === st.search.trim()) {
+                        html += older.length ? `<div class="ord-group is-muted">Older</div>` + older.map(row).join('') : `<p class="text-muted small m-3">Nothing older.</p>`;
+                    } else {
+                        html += `<button type="button" class="ord-older" id="ord-older">Search older orders…</button>`;
+                    }
+                }
+                list.innerHTML = html;
+                shown = shown.concat(olderFor === st.search.trim() ? older : []);
+                if (!shown.some(o => o.id === st.id)) st.id = (active[0] || done[0] || {}).id;
+                list.querySelectorAll('.ord-row').forEach(r => r.classList.toggle('is-selected', +r.dataset.id === st.id));
+                detail();
+                syncUrl();
+            }
+
+            // ---- the detail panel (same markup as before, built from the data) ----
+            function detail() {
+                const o = shown.find(x => x.id === st.id);
+                if (!o) { slot.innerHTML = `<section class="card ord-detail ord-empty"><p class="text-muted mb-0">Select an order to see its details.</p></section>`; return; }
+                const cancelled = o.status === CANCELLED, finished = o.status === COMPLETED || cancelled;
+                const tok = `<input type="hidden" name="__RequestVerificationToken" value="${esc(token)}" />`;
+                const form = (handler, inner, extra = '') => `<form method="post" action="?handler=${handler}&${esc(route(o.id))}" ${extra}>${tok}`
+                    + `<input type="hidden" name="orderId" value="${o.id}" /><input type="hidden" name="expectedStatus" value="${o.status}" />${inner}</form>`;
+                const qty = o.items.reduce((s, i) => s + i.q, 0);
+                let steps = '';
+                if (o.status === AWAITING) steps = `<div class="alert alert-info" role="status">Awaiting arrival — this pre-order has not been sent to the kitchen.</div>`;
+                else if (cancelled) steps = `<div class="ord-cancelled" role="status">This order was cancelled${o.pay === REFUNDED ? ' and refunded' : ''}.</div>`;
+                else steps = `<ol class="ord-steps" aria-label="Order progress">` + meta.steps.map((s, i) => {
+                    const state = i < o.step ? 'is-done' : i === o.step ? 'is-current' : '';
+                    const t = i === 0 ? time(o.at) : (s.v === COMPLETED && o.status === COMPLETED && o.paidAt ? time(o.paidAt) : '');
+                    return `<li class="${state}" ${i === o.step ? 'aria-current="step"' : ''}><span class="ord-step-bar"></span><span class="ord-step-name">${esc(s.name)}</span><span class="ord-step-time">${t}</span></li>`;
+                }).join('') + `</ol>`;
+                const cancelText = o.pay === PAID ? 'It was already paid, so it will be marked as refunded.' : 'It moves to Cancelled and stays in the order history.';
+                slot.innerHTML = `<section class="card ord-detail" id="order-detail" aria-labelledby="ord-detail-name">
+                  <header class="ord-d-head"><div>
+                    <div class="ord-eyebrow">${o.no} · ${esc(o.typeName.toUpperCase())}${o.table ? ' · TABLE ' + esc(o.table) : ''}</div>
+                    <h2 id="ord-detail-name" class="ord-d-name">${esc(o.name)}</h2>
+                    <div class="ord-d-sub">Ordered ${fullDay(o.at)}${o.active ? ' · ' + elapsed(o.at) + ' ago' : ''}${o.area ? ' · ' + esc(o.area) : ''} · ${esc(o.email || 'No account')}</div>
+                  </div><div class="ord-d-total"><span>${rm(o.total)}</span>
+                    <span class="ord-pay-pill ord-pay-${esc(o.payName.toLowerCase())}">${esc(o.payName)}${o.method && o.pay !== UNPAID ? ' · ' + esc(o.method) : ''}</span></div></header>
+                  ${steps}
+                  <div class="ord-items">${o.items.map(i => `<div class="ord-item"><span class="ord-qty">×${i.q}</span><span>${esc(i.n)}</span><span class="ord-unit">${rm(i.u)}</span><span class="ord-line">${rm(i.u * i.q)}</span></div>`).join('')}
+                    ${o.items.length ? '' : '<p class="text-muted small my-3">No items on this order.</p>'}
+                    <div class="ord-items-foot"><span>${o.items.length} dish${o.items.length === 1 ? '' : 'es'} · ${qty} items</span><span>Total <strong>${rm(o.total)}</strong></span></div></div>
+                  ${o.notes ? `<p class="ord-notes"><strong>Notes:</strong> ${esc(o.notes)}</p>` : ''}
+                  ${o.paidAt && o.pay !== UNPAID ? `<p class="small text-muted mb-0">Paid ${fmt(o.paidAt, { day: 'numeric', month: 'short', year: 'numeric' })}, ${time(o.paidAt)}${o.method ? ' by ' + esc(o.method) : ''}.</p>` : ''}
+                  <div class="ord-actions">
+                    ${o.next != null ? form('Advance', `<button type="submit" class="btn ${o.nextPrimary ? 'btn-primary' : 'btn-outline-primary'}">${esc(o.nextLabel)}</button>`) : ''}
+                    ${o.pay === UNPAID && !cancelled ? form('Pay', `<label class="visually-hidden" for="pay-method">Payment method</label><select id="pay-method" name="method" class="form-select">${meta.payMethods.map(m => `<option value="${m.v}">${esc(m.name)}</option>`).join('')}</select><button type="submit" class="btn ${o.next != null ? 'btn-outline-primary' : 'btn-primary'}">Take payment</button>`, 'class="ord-payform"') : ''}
+                    <button type="button" class="btn btn-outline-primary" onclick="window.print()">Print bill</button>
+                    ${!finished ? form('Cancel', `<button type="submit" class="btn ord-btn-cancel">Cancel order</button>`, `class="ms-auto" data-confirm-title="Cancel order ${o.no}?" data-confirm-text="${esc(cancelText)}" data-confirm-ok="Confirm" data-confirm-no="Back" data-confirm-icon="x"`) : ''}
+                  </div></section>`;
+            }
+
+            function select(id, scroll) {
+                st.id = id;
+                list.querySelectorAll('.ord-row').forEach(r => { const on = +r.dataset.id === id; r.classList.toggle('is-selected', on); r.setAttribute('aria-selected', on); });
+                detail(); syncUrl();
+                if (scroll) list.querySelector('.ord-row.is-selected')?.scrollIntoView({ block: 'nearest' });
+                if (window.innerWidth < 992 && !scroll) slot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+
+            // ---- events ----
+            list.addEventListener('click', async e => {
+                if (e.target.id === 'ord-older') {
+                    e.target.disabled = true; e.target.textContent = 'Searching…';
+                    const q = st.search.trim();
+                    try {
+                        const r = await fetch(`?handler=Older&q=${encodeURIComponent(q)}&before=${data.windowStart}`);
+                        older = r.ok ? await r.json() : [];
+                    } catch { older = []; }
+                    olderFor = q; render(); return;
+                }
+                const a = e.target.closest('a.ord-row');
+                if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+                e.preventDefault();
+                select(+a.dataset.id);
+            });
+            $('ord-chips').addEventListener('click', e => { const a = e.target.closest('[data-show]'); if (!a) return; e.preventDefault(); st.show = a.dataset.show; render(); });
+            $('ord-types').addEventListener('click', e => { const a = e.target.closest('[data-type]'); if (!a) return; e.preventDefault(); st.type = st.type === +a.dataset.type ? null : +a.dataset.type; render(); });
+            let typing = 0;
+            box.addEventListener('input', () => { clearTimeout(typing); typing = setTimeout(() => { st.search = box.value; older = []; olderFor = null; render(); list.scrollTop = 0; }, 60); });
+            const onDates = async () => {
+                st.from = fromBox.value; st.to = toBox.value;
+                if (st.from && st.from < data.windowStart) await refresh(true);   // older than what's loaded: fetch from that date
+                render();
+            };
+            fromBox.addEventListener('change', onDates); toBox.addEventListener('change', onDates);
+            $('ord-clear').addEventListener('click', e => {
+                e.preventDefault();
+                Object.assign(st, { show: 'all', type: null, search: '', from: '', to: '' });
+                box.value = fromBox.value = toBox.value = ''; older = []; olderFor = null; render();
+            });
+
+            // Keyboard: / search · ↑ ↓ move through the results · Enter opens · Esc clears the search.
+            document.addEventListener('keydown', e => {
+                if (document.querySelector('dialog[open]')) return;
+                const inField = /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName);
+                if (e.key === '/' && !inField) { e.preventDefault(); box.focus(); box.select(); return; }
+                if (e.key === 'Escape' && e.target === box) { box.value = ''; st.search = ''; older = []; olderFor = null; render(); return; }
+                if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && (!inField || e.target === box)) {
+                    const rows = [...list.querySelectorAll('.ord-row')];
+                    if (!rows.length) return;
+                    e.preventDefault();
+                    const i = rows.findIndex(r => +r.dataset.id === st.id);
+                    const n = rows[Math.min(rows.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+                    select(+n.dataset.id, true);
+                }
+                if (e.key === 'Enter' && e.target === box) { e.preventDefault(); slot.querySelector('button, select')?.focus(); }
+            });
+
+            // ---- keep fresh: every 20 s while the tab is visible; the server answers "no change" when nothing moved ----
+            async function refresh(force) {
+                try {
+                    const u = `?handler=List&v=${force ? '' : data.version}${st.from ? '&from=' + st.from : ''}`;
+                    const r = await fetch(u, { cache: 'no-store' });
+                    if (r.status === 200) { data = await r.json(); return true; }
+                } catch { }
+                return false;
+            }
+            setInterval(async () => {
+                if (document.hidden || document.activeElement?.closest('#ord-detail-slot form')) return;   // don't redraw under the user
+                if (await refresh(false)) render();
+            }, 20000);
+            document.addEventListener('visibilitychange', async () => { if (!document.hidden && await refresh(false)) render(); });
+
+            render();
+            list.querySelector('.ord-row.is-selected')?.scrollIntoView({ block: 'nearest' });
+        })();
+    </script>
+    </div>
+}

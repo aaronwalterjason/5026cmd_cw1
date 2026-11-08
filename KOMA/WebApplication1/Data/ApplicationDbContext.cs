@@ -29,6 +29,11 @@ namespace KOMA.Data
         public DbSet<TableServiceSession> TableServiceSessions
             => Set<TableServiceSession>();
         public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+        public DbSet<HelpRequest> HelpRequests => Set<HelpRequest>();   // table tablet "Call staff" etc.
+        public DbSet<Shift> Shifts => Set<Shift>();                     // staff schedule: shift list (edited in Settings)
+        public DbSet<ShiftAssignment> ShiftAssignments => Set<ShiftAssignment>();
+        public DbSet<ScheduleWeek> ScheduleWeeks => Set<ScheduleWeek>();
+        public DbSet<BookingEmail> BookingEmails => Set<BookingEmail>();               // booking email outbox (Services/Email)
 
         // Engineer B: editable text/photo of the customer landing page (one row).
         public DbSet<LandingPageContent> LandingPageContents => Set<LandingPageContent>();
@@ -145,6 +150,34 @@ namespace KOMA.Data
                 .OnDelete(DeleteBehavior.SetNull);
             builder.Entity<Order>().HasIndex(o => o.OrderedAt);
             builder.Entity<Order>().HasIndex(o => o.PaidAt);
+            builder.Entity<HelpRequest>().HasIndex(h => h.DoneAt);
+            builder.Entity<HelpRequest>()
+                .HasOne(h => h.RestaurantTable).WithMany()
+                .HasForeignKey(h => h.RestaurantTableId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Booking emails: the worker reads waiting rows by time; a reminder is never queued twice.
+            builder.Entity<BookingEmail>().HasIndex(e => new { e.Status, e.SendAfter });
+            builder.Entity<BookingEmail>().HasIndex(e => e.DedupKey).IsUnique().HasFilter("[DedupKey] IS NOT NULL");
+            builder.Entity<BookingEmail>()
+                .HasOne(e => e.Reservation).WithMany()
+                .HasForeignKey(e => e.ReservationId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Staff schedule: one row per person per day (no row = Off). Two starter shifts; Settings will edit them.
+            builder.Entity<ShiftAssignment>().HasIndex(a => new { a.UserId, a.Date }).IsUnique();
+            builder.Entity<ShiftAssignment>().HasIndex(a => a.Date);
+            builder.Entity<ShiftAssignment>()
+                .HasOne<ApplicationUser>().WithMany()
+                .HasForeignKey(a => a.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            builder.Entity<ShiftAssignment>()
+                .HasOne(a => a.Shift).WithMany()
+                .HasForeignKey(a => a.ShiftId)
+                .OnDelete(DeleteBehavior.Restrict);
+            builder.Entity<Shift>().HasData(
+                new Shift { Id = 1, Name = "Morning", Starts = new TimeOnly(10, 0), Ends = new TimeOnly(16, 0), Needed = 2, SortOrder = 0, IsActive = true },
+                new Shift { Id = 2, Name = "Evening", Starts = new TimeOnly(16, 0), Ends = new TimeOnly(23, 0), Needed = 2, SortOrder = 1, IsActive = true });
 
             // Deleting an order removes its lines; a menu item that appears on past orders can't be deleted.
             builder.Entity<OrderItem>()

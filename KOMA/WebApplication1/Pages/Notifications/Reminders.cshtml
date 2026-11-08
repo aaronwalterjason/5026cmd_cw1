@@ -1,0 +1,31 @@
+@page
+@model KOMA.Pages.Notifications.RemindersModel
+@{
+    ViewData["Title"] = "Reminder emails";
+}
+<div class="nt-box">
+    @if (Model.Invalid)
+    {
+        <h1>This link has expired</h1>
+        <p>Sign in to your account to manage reminder emails.</p>
+    }
+    else
+    {
+        <h1>@(Model.Off ? "Reminders are off" : "Reminder emails")</h1>
+        <p>
+            @if (Model.Off)
+            {
+                <text>We won't send booking reminders to <b>@Model.Email</b>. You'll still get emails when a booking is confirmed, changed or cancelled.</text>
+            }
+            else
+            {
+                <text>We send <b>@Model.Email</b> a reminder the day before each booking.</text>
+            }
+        </p>
+        <form method="post">
+            <input type="hidden" name="t" value="@Model.T" />
+            <input type="hidden" name="off" value="@(Model.Off ? "false" : "true")" />
+            <button type="submit" class="nt-btn">@(Model.Off ? "Turn reminders back on" : "Turn off reminders")</button>
+        </form>
+    }
+</div>
