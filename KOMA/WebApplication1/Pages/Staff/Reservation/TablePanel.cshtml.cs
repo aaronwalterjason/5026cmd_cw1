@@ -11,7 +11,7 @@ namespace KOMA.Pages.Staff.Reservations;
 
 [Authorize(Roles = "Staff,Administrator")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining) : PageModel
+public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining, ArrivalService arrivals) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public int TableId { get; set; }
@@ -48,9 +48,9 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining)
         var now = ReservationRules.MalaysiaNow;
         return db.RestaurantTables.Where(t => t.Id != visit.RestaurantTableId && t.IsActive &&
             t.DiningArea!.IsActive && t.Capacity >= visit.GuestCount &&
-            !db.Reservations.Any(r => r.RestaurantTableId == t.Id && r.Status != ReservationStatus.Cancelled &&
-                r.StartTime < visit.EndTime && r.EndTime > now) &&
-            !db.TableServiceSessions.Any(s => s.RestaurantTableId == t.Id && s.StartTime < visit.EndTime && s.EndTime > now));
+            !db.Reservations.Any(r => r.RestaurantTableId == t.Id && r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
+                r.StartTime < visit.EndTime.AddMinutes(ReservationRules.TurnaroundMinutes) && r.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)) &&
+            !db.TableServiceSessions.Any(s => s.RestaurantTableId == t.Id && s.StartTime < visit.EndTime.AddMinutes(ReservationRules.TurnaroundMinutes) && s.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)));
     }
 
     public async Task<IActionResult> OnPostMoveWalkInAsync(int destination)
@@ -99,7 +99,7 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining)
             .AsNoTracking()
             .Where(r =>
                 r.RestaurantTableId == TableId &&
-                r.Status != ReservationStatus.Cancelled &&
+                r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
                 (selection.IsNow
                     ? r.StartTime <= start && r.EndTime > start
                     : r.StartTime < end && r.EndTime > start))
@@ -116,6 +116,17 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining)
                     : s.StartTime < end && s.EndTime > start))
             .OrderBy(s => s.StartTime)
             .ToListAsync();
+
+        if (!selection.IsNow && Bookings.Count == 0 && WalkIns.Count == 0)
+        {
+            var neighbor = await ReservationService.BlockingReservations(db, null, start, start, end)
+                .AsNoTracking().Where(r => r.RestaurantTableId == TableId)
+                .OrderBy(r => r.StartTime > start)
+                .ThenBy(r => EF.Functions.DateDiffSecond(start, r.StartTime) < 0
+                    ? EF.Functions.DateDiffSecond(r.StartTime, start) : EF.Functions.DateDiffSecond(start, r.StartTime))
+                .ThenBy(r => r.Id).FirstOrDefaultAsync();
+            if (neighbor != null) Bookings.Add(neighbor);
+        }
 
         if (BookingId.HasValue && SessionId.HasValue)
             return false;
@@ -187,6 +198,14 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining)
         return true;
     }
 
+    public List<RestaurantTable> ArrivalTables { get; private set; } = [];
+    public async Task<IActionResult> OnPostArrivalAsync(string operation, string version, TimeOnly? eta, int? destination)
+    {
+        if (!ModelState.IsValid || !BookingId.HasValue) return BadRequest("Invalid arrival details.");
+        var error = await arrivals.UpdateAsync(BookingId.Value, TableId, version, operation, eta, destination);
+        return error == null ? new OkResult() : new ConflictObjectResult(error);
+    }
+
     public async Task<IActionResult> OnPostSettleAsync(PaymentMethod? method, string? billToken)
     {
         if (!ModelState.IsValid || method is not (PaymentMethod.Cash or PaymentMethod.Card or PaymentMethod.TouchNGo) ||
@@ -203,6 +222,7 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining)
     private static IActionResult ConflictResultForBill() =>
         new ConflictObjectResult("The bill changed. Reopen Food orders and review it before settling.");
 
+
     public async Task<IActionResult> OnGetAsync()
     {
         if (!ModelState.IsValid || !await LoadAsync())
@@ -213,6 +233,9 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining)
 
         if (Booking == null && Session != null && Session.EndTime > ReservationRules.MalaysiaNow)
             MoveTargets = await AvailableFor(Session).OrderBy(t => t.TableNumber).ToListAsync();
+        if (Booking != null && Session == null)
+            ArrivalTables = await db.RestaurantTables.Where(t => t.IsActive && t.DiningArea!.IsActive && t.Capacity >= Booking.GuestCount)
+                .OrderBy(t => t.TableNumber).ToListAsync();
         return Partial("_TablePanel", this);
     }
 }

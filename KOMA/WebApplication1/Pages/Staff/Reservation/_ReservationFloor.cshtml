@@ -1,4 +1,4 @@
-﻿@model KOMA.Pages.Staff.Reservations.IndexModel
+@model KOMA.Pages.Staff.Reservations.IndexModel
 @using KOMA.Models
 @using System.Globalization
 
@@ -11,6 +11,7 @@
 }
 
 <div class="floor-board"
+     data-live="@(Model.Now ? "true" : "false")"
      data-panel-url="@Url.Page("TablePanel", Model.PanelContext)"
      data-refresh-url="@Url.Page("Index", "Floor", new
      {
@@ -29,9 +30,14 @@
 
     <p class="small text-muted">
         Availability reflects the time shown above.
-        Click Now again to refresh the current status.
+        @(Model.Now ? "Current availability refreshes automatically." : "Select Now to see current availability.")
     </p>
 
+    @foreach (var booking in Model.CallsDue)
+    {
+        <div class="alert alert-warning">Call @booking.CustomerName · <a href="tel:@booking.ContactNumber">@booking.ContactNumber</a>
+        <button class="btn btn-outline-secondary btn-sm" data-open-table="@booking.RestaurantTableId">Open table @booking.RestaurantTable.TableNumber</button></div>
+    }
     @if (!Model.Selection.IsOpen)
     {
         <div class="alert alert-info">
@@ -94,7 +100,8 @@
                             var hasWalkIn = Model.WalkIns.Any(s =>
                                 s.RestaurantTableId == table.Id);
 
-                            var occupied = hasBooking || hasWalkIn;
+                            var blocked = Model.BlockedTables.Contains(table.Id);
+                            var occupied = hasBooking || hasWalkIn || blocked;
 
                             var closed =
                                 !area.IsActive ||
@@ -110,7 +117,7 @@
                             var status = closed
                                 ? "Closed"
                                 : occupied
-                                    ? "Booked or walk-in"
+                                    ? (hasBooking || hasWalkIn ? "Booked or walk-in" : "Unavailable for this slot")
                                     : "Available";
 
                             var symbol = closed

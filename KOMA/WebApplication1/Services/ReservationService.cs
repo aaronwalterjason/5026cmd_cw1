@@ -30,6 +30,10 @@ public class ReservationInput
 
 public static class ReservationRules
 {
+    public const int CallMinutes = 15;
+    public const int GraceMinutes = 30;
+    public const int SpacingMinutes = 120;
+    public const int TurnaroundMinutes = 15;
     public const int SlotMinutes = 60;
     public static DateTime MalaysiaNow => TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "Singapore Standard Time");
     public static IReadOnlyList<TimeOnly> Slots(RestaurantSettings settings)
@@ -37,7 +41,7 @@ public static class ReservationRules
         var slots = new List<TimeOnly>();
         var opening = settings.OpeningTime.ToTimeSpan().TotalMinutes;
         var closing = settings.ClosingTime.ToTimeSpan().TotalMinutes;
-        for (var minute = opening; minute + SlotMinutes <= closing; minute += SlotMinutes)
+        for (var minute = Math.Ceiling(opening / 60) * 60; minute + SlotMinutes + TurnaroundMinutes <= closing; minute += SlotMinutes)
             slots.Add(TimeOnly.FromTimeSpan(TimeSpan.FromMinutes(minute)));
         return slots;
     }
@@ -64,6 +68,30 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
     private readonly ApplicationDbContext _context = context;
     private static bool IsStaff(ClaimsPrincipal actor) => actor.IsInRole("Staff") || actor.IsInRole("Administrator");
 
+    internal static IQueryable<Reservation> BlockingReservations(ApplicationDbContext db, int? excludeId, DateTime scheduled, DateTime occupiedFrom, DateTime diningEnd)
+    {
+        var earliest = scheduled.AddMinutes(-ReservationRules.SpacingMinutes);
+        var latest = scheduled.AddMinutes(ReservationRules.SpacingMinutes);
+        var ready = diningEnd.AddMinutes(ReservationRules.TurnaroundMinutes);
+        var previousEnd = occupiedFrom.AddMinutes(-ReservationRules.TurnaroundMinutes);
+        return db.Reservations.Where(r => r.Id != (excludeId ?? 0) &&
+                r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
+                ((r.StartTime > earliest && r.StartTime < latest) || (r.StartTime < ready && r.EndTime > previousEnd)));
+    }
+
+    internal static IQueryable<RestaurantTable> AvailableTables(ApplicationDbContext db, int guests,
+        int? excludeId, DateTime scheduled, DateTime occupiedFrom, DateTime diningEnd)
+    {
+        var blockers = BlockingReservations(db, excludeId, scheduled, occupiedFrom, diningEnd);
+        var ready = diningEnd.AddMinutes(ReservationRules.TurnaroundMinutes);
+        var previousEnd = occupiedFrom.AddMinutes(-ReservationRules.TurnaroundMinutes);
+        return db.RestaurantTables.Include(t => t.DiningArea)
+            .Where(t => t.IsActive && t.DiningArea!.IsActive && t.Capacity >= guests)
+            .Where(t => !blockers.Any(r => r.RestaurantTableId == t.Id))
+            .Where(t => !db.TableServiceSessions.Any(s => s.RestaurantTableId == t.Id && s.ReservationId == null &&
+                s.StartTime < ready && s.EndTime > previousEnd));
+    }
+
     public async Task<BookingResult> SaveAsync(ReservationInput input, int? id, ClaimsPrincipal actor)
     {
         var userId = actor.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -74,6 +102,7 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
         // A transaction-owned SQL Server lock serializes booking writes across app instances.
         // All future customer booking handlers must use this service too.
         await LockAsync();
+        await ArrivalService.ExpireAsync(_context, ReservationRules.MalaysiaNow);
         Reservation? booking = null;
         if (id.HasValue)
         {
@@ -82,7 +111,7 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
             if (!IsStaff(actor) && booking.CustomerUserId != userId) return new(null, "You cannot change this reservation.");
             if (!IsStaff(actor) && await _context.TableServiceSessions.AnyAsync(s => s.ReservationId == id.Value))
                 return new(null, "This reservation has already been checked in. Please contact staff to make changes.");
-            if (booking.Status == ReservationStatus.Cancelled) return new(null, "Cancelled reservations cannot be edited.");
+            if (booking.Status is ReservationStatus.Cancelled or ReservationStatus.NoShow) return new(null, "Cancelled reservations cannot be edited.");
             if (booking.StartTime <= ReservationRules.MalaysiaNow &&
                 (!IsStaff(actor) || booking.EndTime <= ReservationRules.MalaysiaNow)) return new(null, "Past or started reservations cannot be changed.");
             if (Convert.ToBase64String(booking.RowVersion) != input.RowVersion) return new(null, "This booking changed. Reload the page before editing again.");
@@ -94,23 +123,7 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
         var start = input.Date.ToDateTime(input.Time);
         var end = booking?.StartTime == start ? booking.EndTime : start.AddMinutes(ReservationRules.SlotMinutes);
         // Exclude tables occupied by either reservations or walk-ins.
-        var available = _context.RestaurantTables
-            .Include(t => t.DiningArea)
-            .Where(t =>
-                t.IsActive &&
-                t.DiningArea!.IsActive &&
-                t.Capacity >= input.GuestCount)
-            .Where(t => !_context.Reservations.Any(r =>
-                r.RestaurantTableId == t.Id &&
-                r.Id != (id ?? 0) &&
-                r.Status != ReservationStatus.Cancelled &&
-                r.StartTime < end &&
-                r.EndTime > start))
-            .Where(t => !_context.TableServiceSessions.Any(s =>
-                s.RestaurantTableId == t.Id &&
-                s.ReservationId == null &&
-                s.StartTime < end &&
-                s.EndTime > start));
+        var available = AvailableTables(_context, input.GuestCount, id, start, start, end);
 
         var linkedSession = id.HasValue
             ? await _context.TableServiceSessions
@@ -220,6 +233,12 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
         booking.Email = string.IsNullOrWhiteSpace(input.Email) ? null : input.Email.Trim();
         booking.GuestCount = input.GuestCount;
         booking.SpecialRequests = input.SpecialRequests?.Trim();
+        if (isNew || booking.StartTime != start)
+        {
+            booking.HoldUntil = start.AddMinutes(ReservationRules.GraceMinutes);
+            booking.ExpectedArrival = null;
+            booking.ContactAttemptAt = null;
+        }
         booking.StartTime = start;
         booking.EndTime = end;
         // Keep the linked visit's customer information up to date.

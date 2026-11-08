@@ -27,7 +27,7 @@ public static class BookingEmailTemplates
         var first = (r.CustomerName ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "there";
         var details = new List<(string, string)>
         {
-            ("Date", Day(r.StartTime)), ("Time", $"{Time(r.StartTime)} – {Time(r.EndTime)}"),
+            ("Date", Day(r.StartTime)), ("Booking time", Time(r.StartTime)),
             ("Guests", r.GuestCount.ToString()), ("Seating", Seating(r)), ("Booking ref", Ref(r))
         };
         string subject, kana, title, intro, body;

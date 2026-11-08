@@ -23,7 +23,7 @@
             <div>
                 Booking R-@booking.Id.ToString("D5") ·
                 @booking.CustomerName ·
-                @booking.StartTime.ToString("HH:mm")–@booking.EndTime.ToString("HH:mm")
+                @booking.StartTime.ToString("HH:mm")
             </div>
         }
         else if (session != null)
@@ -110,6 +110,30 @@
                     <strong>Contact:</strong>
                     @booking.ContactNumber · @booking.Email
                 </p>
+                @if (booking.Status == ReservationStatus.Confirmed && session == null &&
+                    booking.StartTime <= ReservationRules.MalaysiaNow && booking.HoldUntil > ReservationRules.MalaysiaNow)
+                {
+                    <p>Hold until @booking.HoldUntil.Value.ToString("HH:mm").</p>
+                    @if (booking.ExpectedArrival.HasValue) { <p>Confirmed ETA: @booking.ExpectedArrival.Value.ToString("HH:mm")</p> }
+                    @if (booking.ContactAttemptAt.HasValue) { <p>Last contact attempt: @booking.ContactAttemptAt.Value.ToString("HH:mm")</p> }
+                    else if (booking.StartTime.AddMinutes(ReservationRules.CallMinutes) <= ReservationRules.MalaysiaNow)
+                    { <p>Call the guest: <a href="tel:@booking.ContactNumber">@booking.ContactNumber</a></p> }
+                    <form method="post" asp-page="TablePanel" asp-page-handler="Arrival" class="arrival-form">
+                        <input type="hidden" name="TableId" value="@Model.TableId"/>
+                        <input type="hidden" name="BookingId" value="@booking.Id"/>
+                        <input type="hidden" name="version" value="@Convert.ToBase64String(booking.RowVersion)"/>
+                        <button class="btn btn-primary" name="operation" value="arrived">Mark arrived</button>
+                        <button class="btn btn-outline-secondary" name="operation" value="called">Called, no answer</button>
+                        <details class="mt-2"><summary>Late arrival</summary>
+                        <label>Confirmed arrival time <input type="time" name="eta" class="form-control"/></label>
+                        <label>Table <select name="destination" class="form-select">@foreach (var t in Model.ArrivalTables)
+                        { <option value="@t.Id" selected="@(t.Id == booking.RestaurantTableId)">@t.TableNumber</option> }</select></label>
+                        <button class="btn btn-primary" name="operation" value="eta">Confirm ETA</button>
+                        <button class="btn btn-outline-secondary" name="operation" value="cancel" onclick="return confirm('Cancel this reservation and release the table?')">Cancel reservation</button>
+                        </details>
+                    </form>
+                }
+                else if (session != null) { <p>Checked in</p> }
                 <p style="white-space:pre-wrap"><strong>Requests:</strong> @(booking.SpecialRequests ?? "None")</p>
 
 

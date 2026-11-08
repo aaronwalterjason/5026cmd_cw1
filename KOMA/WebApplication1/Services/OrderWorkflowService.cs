@@ -241,6 +241,7 @@ public class OrderWorkflowService(ApplicationDbContext db)
         if (expected == OrderStatus.AwaitingArrival && !order.TableServiceSessionId.HasValue)
         {
             var booking = await db.Reservations.SingleAsync(r => r.Id == order.ReservationId);
+            if (booking.HoldUntil <= ReservationRules.MalaysiaNow && !await db.TableServiceSessions.AnyAsync(s => s.ReservationId == booking.Id)) return "The arrival deadline has passed.";
             order.TableServiceSession = await DiningOrderService.BookingSessionAsync(db, booking);
         }
         order.Status = next.Value;

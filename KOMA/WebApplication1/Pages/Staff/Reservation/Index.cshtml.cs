@@ -40,6 +40,8 @@ public class IndexModel(ApplicationDbContext context) : PageModel
         At = Selection?.SnapshotParameter
     };
 
+    public List<KOMA.Models.Reservation> CallsDue { get; private set; } = [];
+    public HashSet<int> BlockedTables { get; private set; } = [];
     public async Task OnGetAsync()
     {
         if (!ModelState.IsValid)
@@ -108,13 +110,29 @@ public class IndexModel(ApplicationDbContext context) : PageModel
         Bookings = await context.Reservations
             .AsNoTracking()
             .Where(r =>
-                r.Status != ReservationStatus.Cancelled &&
+                r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
                 (Now
                     ? r.StartTime <= start && r.EndTime > start
                     : r.StartTime < end && r.EndTime > start))
             .OrderBy(r => r.StartTime)
             .ToListAsync();
 
+        if (Now)
+        {
+            CallsDue = await context.Reservations.AsNoTracking().Include(r => r.RestaurantTable)
+                .Where(r => r.Status == ReservationStatus.Confirmed && r.HoldUntil > now && r.ContactAttemptAt == null &&
+                    r.StartTime <= now.AddMinutes(-ReservationRules.CallMinutes) &&
+                    !context.TableServiceSessions.Any(s => s.ReservationId == r.Id)).ToListAsync();
+            BlockedTables = (await context.Reservations.Where(r => r.Status == ReservationStatus.Confirmed &&
+                r.EndTime <= now && r.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes))
+                .Select(r => r.RestaurantTableId).Union(context.TableServiceSessions.Where(s => s.EndTime <= now &&
+                    s.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)).Select(s => s.RestaurantTableId)).ToListAsync()).ToHashSet();
+        }
+        else
+        {
+            var available = ReservationService.AvailableTables(context, 1, null, start, start, end).Select(t => t.Id);
+            BlockedTables = (await context.RestaurantTables.Where(t => !available.Contains(t.Id)).Select(t => t.Id).ToListAsync()).ToHashSet();
+        }
         WalkIns = await context.TableServiceSessions
             .AsNoTracking()
             .Where(s =>

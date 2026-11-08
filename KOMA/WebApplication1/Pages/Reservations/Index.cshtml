@@ -23,7 +23,7 @@ else
                     <td>R-@booking.Id.ToString("D5")</td>
                     <td>@booking.StartTime.ToString("dd MMM yyyy, HH:mm")</td>
                     <td>@booking.RestaurantTable.TableNumber</td>
-                    <td>@booking.GuestCount</td><td>@booking.Status</td>
+                    <td>@booking.GuestCount</td><td>@(booking.Status == KOMA.Models.ReservationStatus.NoShow ? "No-show" : booking.Status.ToString())</td>
                     <td>
                         <div class="d-flex flex-wrap gap-2">
                             @if (Model.EditableIds.Contains(booking.Id))
