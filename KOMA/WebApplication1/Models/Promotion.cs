@@ -51,7 +51,7 @@ namespace KOMA.Models
         }
 
         // Does the discount apply to food served at this time? (date range, weekday, time window, not paused)
-        // Pre-orders use the booking's start time; table-tablet orders use the time they are placed.
+        // Applies only to dine-in orders placed on the table tablet, at the time they are placed (pre-orders pay the menu price).
         public bool AppliesAt(DateTime when)
         {
             if (!IsActive || DiscountPercent <= 0) return false;

@@ -2,8 +2,8 @@ using KOMA.Models;
 
 namespace KOMA.Services;
 
-// One place for "what does this dish cost at this time?" - used by pre-orders (and any other ordering screen),
-// so the price shown, the total checked and the price saved on the order always match.
+// One place for "what does this dish cost?" - so the price shown, the total checked and the price saved always match.
+// Promotions apply ONLY to dine-in orders placed on the table tablet; pre-orders always use the menu price.
 // A dish has at most one promotion (MenuItem.PromotionId); it applies when Promotion.AppliesAt(time) is true.
 public static class MenuPricing
 {
@@ -21,10 +21,14 @@ public static class MenuPricing
         return new Price(m.Price, m.Price, null);
     }
 
+    // The normal menu price (pre-orders).
+    public static Price Menu(MenuItem m) => new(m.Price, m.Price, null);
+
     // Copy the price onto an order line (the line keeps its own price if the menu or promotion changes later).
-    public static void Apply(OrderItem line, MenuItem m, DateTime when)
+    // when = null: no promotion (pre-order); otherwise the promotion running at that time (tablet order).
+    public static void Apply(OrderItem line, MenuItem m, DateTime? when)
     {
-        var price = For(m, when);
+        var price = when is { } t ? For(m, t) : Menu(m);
         line.UnitPrice = price.Unit;
         line.ListPrice = price.Discounted ? price.List : null;
         line.PromotionTitle = price.Discounted ? price.Promo!.Title : null;

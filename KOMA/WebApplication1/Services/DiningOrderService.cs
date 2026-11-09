@@ -107,7 +107,7 @@ public class DiningOrderService(ApplicationDbContext db)
         var ids = selected.Keys.ToArray();
         var dishes = await Menu().Where(m => ids.Contains(m.Id)).ToListAsync();
         if (dishes.Count != selected.Count) return (null, "A selected dish is no longer available. Review the menu.");
-        var lines = OrderingMenu.BuildLines(dishes, selected, ReservationRules.MalaysiaNow);   // tablet: promotions running now
+        var lines = OrderingMenu.BuildLines(dishes, selected, ReservationRules.MalaysiaNow);   // tablet (dine-in): promotions running now
         var total = lines.Sum(i => i.LineTotal);
         if (total + (preorder?.TotalAmount ?? 0) != expectedTotal || total > 99999999.99m)
             return (null, "Review the current prices and total before sending.");
