@@ -3,6 +3,7 @@
 @{
     ViewData["Title"] = "Reports";
     var M = Model;
+    var anchor = M.P.InProgress ? DateTime.Today : M.P.Start;   // Day / Week / Month keep roughly the same date
     string Url2(KOMA.Pages.Admin.Reports.IndexModel.Part p) => p.Key == "team"
         ? Url.Page(p.LinkPage, new { group = "staff", view = "schedule" })!
         : Url.Page(p.LinkPage)!;
@@ -21,17 +22,46 @@
     Reports: one card per stage of the restaurant flow (Book -> Arrive -> Order -> Kitchen -> Serve -> Help -> Team).
     Each card = one chart + one table + CSV + a link to the page to act on. Charts are plain HTML/SVG (no chart library).
 *@
-<div class="rp-head">
-    <h1 class="mb-0">Reports</h1>
-    <form method="get" class="rp-range">
-        <select name="days" aria-label="Date range" onchange="this.form.submit()">
-            @foreach (var r in KOMA.Pages.Admin.Reports.IndexModel.Ranges)
+<div class="rv-head">
+    <h1 class="rv-title">Reports <span>· @M.P.Label</span></h1>
+
+    <div class="rv-tools">
+        <nav class="rv-pills" aria-label="Period">
+            @foreach (var (k, label) in new[] { ("day", "Day"), ("week", "Week"), ("month", "Month") })
             {
-                <option value="@r.Days" selected="@(r.Days == M.Days)">@r.Label</option>
+                <a asp-page="./Index" asp-all-route-data="@KOMA.Services.Reporting.ReportPeriod.TodayRoute(k, anchor)"
+                   class="@(M.P.Kind == k ? "is-on" : "")" aria-current="@(M.P.Kind == k ? "page" : null)">@label</a>
             }
-        </select>
-        <noscript><button type="submit">Show</button></noscript>
-    </form>
+        </nav>
+
+        <div class="rv-stepper">
+            <a asp-page="./Index" asp-all-route-data="M.P.PrevRoute" class="rv-arrow" aria-label="Previous @M.P.Kind">‹</a>
+            <form method="get" class="rv-picker">
+                <input type="hidden" name="period" value="@M.P.Kind" />
+                @if (M.P.Kind == "month")
+                {
+                    <input type="month" name="month" value="@M.P.MonthValue" max="@DateTime.Today.ToString("yyyy-MM")"
+                           aria-label="Choose a month" onchange="this.form.submit()" />
+                }
+                else
+                {
+                    <input type="date" name="date" value="@M.P.DateValue" max="@DateTime.Today.ToString("yyyy-MM-dd")"
+                           aria-label="@(M.P.Kind == "week" ? "Choose any day in the week" : "Choose a day")" onchange="this.form.submit()" />
+                }
+                <noscript><button type="submit" class="btn btn-sm btn-primary">Show</button></noscript>
+            </form>
+            @if (M.P.HasNext)
+            {
+                <a asp-page="./Index" asp-all-route-data="M.P.NextRoute" class="rv-arrow" aria-label="Next @M.P.Kind">›</a>
+            }
+            else
+            {
+                <span class="rv-arrow is-disabled" aria-hidden="true">›</span>
+            }
+        </div>
+
+        <partial name="_ExportMenu" model='new KOMA.Services.Reporting.ExportMenu("/Admin/Reports/Index", M.P.Route)' />
+    </div>
 </div>
 
 <div class="rp-grid">
@@ -48,7 +78,7 @@
                 <span class="rp-tools">
                     @if (!p.Empty)
                     {
-                        <a class="rp-csv" asp-page-handler="Csv" asp-route-part="@p.Key" asp-route-days="@M.Days" title="Download CSV"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>CSV</a>
+                        <a class="rp-csv" asp-page-handler="Csv" asp-route-part="@p.Key" asp-all-route-data="M.P.Route" title="Download CSV"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>CSV</a>
                     }
                     <a class="koma-go" href="@Url2(p)">@p.Link<span class="koma-go-disc" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span></a>
                 </span>
@@ -56,7 +86,7 @@
 
             @if (p.Empty)
             {
-                <partial name="_Empty" model='new EmptyState("calendar", "Nothing in this range", "Try a longer range.", null, null, true)' />
+                <partial name="_Empty" model='new EmptyState("calendar", "Nothing in this period", "Try another day, week or month.", null, null, true)' />
             }
             else
             {
