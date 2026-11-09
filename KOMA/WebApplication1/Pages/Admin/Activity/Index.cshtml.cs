@@ -110,7 +110,14 @@ public class IndexModel(ApplicationDbContext _db, UserManager<ApplicationUser> u
         }
         else
         {
-            foreach (var s in Enumerable.Reverse(snaps))
+            // Order matters when a promotion and its dishes changed together:
+            // 1) bring back deleted rows, 2) put fields back, 3) remove rows that were created.
+            // A restored row gets a NEW id, so dishes that pointed at the old id are linked to the restored row instead.
+            var restoredMap = new Dictionary<(Type, object), object>();
+            var order = snaps.Select((s, i) => (s, i))
+                .OrderBy(x => x.s.State switch { "Deleted" => 0, "Modified" => 1, _ => 2 })
+                .ThenByDescending(x => x.i).Select(x => x.s).ToList();
+            foreach (var s in order)
             {
                 var et = _db.Model.FindEntityType(s.Type)!;
                 var keys = et.FindPrimaryKey()!.Properties.Select(p => FromJson(s.Key[p.Name], p.ClrType)).ToArray();
@@ -120,7 +127,14 @@ public class IndexModel(ApplicationDbContext _db, UserManager<ApplicationUser> u
                     case "Modified" when entity is not null:
                         var entry = _db.Entry(entity);
                         foreach (var f in s.Changed)
-                            entry.Property(f).CurrentValue = FromJson(s.Before![f], entry.Property(f).Metadata.ClrType);
+                        {
+                            var old = FromJson(s.Before![f], entry.Property(f).Metadata.ClrType);
+                            var fk = entry.Property(f).Metadata.GetContainingForeignKeys().FirstOrDefault();
+                            if (old is not null && fk?.DependentToPrincipal is { } nav && restoredMap.TryGetValue((fk.PrincipalEntityType.ClrType, old), out var principal))
+                                entry.Navigation(nav.Name).CurrentValue = principal;
+                            else
+                                entry.Property(f).CurrentValue = old;
+                        }
                         break;
                     case "Added" when entity is not null:
                         _db.Remove(entity);
@@ -134,6 +148,16 @@ public class IndexModel(ApplicationDbContext _db, UserManager<ApplicationUser> u
                             if (p.IsPrimaryKey() && p.ValueGenerated != Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.Never) continue;
                             if (s.Before!.TryGetValue(p.Name, out var v)) e2.Property(p.Name).CurrentValue = FromJson(v, p.ClrType);
                         }
+                        // A link to something that no longer exists (e.g. a deleted promotion) is cleared.
+                        foreach (var link in et.GetForeignKeys().Where(l => !l.IsRequired && l.Properties.Count == 1))
+                        {
+                            var fp = e2.Property(link.Properties[0].Name);
+                            if (fp.CurrentValue is { } fkv && !restoredMap.ContainsKey((link.PrincipalEntityType.ClrType, fkv))
+                                && await _db.FindAsync(link.PrincipalEntityType.ClrType, fkv) is null)
+                                fp.CurrentValue = null;
+                        }
+                        var oldKey = et.FindPrimaryKey()!.Properties.Count == 1 ? FromJson(s.Key[et.FindPrimaryKey()!.Properties[0].Name], et.FindPrimaryKey()!.Properties[0].ClrType) : null;
+                        if (oldKey is not null) restoredMap[(et.ClrType, oldKey)] = restored;
                         break;
                 }
             }
@@ -220,6 +244,7 @@ public class IndexModel(ApplicationDbContext _db, UserManager<ApplicationUser> u
                 case "RestaurantTableId": return (await _db.RestaurantTables.FindAsync(id)) is { } t ? $"Table {t.TableNumber}" : $"#{id}";
                 case "DiningAreaId": return (await _db.DiningAreas.FindAsync(id))?.Name ?? $"#{id}";
                 case "FloorLayoutId": return (await _db.FloorLayouts.FindAsync(id))?.Name ?? $"#{id}";
+                case "PromotionId": return (await _db.Promotions.FindAsync(id))?.Title ?? "(deleted promotion)";
             }
         }
         return ActivityFormat.Value(field, value);
