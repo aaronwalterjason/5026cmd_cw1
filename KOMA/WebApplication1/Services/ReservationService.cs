@@ -35,7 +35,7 @@ public static class ReservationRules
     public const int SpacingMinutes = 120;
     public const int TurnaroundMinutes = 15;
     public const int SlotMinutes = 60;
-    public static DateTime MalaysiaNow => TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "Singapore Standard Time");
+    public static DateTime MalaysiaNow => DemoClock.Shared.MalaysiaNow;
     public static IReadOnlyList<TimeOnly> Slots(RestaurantSettings settings)
     {
         var slots = new List<TimeOnly>();

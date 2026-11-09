@@ -314,7 +314,7 @@ namespace KOMA.Pages.Admin.Orders
 
         private async Task<LookupData> LoadLookupAsync(DateTime? from)
         {
-            var start = DateTime.Today.AddDays(-LookupDays);
+            var start = KOMA.Services.DemoClock.Shared.MalaysiaNow.Date.AddDays(-LookupDays);
             if (from.HasValue && from.Value.Date < start) start = from.Value.Date;   // the date filter asked for older orders
             var rows = await Project(_db.Orders.AsNoTracking()
                     .Where(o => o.OrderedAt >= start || (o.Status != OrderStatus.Completed && o.Status != OrderStatus.Cancelled))
@@ -473,7 +473,7 @@ namespace KOMA.Pages.Admin.Orders
         // "12 min" / "1 h 05 min" since the order was placed.
         public static string Elapsed(Order o)
         {
-            var span = DateTime.Now - o.OrderedAt;
+            var span = KOMA.Services.DemoClock.Shared.MalaysiaNow - o.OrderedAt;
             if (span.TotalMinutes < 1) return "just now";
             return span.TotalHours >= 1 ? $"{(int)span.TotalHours} h {span.Minutes:D2} min" : $"{(int)span.TotalMinutes} min";
         }

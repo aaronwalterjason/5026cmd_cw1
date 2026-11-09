@@ -40,7 +40,7 @@ namespace KOMA.Pages.Admin.Accounts
 
         public async Task LoadScheduleAsync()
         {
-            var today = DateOnly.FromDateTime(DateTime.Today);
+            var today = DateOnly.FromDateTime(KOMA.Services.DemoClock.Shared.MalaysiaNow.Date);
             var week = MondayOf(Week ?? today);
             DateOnly month;
             if (!string.IsNullOrEmpty(MonthKey) && DateOnly.TryParseExact(MonthKey + "-01", "yyyy-MM-dd", out var mk)) month = mk;
@@ -100,7 +100,7 @@ namespace KOMA.Pages.Admin.Accounts
         {
             var w = await _db.ScheduleWeeks.FirstOrDefaultAsync(x => x.WeekStart == week);
             if (w is null) { w = new ScheduleWeek { WeekStart = week }; _db.ScheduleWeeks.Add(w); }
-            w.ChangedAt = DateTime.Now;
+            w.ChangedAt = KOMA.Services.DemoClock.Shared.MalaysiaNow;
         }
 
         // One cell: value = shift id | "leave" | "off". Returns the redrawn schedule.
@@ -166,8 +166,8 @@ namespace KOMA.Pages.Admin.Accounts
         {
             week = MondayOf(week);
             var w = await _db.ScheduleWeeks.FirstOrDefaultAsync(x => x.WeekStart == week);
-            if (w is null) { w = new ScheduleWeek { WeekStart = week, ChangedAt = DateTime.Now }; _db.ScheduleWeeks.Add(w); }
-            w.PublishedAt = DateTime.Now;
+            if (w is null) { w = new ScheduleWeek { WeekStart = week, ChangedAt = KOMA.Services.DemoClock.Shared.MalaysiaNow }; _db.ScheduleWeeks.Add(w); }
+            w.PublishedAt = KOMA.Services.DemoClock.Shared.MalaysiaNow;
             w.PublishedBy = User.Identity?.Name;
             await _db.SaveChangesAsync();
             TempData["StatusMessage"] = $"Schedule for {week:d MMM} – {week.AddDays(6):d MMM} published.";
@@ -181,7 +181,7 @@ namespace KOMA.Pages.Admin.Accounts
         {
             try
             {
-                var today = DateOnly.FromDateTime(DateTime.Today);
+                var today = DateOnly.FromDateTime(KOMA.Services.DemoClock.Shared.MalaysiaNow.Date);
                 var first = new DateOnly(today.Year, today.Month, 1);
                 var last = first.AddMonths(1).AddDays(-1);
                 var shifts = await _db.Shifts.AsNoTracking().Where(s => s.IsActive).OrderBy(s => s.SortOrder).ThenBy(s => s.Id).ToListAsync();

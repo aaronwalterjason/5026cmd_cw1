@@ -9,8 +9,8 @@
     var p = Model;
     var band = p.IsAdmin ? "#d0442b" : "#42602d";
     var tel = string.IsNullOrWhiteSpace(p.Phone) ? null : new string(p.Phone.Where(c => char.IsDigit(c) || c == '+').ToArray());
-    string When(DateTime d) => d.Date == DateTime.Today ? d.ToString("h:mm tt") : d.Date == DateTime.Today.AddDays(-1) ? "Yesterday, " + d.ToString("h:mm tt") : d.ToString("ddd d MMM, h:mm tt");
-    string Day(DateTime d) => d.Date == DateTime.Today ? "TODAY" : d.Date == DateTime.Today.AddDays(-1) ? "YESTERDAY" : d.ToString("ddd d MMM").ToUpperInvariant();
+    string When(DateTime d) => d.Date == KOMA.Services.DemoClock.Shared.MalaysiaNow.Date ? d.ToString("h:mm tt") : d.Date == KOMA.Services.DemoClock.Shared.MalaysiaNow.Date.AddDays(-1) ? "Yesterday, " + d.ToString("h:mm tt") : d.ToString("ddd d MMM, h:mm tt");
+    string Day(DateTime d) => d.Date == KOMA.Services.DemoClock.Shared.MalaysiaNow.Date ? "TODAY" : d.Date == KOMA.Services.DemoClock.Shared.MalaysiaNow.Date.AddDays(-1) ? "YESTERDAY" : d.ToString("ddd d MMM").ToUpperInvariant();
     string AreaIcon(string a) => a switch
     {
         "Menu" => "M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4z",
@@ -121,7 +121,7 @@
         @* ---- Schedule: next shift + this month (from Admin > Accounts > Staff > Schedule) ---- *@
         @if (p.HasSchedule)
         {
-            var today = DateOnly.FromDateTime(DateTime.Today);
+            var today = DateOnly.FromDateTime(KOMA.Services.DemoClock.Shared.MalaysiaNow.Date);
             var mEnd = p.SchedMonth.AddMonths(1).AddDays(-1);
             <section id="cp-t-sched" role="tabpanel" hidden>
                 @if (p.NextShift is { } n)

@@ -175,12 +175,35 @@
             @if (booking == null && session == null) { <p>No visit at this time.</p> }
         </div>
         <div class="tab-pane fade" id="food-panel" role="tabpanel" aria-labelledby="food-tab">
+            @{
+                var readyDishes = Model.Orders.Where(o => o.Status is OrderStatus.Preparing or OrderStatus.ReadyToServe && o.PaymentStatus != PaymentStatus.Refunded)
+                    .SelectMany(o => o.Items.Where(i => OrderWorkflowService.EffectiveDishStatus(o, i) == DishStatus.Ready)).ToList();
+            }
+            @if (readyDishes.Count > 0)
+            {
+                <section class="alert alert-warning" aria-label="Food ready to serve"><h3 class="h5">! Ready to serve</h3>
+                @foreach (var dish in readyDishes)
+                {
+                    <form method="post" asp-page="TablePanel" asp-page-handler="Served" class="serve-dish-form d-flex gap-3 align-items-center mb-2">
+                        <input type="hidden" name="TableId" value="@Model.TableId"/>
+                        <input type="hidden" name="BookingId" value="@Model.BookingId"/>
+                        <input type="hidden" name="SessionId" value="@(booking == null ? session?.Id : null)"/>
+                        <input type="hidden" name="At" value="@Model.At?.ToString("O")"/>
+                        <input type="hidden" name="Date" value="@Model.Date?.ToString("yyyy-MM-dd")"/>
+                        <input type="hidden" name="Time" value="@Model.Time?.ToString("HH:mm")"/>
+                        <input type="hidden" name="itemId" value="@dish.Id"/>
+                        <span>@dish.Quantity × @dish.DishName</span><button class="btn btn-primary btn-sm">Mark served</button>
+                    </form>
+                }
+                </section>
+            }
             @if (Model.Orders.Count == 0) { <p>No food orders have been submitted for this visit.</p> }
             @foreach (var order in Model.Orders)
             {
                 <article class="card card-body mb-2">
                     <h3 class="h6">@order.OrderNumber · @order.Status.DisplayName() · @order.PaymentStatus</h3>
                     <partial name="_OrderBill" model="order" />
+                    @foreach (var dish in order.Items) { <p class="small mb-1">@dish.DishName: @(order.Status == OrderStatus.Cancelled ? "Cancelled" : OrderWorkflowService.EffectiveDishStatus(order, dish).DisplayName())</p> }
                 </article>
             }
             @if (Model.Outstanding.Any())

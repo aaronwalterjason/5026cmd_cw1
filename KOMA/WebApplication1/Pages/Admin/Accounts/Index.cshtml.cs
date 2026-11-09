@@ -71,7 +71,7 @@ namespace KOMA.Pages.Admin.Accounts
         public static string Ago(DateTime? t, bool dayOnly = false)
         {
             if (t is null) return "—";
-            var now = DateTime.Now;
+            var now = KOMA.Services.DemoClock.Shared.MalaysiaNow;
             var days = (now.Date - t.Value.Date).Days;
             if (days <= 0)
             {
@@ -92,7 +92,7 @@ namespace KOMA.Pages.Admin.Accounts
         {
             var ids = Shown.Select(a => a.UserId).ToList();
             if (ids.Count == 0) return;
-            var now = DateTime.Now;
+            var now = KOMA.Services.DemoClock.Shared.MalaysiaNow;
 
             if (CurrentGroup!.Role == "Customer")
             {
@@ -196,7 +196,7 @@ namespace KOMA.Pages.Admin.Accounts
             if (string.IsNullOrEmpty(id)) return null;
             var u = await _db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
             if (u is null) return null;
-            var now = DateTime.Now;
+            var now = KOMA.Services.DemoClock.Shared.MalaysiaNow;
 
             // A booking counts as "attended" when staff seated it (table session) or an order was placed against it.
             var seated = await _db.TableServiceSessions.AsNoTracking()
@@ -342,7 +342,7 @@ namespace KOMA.Pages.Admin.Accounts
 
         private async Task<StaffPanel?> BuildStaffPanelAsync(ApplicationUser u, string role)
         {
-            var weekAgo = DateTime.Now.AddDays(-7);
+            var weekAgo = KOMA.Services.DemoClock.Shared.MalaysiaNow.AddDays(-7);
             var logs = _db.ActivityLogs.AsNoTracking().Where(l => l.UserId == u.Id);
             var stats = await logs.GroupBy(l => 1).Select(g => new
             {

@@ -245,10 +245,47 @@ public class OrderWorkflowService(ApplicationDbContext db)
             order.TableServiceSession = await DiningOrderService.BookingSessionAsync(db, booking);
         }
         order.Status = next.Value;
+        if (next == OrderStatus.ReadyToServe)
+            foreach (var item in order.Items.Where(i => i.Status == DishStatus.Preparing))
+            { item.Status = DishStatus.Ready; item.ReadyAt = ReservationRules.MalaysiaNow; }
+        if (next == OrderStatus.Served)
+            foreach (var item in order.Items.Where(i => i.Status != DishStatus.Served))
+            { item.Status = DishStatus.Served; item.ServedAt = ReservationRules.MalaysiaNow; item.ServedVia = "Staff"; }
 
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
 
+        return null;
+    }
+
+    public static DishStatus EffectiveDishStatus(Order order, OrderItem item) =>
+        order.Status is OrderStatus.Served or OrderStatus.Completed ? DishStatus.Served :
+        order.Status == OrderStatus.ReadyToServe && item.Status == DishStatus.Preparing ? DishStatus.Ready : item.Status;
+
+    public async Task<string?> ServeDishAsync(int itemId, int visitId, int tableId, string via)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        await db.Database.ExecuteSqlRawAsync("""
+            DECLARE @result int;
+            EXEC @result = sys.sp_getapplock @Resource = 'KOMA.ReservationWrites',
+                @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000;
+            IF @result < 0 THROW 51000, 'Dining service is busy. Please retry.', 1;
+            """);
+        var order = await db.Orders.Include(o => o.Items).SingleOrDefaultAsync(o =>
+            o.TableServiceSessionId == visitId && o.RestaurantTableId == tableId && o.Items.Any(i => i.Id == itemId));
+        if (order == null || order.Status is OrderStatus.Cancelled or OrderStatus.AwaitingArrival or OrderStatus.Pending ||
+            order.PaymentStatus == PaymentStatus.Refunded) return "This dish is no longer available for serving.";
+        var item = order.Items.Single(i => i.Id == itemId);
+        var status = EffectiveDishStatus(order, item);
+        if (status == DishStatus.Served) return null;
+        if (status != DishStatus.Ready) return "The kitchen has not marked this dish ready yet.";
+        item.Status = DishStatus.Served;
+        item.ServedAt = ReservationRules.MalaysiaNow;
+        item.ServedVia = via;
+        if (order.Items.All(i => i.Status == DishStatus.Served))
+            order.Status = order.PaymentStatus == PaymentStatus.Paid ? OrderStatus.Completed : OrderStatus.Served;
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
         return null;
     }
 

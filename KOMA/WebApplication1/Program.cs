@@ -5,6 +5,7 @@ using KOMA.Models;
 using KOMA.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+DemoClock.Shared.Configure(builder.Configuration.GetValue<bool?>("DemoClock:Enabled") ?? builder.Environment.IsDevelopment());
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found. Check appsettings.json.");

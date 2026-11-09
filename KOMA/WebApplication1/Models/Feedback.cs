@@ -14,6 +14,6 @@ public class Feedback
     public int? TableServiceSessionId { get; set; }
     public TableServiceSession? TableServiceSession { get; set; }
     [StringLength(20)] public string Source { get; set; } = "Website";
-    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAtUtc { get; set; } = KOMA.Services.DemoClock.Shared.UtcNow;
     public DateTime? UpdatedAtUtc { get; set; }
 }

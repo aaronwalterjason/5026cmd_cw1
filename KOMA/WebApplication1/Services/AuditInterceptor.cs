@@ -112,7 +112,7 @@ public class AuditInterceptor(IHttpContextAccessor http) : SaveChangesIntercepto
             var (title, action, summary) = await DescribeAsync(ctx, group.Key, group.ToList(), snaps, ct);
             logs.Add(new ActivityLog
             {
-                At = DateTime.Now, UserId = who.Id, UserRole = who.Role,
+                At = KOMA.Services.DemoClock.Shared.MalaysiaNow, UserId = who.Id, UserRole = who.Role,
                 UserName = Short(appUser?.FullName ?? appUser?.Email ?? context.User.Identity?.Name ?? "Unknown", 100),
                 Area = group.Key, Action = revertOf.HasValue ? "Reverted" : action,
                 Title = Short(title, 150), Summary = summary is null ? null : Short(summary, 300),

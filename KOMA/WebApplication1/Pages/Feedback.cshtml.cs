@@ -80,7 +80,7 @@ public class FeedbackModel(ApplicationDbContext db, TabletAccess tablet, DiningO
         feedback.Comment = Input.Comment.Trim();
         feedback.Name = Visitor ? (string.IsNullOrWhiteSpace(Input.Name) ? "Visitor" : Input.Name.Trim()) : name;
         feedback.Email = Visitor ? Input.Email?.Trim() : email;
-        if (existing == null) db.Feedbacks.Add(feedback); else feedback.UpdatedAtUtc = DateTime.UtcNow;
+        if (existing == null) db.Feedbacks.Add(feedback); else feedback.UpdatedAtUtc = KOMA.Services.DemoClock.Shared.UtcNow;
         try { await db.SaveChangesAsync(); }
         catch (DbUpdateException) { ModelState.AddModelError("", "Feedback could not be saved. Refresh this form and try again."); return Page(); }
         TempData["FeedbackSaved"] = true;

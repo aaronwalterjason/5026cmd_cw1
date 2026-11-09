@@ -8,11 +8,11 @@
 </div>
 @if (!Model.Bookings.Any())
 {
-    <p>You have no upcoming reservations or reservations from the last three months.</p>
+    <p>You have no upcoming reservations or reservations from the last month.</p>
 }
 else
 {
-    <p>Showing upcoming reservations and the last three months. All times are Malaysia time.</p>
+    <p>Showing upcoming reservations and the last month. All times are Malaysia time. Paid dining bills are available in <a asp-page="/OrderHistory/Index">Order History</a> for three months.</p>
     <div class="table-responsive">
         <table class="table table-striped">
             <thead><tr><th>Reference</th><th>Date and time</th><th>Table</th><th>Guests</th><th>Status</th><th>Action</th></tr></thead>

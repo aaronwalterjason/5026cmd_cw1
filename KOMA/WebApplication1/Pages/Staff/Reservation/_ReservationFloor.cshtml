@@ -136,6 +136,7 @@
 
                             <button type="button"
                                     data-open-table="@table.Id"
+                                    data-ready="@(Model.ReadyTables.Contains(table.Id) ? "true" : "false")"
                                     class="lay-preview-table live-table reservation-map-table @stateClass @(table.Shape == TableShape.Round ? "is-round" : "")"
                                     style="@style"
                                     title="@label"
@@ -147,6 +148,7 @@
                                     data-shape="@table.Shape"
                                     data-capacity="@table.Capacity">
                                 <span>@table.TableNumber @symbol</span>
+                                @if (Model.ReadyTables.Contains(table.Id)) { <span class="ready-food-alert" aria-label="Food ready to serve" title="Food ready to serve">!</span> }
                                 <small>@table.Capacity guests</small>
                             </button>
                         }

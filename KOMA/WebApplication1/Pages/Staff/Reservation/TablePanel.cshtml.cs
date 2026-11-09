@@ -11,7 +11,7 @@ namespace KOMA.Pages.Staff.Reservations;
 
 [Authorize(Roles = "Staff,Administrator")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining, ArrivalService arrivals) : PageModel
+public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining, ArrivalService arrivals, OrderWorkflowService workflow) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public int TableId { get; set; }
@@ -101,7 +101,7 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining,
                 r.RestaurantTableId == TableId &&
                 r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
                 (selection.IsNow
-                    ? r.StartTime <= start && r.EndTime > start
+                    ? (r.StartTime <= start && r.EndTime > start) || db.TableServiceSessions.Any(s => s.ReservationId == r.Id && s.StartTime <= start && s.EndTime > start)
                     : r.StartTime < end && r.EndTime > start))
             .OrderBy(r => r.StartTime)
             .ToListAsync();
@@ -146,6 +146,12 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining,
 
             if (Session == null)
                 return false;
+        }
+        else if (selection.IsNow && WalkIns.Count > 0)
+        {
+            // A declined reservation must not hide the current walk-in's food orders.
+            Session = WalkIns[0];
+            SessionId = Session.Id;
         }
         else if (Bookings.Count > 0)
         {
@@ -199,6 +205,13 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining,
     }
 
     public List<RestaurantTable> ArrivalTables { get; private set; } = [];
+    public async Task<IActionResult> OnPostServedAsync(int itemId)
+    {
+        if (!ModelState.IsValid || !await LoadAsync() || Session == null ||
+            !Orders.Any(o => o.Items.Any(i => i.Id == itemId))) return BadRequest("Reopen the table to check this dish.");
+        var error = await workflow.ServeDishAsync(itemId, Session.Id, TableId, "Staff");
+        return error == null ? new OkResult() : new ConflictObjectResult(error);
+    }
     public async Task<IActionResult> OnPostArrivalAsync(string operation, string version, TimeOnly? eta, int? destination)
     {
         if (!ModelState.IsValid || !BookingId.HasValue) return BadRequest("Invalid arrival details.");

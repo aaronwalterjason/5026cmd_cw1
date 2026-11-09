@@ -52,7 +52,7 @@ public class IndexModel(ApplicationDbContext _db, UserManager<ApplicationUser> u
     public async Task OnGetAsync()
     {
         var q = _db.ActivityLogs.AsNoTracking().AsQueryable();
-        if (Days > 0) q = q.Where(l => l.At >= DateTime.Today.AddDays(1 - Days));
+        if (Days > 0) q = q.Where(l => l.At >= KOMA.Services.DemoClock.Shared.MalaysiaNow.Date.AddDays(1 - Days));
         if (WhoKey == "admins") q = q.Where(l => l.UserRole == "Admin");
         if (WhoKey == "staff") q = q.Where(l => l.UserRole == "Staff");
         if (!string.IsNullOrWhiteSpace(Q))
@@ -246,7 +246,7 @@ public class IndexModel(ApplicationDbContext _db, UserManager<ApplicationUser> u
     }
 
     public static string DayLabel(DateTime at) =>
-        at.Date == DateTime.Today ? "Today" : at.Date == DateTime.Today.AddDays(-1) ? "Yesterday" : at.ToString("ddd d MMM");
+        at.Date == KOMA.Services.DemoClock.Shared.MalaysiaNow.Date ? "Today" : at.Date == KOMA.Services.DemoClock.Shared.MalaysiaNow.Date.AddDays(-1) ? "Yesterday" : at.ToString("ddd d MMM");
 
     public static bool IsWarning(string action) =>
         action is "Deleted" or "Sold out" or "Failed sign-in" or "Locked out" or "Cancelled" or "Role changed";

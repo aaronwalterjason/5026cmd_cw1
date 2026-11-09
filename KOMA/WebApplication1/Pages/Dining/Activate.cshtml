@@ -9,6 +9,20 @@ else
 {
     <h1>Table @Model.TableNumber</h1>
     <div asp-validation-summary="All" class="text-danger" role="alert"></div>
+    @if (Model.NearbyReservation != null)
+    {
+        <section class="card card-body mb-4" role="alert" aria-labelledby="reservation-prompt">
+            <h2 id="reservation-prompt">You have a reservation at @Model.NearbyReservation.StartTime.ToString("h:mm tt").</h2>
+            <p>Is this your reservation? Confirm to load your pre-ordered food.</p>
+            <form method="post" asp-page-handler="Reservation" class="d-flex gap-3">
+                <input type="hidden" name="token" value="@Model.ChoiceToken" />
+                <button class="btn btn-primary btn-lg" name="accept" value="true">Yes, it's me.</button>
+                <button class="btn btn-outline-secondary" name="accept" value="false">Not me</button>
+            </form>
+        </section>
+    }
+    else
+    {
     <div class="tablet-entry">
         <form method="post" asp-page-handler="Scan" id="scan-form" class="card card-body">
             <h2>Have an account?</h2><p>Open My dining QR in your KOMA account.</p>
@@ -20,6 +34,7 @@ else
             <h2>Guest</h2><p>Order without an account.</p><button class="btn btn-outline-primary">Continue as guest</button>
         </form>
     </div>
+    }
 }
 @section Scripts {
 <script src="~/lib/jsqr/jsQR.js" defer></script><script src="~/js/tablet-scan.js" defer asp-append-version="true"></script>

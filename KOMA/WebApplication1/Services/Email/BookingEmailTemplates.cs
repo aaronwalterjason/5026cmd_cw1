@@ -200,7 +200,7 @@ public static class BookingEmailTemplates
         static string Esc(string s) => s.Replace("\\", "\\\\").Replace(",", "\\,").Replace(";", "\\;");
         var ics = string.Join("\r\n",
             "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//KOMA//Bookings//EN", "METHOD:PUBLISH", "BEGIN:VEVENT",
-            $"UID:koma-booking-{r.Id}@koma.my", $"SEQUENCE:{sequence}", $"DTSTAMP:{DateTime.UtcNow:yyyyMMdd'T'HHmmss'Z'}",
+            $"UID:koma-booking-{r.Id}@koma.my", $"SEQUENCE:{sequence}", $"DTSTAMP:{KOMA.Services.DemoClock.Shared.UtcNow:yyyyMMdd'T'HHmmss'Z'}",
             $"DTSTART:{U(r.StartTime)}", $"DTEND:{U(r.EndTime)}",
             $"SUMMARY:{Esc($"Table at KOMA ({r.GuestCount} guests)")}", $"LOCATION:{Esc(o.Address)}",
             $"DESCRIPTION:{Esc($"Booking ref {Ref(r)}")}", "END:VEVENT", "END:VCALENDAR", "");

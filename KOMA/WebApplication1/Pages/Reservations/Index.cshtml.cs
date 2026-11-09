@@ -20,7 +20,7 @@ public class IndexModel(ApplicationDbContext context) : PageModel
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId == null) return Challenge();
         var now = KOMA.Services.ReservationRules.MalaysiaNow;
-        var historyStart = now.Date.AddMonths(-3);
+        var historyStart = now.AddMonths(-1);
         Bookings = await context.Reservations.AsNoTracking().Include(r => r.RestaurantTable)
             .Where(r => r.CustomerUserId == userId && r.StartTime >= historyStart)
             .OrderByDescending(r => r.StartTime).ToListAsync();

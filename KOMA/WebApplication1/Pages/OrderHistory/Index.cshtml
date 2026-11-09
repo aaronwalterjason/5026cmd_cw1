@@ -1,0 +1,36 @@
+@page
+@model KOMA.Pages.OrderHistory.IndexModel
+@{ ViewData["Title"] = "Order History"; }
+<link rel="stylesheet" href="~/css/order-history.css" asp-append-version="true" />
+<section class="order-history">
+    <header class="history-heading"><div><p class="history-eyebrow">YOUR DINING MOMENTS</p><h1>Order History</h1><p>Fully paid visits from the last three months. All times are Malaysia time.</p></div></header>
+    @if (Model.Visits.Count == 0)
+    {
+        <div class="history-empty"><h2>No paid visits yet</h2><p>Once your dining bill is fully paid, your receipt will appear here.</p><a asp-page="/Reservations/Index" class="btn btn-primary">My Reservations</a></div>
+    }
+    else
+    {
+        <div class="history-grid">
+        @foreach (var visit in Model.Visits)
+        {
+            var dishes = visit.Orders.SelectMany(o => o.Items).ToList();
+            <a class="history-card" asp-page="Details" asp-route-reference="@visit.Reference" asp-route-pageNumber="@Model.PageNumber">
+                <div class="history-card-top"><span>@visit.Reference</span><span class="history-paid">Paid</span></div>
+                <h2>@visit.DiningAt.ToString("dd MMM yyyy")</h2>
+                <p>@visit.DiningAt.ToString("h:mm tt") · Table @visit.Table</p>
+                <p class="history-dishes">@string.Join(", ", dishes.Take(3).Select(i => i.DishName))@(dishes.Count > 3 ? "…" : "")</p>
+                <div class="history-card-total"><span>@visit.DishCount items</span><strong>RM @visit.Total.ToString("N2")</strong></div>
+                <span class="history-open">View full bill <span aria-hidden="true">↗</span></span>
+            </a>
+        }
+        </div>
+        @if (Model.TotalPages > 1)
+        {
+            <nav class="history-pagination" aria-label="Order history pages">
+                @if (Model.PageNumber > 1) { <a asp-route-pageNumber="@(Model.PageNumber - 1)" class="btn btn-outline-primary">Previous</a> }
+                <span>Page @Model.PageNumber of @Model.TotalPages</span>
+                @if (Model.PageNumber < Model.TotalPages) { <a asp-route-pageNumber="@(Model.PageNumber + 1)" class="btn btn-outline-primary">Next</a> }
+            </nav>
+        }
+    }
+</section>

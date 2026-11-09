@@ -23,7 +23,7 @@ public class Reservation
     [Range(1, 20)] public int GuestCount { get; set; }
     [StringLength(500)] public string? SpecialRequests { get; set; }
     public ReservationStatus Status { get; set; } = ReservationStatus.Confirmed;
-    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAtUtc { get; set; } = KOMA.Services.DemoClock.Shared.UtcNow;
     public string CreatedByUserId { get; set; } = "";
     [Timestamp] public byte[] RowVersion { get; set; } = [];
 }

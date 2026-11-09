@@ -78,6 +78,20 @@ public sealed class TabletAccess(ApplicationDbContext db, IMemoryCache cache, ID
         cache.Set("tablet-visit:" + token, new Grant(visit, table, customer), TimeSpan.FromHours(6));
         http.Response.Cookies.Append(VisitCookie, token, Options(http));
     }
+    public sealed record ReservationChoice(int Table, string Customer, int Booking);
+    public string OfferReservation(int table, string customer, int booking)
+    {
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        cache.Set("tablet-reservation:" + token, new ReservationChoice(table, customer, booking), TimeSpan.FromMinutes(5));
+        return token;
+    }
+    public ReservationChoice? ReadReservation(string? token, int table)
+    {
+        if (token?.Length != 64) return null;
+        var choice = cache.Get<ReservationChoice>("tablet-reservation:" + token);
+        return choice?.Table == table ? choice : null;
+    }
+    public void ClearReservation(string token) => cache.Remove("tablet-reservation:" + token);
     public async Task<(int Visit, string? Customer)?> VisitAsync(HttpContext http)
     {
         if (!http.Request.Cookies.TryGetValue(VisitCookie, out var token)) return null;

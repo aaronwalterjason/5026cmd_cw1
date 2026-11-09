@@ -31,7 +31,7 @@ public class IndexModel(ApplicationDbContext db) : PageModel
 
         var availableIds = Dishes.Select(d => d.Id).ToArray();
         // Match the default Admin Reports period: today and the previous 29 days.
-        var salesTo = DateTime.Today.AddDays(1);
+        var salesTo = KOMA.Services.DemoClock.Shared.MalaysiaNow.Date.AddDays(1);
         var salesFrom = salesTo.AddDays(-30);
         var sales = await db.OrderItems.AsNoTracking()
             .Where(i => i.Order!.Status != OrderStatus.Cancelled

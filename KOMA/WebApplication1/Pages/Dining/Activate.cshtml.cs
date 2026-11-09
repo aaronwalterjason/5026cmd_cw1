@@ -10,6 +10,22 @@ namespace KOMA.Pages.Dining;
 public class ActivateModel(TabletAccess tablet, DiningOrderService service, ApplicationDbContext db) : PageModel
 {
     public string? TableNumber { get; private set; }
+    public KOMA.Models.Reservation? NearbyReservation { get; private set; }
+    public string? ChoiceToken { get; private set; }
+    public async Task<IActionResult> OnPostReservationAsync(string token, bool? accept)
+    {
+        var state = await OnGetAsync();
+        if (state is RedirectToPageResult) return state;
+        var table = await tablet.TableAsync(HttpContext);
+        var choice = table.HasValue ? tablet.ReadReservation(token, table.Value) : null;
+        if (choice == null || !accept.HasValue) { ModelState.AddModelError("", "Please scan your account QR again."); return Page(); }
+        var result = await service.BeginAsync(choice.Table, choice.Customer,
+            accept.Value ? choice.Booking : null, accept.Value ? null : choice.Booking);
+        if (!result.Id.HasValue) { ModelState.AddModelError("", result.Error!); return Page(); }
+        tablet.ClearReservation(token);
+        tablet.Open(HttpContext, choice.Table, result.Id.Value, choice.Customer);
+        return RedirectToPage("Menu");
+    }
     public async Task<IActionResult> OnGetAsync()
     {
         var grant = await tablet.VisitAsync(HttpContext);
@@ -38,6 +54,16 @@ public class ActivateModel(TabletAccess tablet, DiningOrderService service, Appl
         if (id == null) return StatusCode(403);
         var account = scan ? tablet.Redeem(code) : null;
         if (scan && account == null) { ModelState.AddModelError("", "This code expired or was used. Open a new QR code in your account."); return Page(); }
+        if (account != null)
+        {
+            var now = ReservationRules.MalaysiaNow;
+            NearbyReservation = await service.NearbyReservations(account, id.Value, now).FirstOrDefaultAsync();
+            if (NearbyReservation != null)
+            {
+                ChoiceToken = tablet.OfferReservation(id.Value, account, NearbyReservation.Id);
+                return Page();
+            }
+        }
         var result = await service.BeginAsync(id.Value, account);
         if (!result.Id.HasValue) { ModelState.AddModelError("", result.Error!); return Page(); }
         tablet.Open(HttpContext, id.Value, result.Id.Value, account);

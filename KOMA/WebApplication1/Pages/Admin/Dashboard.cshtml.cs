@@ -88,8 +88,8 @@ namespace KOMA.Pages.Admin
 
         public async Task OnGetAsync()
         {
-            Now = DateTime.Now;
-            var today = DateTime.Today;
+            Now = KOMA.Services.DemoClock.Shared.MalaysiaNow;
+            var today = KOMA.Services.DemoClock.Shared.MalaysiaNow.Date;
             var tomorrow = today.AddDays(1);
             var lastWeek = today.AddDays(-7);
 

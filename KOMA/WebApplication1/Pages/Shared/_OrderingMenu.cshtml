@@ -31,7 +31,7 @@
                     <div id="menu-empty" class="po-empty" hidden="@(Model.Menu.Count > 0)"><h3>No dishes found</h3><p>Try another category or search. If the menu is empty, please check back later.</p></div>
                 </section>
                 <aside class="po-cart" id="your-cart" aria-labelledby="cart-heading">
-                    <div class="po-cart-heading"><div><h2 id="cart-heading">@(Model.Tablet ? "Your bill" : "Your pre-order")</h2></div><span id="cart-count">0</span></div>
+                    <div class="po-cart-heading"><div><h2 id="cart-heading">@(Model.Tablet ? "Your next order" : "Your pre-order")</h2></div><span id="cart-count">0</span></div>
                     @if (Model.Preorder != null)
                     {
                         <section id="saved-dishes" data-cents="@((long)(Model.Preorder.TotalAmount * 100))"><strong>You have a preorder</strong>

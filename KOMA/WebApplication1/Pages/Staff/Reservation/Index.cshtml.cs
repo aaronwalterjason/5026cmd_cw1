@@ -42,6 +42,7 @@ public class IndexModel(ApplicationDbContext context) : PageModel
 
     public List<KOMA.Models.Reservation> CallsDue { get; private set; } = [];
     public HashSet<int> BlockedTables { get; private set; } = [];
+    public HashSet<int> ReadyTables { get; private set; } = [];
     public async Task OnGetAsync()
     {
         if (!ModelState.IsValid)
@@ -112,13 +113,19 @@ public class IndexModel(ApplicationDbContext context) : PageModel
             .Where(r =>
                 r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
                 (Now
-                    ? r.StartTime <= start && r.EndTime > start
+                    ? (r.StartTime <= start && r.EndTime > start) || context.TableServiceSessions.Any(s => s.ReservationId == r.Id && s.StartTime <= start && s.EndTime > start)
                     : r.StartTime < end && r.EndTime > start))
             .OrderBy(r => r.StartTime)
             .ToListAsync();
 
         if (Now)
         {
+            ReadyTables = (await context.Orders.AsNoTracking().Where(o => o.RestaurantTableId != null &&
+                o.PaymentStatus != PaymentStatus.Refunded &&
+                (o.Status == OrderStatus.ReadyToServe || o.Status == OrderStatus.Preparing) &&
+                o.Items.Any(i => i.Status == DishStatus.Ready || (o.Status == OrderStatus.ReadyToServe && i.Status != DishStatus.Served)) &&
+                o.TableServiceSession != null && o.TableServiceSession.StartTime <= now && o.TableServiceSession.EndTime > now)
+                .Select(o => o.RestaurantTableId!.Value).Distinct().ToListAsync()).ToHashSet();
             CallsDue = await context.Reservations.AsNoTracking().Include(r => r.RestaurantTable)
                 .Where(r => r.Status == ReservationStatus.Confirmed && r.HoldUntil > now && r.ContactAttemptAt == null &&
                     r.StartTime <= now.AddMinutes(-ReservationRules.CallMinutes) &&

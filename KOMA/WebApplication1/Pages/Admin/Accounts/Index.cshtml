@@ -55,7 +55,7 @@ else
         @* Team (ID badges) | Schedule (duty schedule, _Schedule.cshtml) - same full-width switch as Orders *@
         <nav class="ob-switch acc-switch" aria-label="Staff view">
             <a asp-page="./Index" asp-route-group="staff" class="@(Model.IsSchedule ? "" : "is-on")"><b>Team</b><span>@Model.CountFor(g) staff</span></a>
-            <a asp-page="./Index" asp-route-group="staff" asp-route-view="schedule" class="@(Model.IsSchedule ? "is-on" : "")"><b>Schedule</b><span>@((Model.Schedule?.Month ?? DateOnly.FromDateTime(DateTime.Today)).ToString("MMMM"))</span></a>
+            <a asp-page="./Index" asp-route-group="staff" asp-route-view="schedule" class="@(Model.IsSchedule ? "is-on" : "")"><b>Schedule</b><span>@((Model.Schedule?.Month ?? DateOnly.FromDateTime(KOMA.Services.DemoClock.Shared.MalaysiaNow.Date)).ToString("MMMM"))</span></a>
         </nav>
     }
     if (Model.IsSchedule && Model.Schedule is not null)

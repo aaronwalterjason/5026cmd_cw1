@@ -10,7 +10,7 @@ namespace KOMA.Models
     public class ActivityLog
     {
         public int Id { get; set; }
-        public DateTime At { get; set; } = DateTime.Now;
+        public DateTime At { get; set; } = KOMA.Services.DemoClock.Shared.MalaysiaNow;
 
         // Who did it (copied, so the log stays readable if the account changes later).
         public string? UserId { get; set; }

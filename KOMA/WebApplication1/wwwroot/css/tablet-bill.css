@@ -1,0 +1,10 @@
+.tablet-heading { display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+#visit-bill-dialog,#last-call-dialog { width:min(94vw,680px); max-height:85vh; overflow:auto; border:0; border-radius:18px; padding:24px; box-shadow:0 20px 70px #0004; }
+#visit-bill-dialog::backdrop,#last-call-dialog::backdrop { background:#0007; }
+.visit-bill-line { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; }
+.visit-bill-line > div { flex:1; min-width:180px; }
+.visit-bill-line label { padding:10px; white-space:nowrap; }
+.visit-bill-line input { width:20px; height:20px; vertical-align:middle; }
+#ordering-controls { min-width:0; }
+#ordering-controls:disabled .po-stepper { opacity:.45; }
+.ready-food-alert { display:inline-flex; justify-content:center; align-items:center; background:#b42318; color:white; border-radius:50%; min-width:26px; height:26px; font-weight:800; }

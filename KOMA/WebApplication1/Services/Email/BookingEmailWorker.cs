@@ -42,7 +42,7 @@ public class BookingEmailWorker(IServiceScopeFactory scopes, ILogger<BookingEmai
         var now = ReservationRules.MalaysiaNow;
         var due = await db.Reservations.AsNoTracking()
             .Where(r => r.Status == ReservationStatus.Confirmed && r.StartTime > now.AddHours(2) && r.StartTime <= now.AddHours(o.ReminderHours)
-                        && r.CreatedAtUtc < DateTime.UtcNow.AddHours(-o.ReminderHours / 2.0)   // booked at the last minute: no reminder needed
+                        && r.CreatedAtUtc < KOMA.Services.DemoClock.Shared.UtcNow.AddHours(-o.ReminderHours / 2.0)   // booked at the last minute: no reminder needed
                         && (r.CustomerUser == null || !r.CustomerUser.NoReminderEmails))
             .Select(r => new { r.Id, r.StartTime, r.CustomerName }).ToListAsync(ct);
         foreach (var r in due)

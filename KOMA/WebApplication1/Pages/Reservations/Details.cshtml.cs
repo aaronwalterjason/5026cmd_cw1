@@ -25,6 +25,7 @@ public class DetailsModel(ApplicationDbContext context, ReservationService reser
     {
         var booking = await context.Reservations.AsNoTracking().Include(r => r.RestaurantTable).ThenInclude(t => t.DiningArea).SingleOrDefaultAsync(r => r.Id == id);
         if (booking == null || (!IsStaff && booking.CustomerUserId != User.FindFirstValue(ClaimTypes.NameIdentifier))) return NotFound();
+        if (!IsStaff && booking.StartTime < ReservationRules.MalaysiaNow.AddMonths(-1)) return NotFound();
         Booking = booking;
         HasVisit = await context.TableServiceSessions.AnyAsync(s => s.ReservationId == id);
         CanGiveFeedback = !IsStaff && booking.Status == ReservationStatus.Confirmed && booking.EndTime <= ReservationRules.MalaysiaNow

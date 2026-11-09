@@ -1,0 +1,29 @@
+@page
+@model KOMA.Pages.OrderHistory.DetailsModel
+@using KOMA.Models
+@{ ViewData["Title"] = "Dining receipt"; var visit = Model.Visit; }
+<link rel="stylesheet" href="~/css/order-history.css" asp-append-version="true" />
+<article class="history-receipt">
+    <header class="history-heading"><div><p class="history-eyebrow">@visit.Reference</p><h1>Dining receipt</h1><span class="history-paid">Paid in full</span></div>
+        <a class="history-exit" asp-page="Index" asp-route-pageNumber="@Model.PageNumber" title="Back to Order History" aria-label="Back to Order History"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 4H4v16h5m6-13 5 5-5 5M8 12h12"/></svg></a>
+    </header>
+    <dl class="history-facts"><div><dt>Dining date and time</dt><dd>@visit.DiningAt.ToString("dd MMM yyyy, h:mm tt")</dd></div><div><dt>Table</dt><dd>@visit.Table @(string.IsNullOrEmpty(visit.Area) ? "" : "· " + visit.Area)</dd></div>
+        @if (visit.Guests.HasValue) { <div><dt>Guests</dt><dd>@visit.Guests</dd></div> }
+        <div><dt>Fully paid at</dt><dd>@visit.PaidAt.ToString("dd MMM yyyy, h:mm tt")</dd></div>
+    </dl>
+    <p class="text-muted small">All times are Malaysia time.</p>
+    @foreach (var order in visit.Orders)
+    {
+        <section class="history-order"><h2>@order.OrderNumber <span>@(order.OrderType == OrderType.OnlinePreOrder ? "Preorder" : "Dining order")</span></h2>
+            <p class="text-muted small">Ordered @order.OrderedAt.ToString("dd MMM yyyy, h:mm tt") · @order.Status.DisplayName()</p>
+            <div class="table-responsive"><table class="table"><thead><tr><th>Dish</th><th class="text-end">Qty</th><th class="text-end">Unit price</th><th class="text-end">Amount</th></tr></thead><tbody>
+                @foreach (var dish in order.Items.OrderBy(i => i.Id)) { <tr><td>@dish.DishName</td><td class="text-end">@dish.Quantity</td><td class="text-end text-nowrap">RM @dish.UnitPrice.ToString("N2")</td><td class="text-end text-nowrap">RM @dish.LineTotal.ToString("N2")</td></tr> }
+            </tbody></table></div>
+            <div class="history-card-total"><span>Order total</span><strong>RM @order.TotalAmount.ToString("N2")</strong></div>
+            <p class="text-muted small">Paid @order.PaidAt?.ToString("dd MMM yyyy, h:mm tt") · @(order.PaymentMethod?.DisplayName() ?? "Payment method not recorded")</p>
+            @if (!string.IsNullOrWhiteSpace(order.Notes)) { <p class="history-notes">Notes: @order.Notes</p> }
+        </section>
+    }
+    <footer class="history-grand-total"><span>Total paid</span><strong>RM @visit.Total.ToString("N2")</strong></footer>
+    <p class="text-muted small mt-3">Your receipt is available here for three months after full payment.</p>
+</article>

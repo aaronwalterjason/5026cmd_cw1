@@ -1,0 +1,26 @@
+@{
+    var clock = KOMA.Services.DemoClock.Shared.Snapshot();
+}
+@if (clock.Enabled)
+{
+    <link rel="stylesheet" href="~/css/demo-clock.css" asp-append-version="true" />
+    <div id="demo-clock" data-url="@Url.Page("/DemoTime", new { area = "" })" data-version="@clock.Version" data-now="@clock.Now.ToString("O")" data-simulated="@clock.Simulated.ToString().ToLowerInvariant()">
+        <button id="demo-clock-toggle" type="button" aria-label="Open time simulator. Drag to move." title="Time simulator · drag to move" aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg>
+            <span class="demo-clock-badge" hidden="@(!clock.Simulated)">DEMO</span>
+        </button>
+        <dialog id="demo-clock-dialog" aria-labelledby="demo-clock-title">
+            <div class="demo-clock-heading"><h2 id="demo-clock-title">Time simulator</h2><button type="button" id="demo-clock-close" aria-label="Close time simulator">×</button></div>
+            <p id="demo-clock-mode"></p><output id="demo-clock-now"></output><small>Malaysia time (UTC+8)</small>
+            <form method="post" asp-area="" asp-page="/DemoTime" asp-page-handler="Set" id="demo-clock-form">
+                <label for="demo-clock-input">Choose date and time</label>
+                <input id="demo-clock-input" name="localTime" type="datetime-local" min="2000-01-01T00:00" max="2100-12-31T23:59" required />
+                <p class="demo-clock-note">Applies to all connected demo screens. Time keeps ticking. Changing time refreshes the pages, so save your work first.</p>
+                <p class="demo-clock-note">Advancing time can expire reservations. Resetting the clock does not undo saved changes.</p>
+                <p id="demo-clock-error" role="alert"></p>
+                <div class="demo-clock-actions"><button type="submit">Use demo time</button><button type="button" id="demo-clock-reset">Return to real time</button></div>
+            </form>
+        </dialog>
+    </div>
+    <script src="~/js/demo-clock.js" asp-append-version="true" defer></script>
+}

@@ -37,7 +37,7 @@ namespace KOMA.Models
         public TableServiceSession? TableServiceSession { get; set; }
 
         [Display(Name = "Ordered at")]
-        public DateTime OrderedAt { get; set; } = DateTime.Now;
+        public DateTime OrderedAt { get; set; } = KOMA.Services.DemoClock.Shared.MalaysiaNow;
 
         public OrderStatus Status { get; set; } = OrderStatus.Pending;
 

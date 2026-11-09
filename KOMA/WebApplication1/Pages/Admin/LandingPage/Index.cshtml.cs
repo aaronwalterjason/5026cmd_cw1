@@ -60,7 +60,7 @@ public class IndexModel(ApplicationDbContext _db, MenuImageService images) : Pag
         Content.Id = existing.Id;                         // copy every field from the form onto the saved row
         _db.Entry(existing).CurrentValues.SetValues(Content);
         existing.HeroImageUrl = image;
-        existing.UpdatedAt = DateTime.Now;
+        existing.UpdatedAt = KOMA.Services.DemoClock.Shared.MalaysiaNow;
         await _db.SaveChangesAsync();
 
         TempData["StatusMessage"] = "The landing page was updated.";

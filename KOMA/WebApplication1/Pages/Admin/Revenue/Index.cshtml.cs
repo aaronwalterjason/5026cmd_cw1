@@ -59,8 +59,8 @@ namespace KOMA.Pages.Admin.Revenue
 
         public async Task OnGetAsync()
         {
-            Now = DateTime.Now;
-            var today = DateTime.Today;
+            Now = KOMA.Services.DemoClock.Shared.MalaysiaNow;
+            var today = KOMA.Services.DemoClock.Shared.MalaysiaNow.Date;
             Period = Period?.ToLowerInvariant() switch { "day" => "day", "year" => "year", _ => "month" };
 
             DateTime prevStart, prevFullEnd, nextStart;

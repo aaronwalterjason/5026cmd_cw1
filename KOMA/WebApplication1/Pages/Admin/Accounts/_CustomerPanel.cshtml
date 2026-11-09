@@ -7,7 +7,7 @@
 *@
 @{
     var p = Model;
-    var now = DateTime.Now;
+    var now = KOMA.Services.DemoClock.Shared.MalaysiaNow;
     string Whole(decimal v) => "RM " + Math.Round(v).ToString("#,0");
     string Dot(IndexModel.PanelBooking b) => b.Status == ReservationStatus.Cancelled ? "bad" : b.Attended ? "ok" : "mid";
     string DotTip(IndexModel.PanelBooking b) => b.Status == ReservationStatus.Cancelled ? "Cancelled" : b.Attended ? "Came" : "No-show";

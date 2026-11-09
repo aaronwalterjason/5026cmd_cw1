@@ -36,8 +36,8 @@ public class IndexModel(ApplicationDbContext _db, MenuImageService images) : Pag
         public bool AllDay { get; set; } = true;
         public int FromMin { get; set; } = 690;     // 11:30
         public int ToMin { get; set; } = 870;       // 2:30 pm
-        [DataType(DataType.Date)] public DateTime StartDate { get; set; } = DateTime.Today;
-        [DataType(DataType.Date)] public DateTime EndDate { get; set; } = DateTime.Today.AddDays(30);
+        [DataType(DataType.Date)] public DateTime StartDate { get; set; } = KOMA.Services.DemoClock.Shared.MalaysiaNow.Date;
+        [DataType(DataType.Date)] public DateTime EndDate { get; set; } = KOMA.Services.DemoClock.Shared.MalaysiaNow.Date.AddDays(30);
         [StringLength(160)] public string? BannerText { get; set; }
         public string? BannerImageUrl { get; set; }
         public bool RemoveImage { get; set; }
@@ -54,7 +54,7 @@ public class IndexModel(ApplicationDbContext _db, MenuImageService images) : Pag
     public bool Editing => Current is not null || Mode == "new";
     public List<DishRow> Dishes { get; private set; } = new();
     public int HomeUsedByOthers { get; private set; }
-    public DateTime Now { get; } = DateTime.Now;
+    public DateTime Now { get; } = KOMA.Services.DemoClock.Shared.MalaysiaNow;
 
     private static readonly string[] Order = { "Live", "Today", "Scheduled", "Paused", "Ended" };
     public string StatusOf(Promotion p) => p.StatusAt(Now);
@@ -82,7 +82,7 @@ public class IndexModel(ApplicationDbContext _db, MenuImageService images) : Pag
             .Select(m => new DishRow(m.Id, m.Name, m.Price, m.ImageUrl, m.MenuCategory!.Name, m.PromotionId, m.Promotion != null ? m.Promotion.Title : null))
             .ToListAsync();
         var editingId = Current?.Id ?? Input.Id;
-        HomeUsedByOthers = Promotions.Count(p => p.Id != editingId && p.ShowOnHome && p.IsActive && p.EndDate.Date >= DateTime.Today);
+        HomeUsedByOthers = Promotions.Count(p => p.Id != editingId && p.ShowOnHome && p.IsActive && p.EndDate.Date >= KOMA.Services.DemoClock.Shared.MalaysiaNow.Date);
     }
 
     private static PromoInput ToInput(Promotion p) => new()
@@ -105,7 +105,7 @@ public class IndexModel(ApplicationDbContext _db, MenuImageService images) : Pag
         if (Input.DishIds.Count == 0) ModelState.AddModelError("Input.DishIds", "Pick at least one dish.");
         if (Input.ShowOnHome)
         {
-            var used = await _db.Promotions.CountAsync(p => p.Id != Input.Id && p.ShowOnHome && p.IsActive && p.EndDate >= DateTime.Today);
+            var used = await _db.Promotions.CountAsync(p => p.Id != Input.Id && p.ShowOnHome && p.IsActive && p.EndDate >= KOMA.Services.DemoClock.Shared.MalaysiaNow.Date);
             if (used >= HomeSlots) ModelState.AddModelError("Input.ShowOnHome", $"All {HomeSlots} home page slots are in use. Turn one off first.");
         }
 

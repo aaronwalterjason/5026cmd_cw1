@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace KOMA.Pages.Dining;
 
 [AllowAnonymous, ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public class MenuModel(DiningOrderService service, TabletAccess tablet, ApplicationDbContext db) : PageModel
+public class MenuModel(DiningOrderService service, TabletAccess tablet, ApplicationDbContext db, OrderWorkflowService workflow) : PageModel
 {
     [BindProperty] public Dictionary<int,int> Quantities { get; set; } = [];
     [BindProperty] public decimal? ExpectedTotal { get; set; }
@@ -18,6 +18,24 @@ public class MenuModel(DiningOrderService service, TabletAccess tablet, Applicat
     public TableServiceSession Visit { get; private set; } = null!;
     public List<MenuItem> Dishes { get; private set; } = [];
     public Order? Preorder { get; private set; }
+    public string FirstName { get; private set; } = "Guest";
+    public List<Order> Orders { get; private set; } = [];
+    public DiningHours Hours { get; private set; } = null!;
+    public DateTime ServerNow { get; private set; }
+    public async Task<IActionResult> OnGetBillAsync()
+    {
+        if (!await LoadAsync()) return Unauthorized();
+        return Partial("_VisitBill", this);
+    }
+    public async Task<IActionResult> OnPostServedAsync(int itemId, int visitId, string? pin)
+    {
+        if (!await LoadAsync()) return Unauthorized();
+        if (visitId != Visit.Id) return BadRequest("The table visit changed. Reopen the bill.");
+        var pinError = tablet.CheckExitPin(Visit.RestaurantTableId, pin);
+        if (pinError != null) return new ObjectResult(pinError) { StatusCode = 403 };
+        var error = await workflow.ServeDishAsync(itemId, Visit.Id, Visit.RestaurantTableId, "Tablet");
+        return error == null ? new OkResult() : new ConflictObjectResult(error);
+    }
     private string? customer;
     private async Task<bool> LoadAsync()
     {
@@ -28,6 +46,19 @@ public class MenuModel(DiningOrderService service, TabletAccess tablet, Applicat
         var visit = await service.ActiveVisits().Include(s => s.RestaurantTable).SingleOrDefaultAsync(s => s.Id == id);
         if (visit == null) return false;
         Visit = visit;
+        if (account != null)
+        {
+            var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == account);
+            FirstName = !string.IsNullOrWhiteSpace(user?.FirstName) ? user.FirstName :
+                user?.FullName?.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Guest";
+        }
+        ServerNow = ReservationRules.MalaysiaNow;
+        var settings = await db.RestaurantSettings.AsNoTracking().FirstOrDefaultAsync();
+        Hours = settings == null ? new DiningHours(ServerNow, true, false) : DiningHours.At(settings, ServerNow);
+        Orders = await db.Orders.AsNoTracking().Include(o => o.Items).ThenInclude(i => i.MenuItem)
+            .Where(o => o.RestaurantTableId == Visit.RestaurantTableId &&
+                (o.TableServiceSessionId == Visit.Id || (Visit.ReservationId != null && o.ReservationId == Visit.ReservationId)))
+            .OrderBy(o => o.Id).ToListAsync();
         Dishes = await service.Menu().AsNoTracking().Include(m => m.MenuCategory)
             .OrderBy(m => m.MenuCategory!.Name).ThenBy(m => m.Name).ToListAsync();
         Preorder = visit.ReservationId.HasValue ? await db.Orders.AsNoTracking().Include(o => o.Items)

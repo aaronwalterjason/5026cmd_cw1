@@ -18,10 +18,18 @@ public class DiningOrderService(ApplicationDbContext db)
 
     public IQueryable<MenuItem> Menu() => db.MenuItems.Where(m => m.IsAvailable && m.MenuCategory!.IsActive);
 
+    public IQueryable<Reservation> NearbyReservations(string customer, int table, DateTime now) =>
+        db.Reservations.AsNoTracking().Where(r => r.CustomerUserId == customer &&
+            r.Status == ReservationStatus.Confirmed && r.StartTime >= now.AddHours(-1) &&
+            r.StartTime <= now.AddHours(1) && r.EndTime > now &&
+            (r.HoldUntil == null || r.HoldUntil > now || db.TableServiceSessions.Any(s => s.ReservationId == r.Id)))
+            .OrderBy(r => r.RestaurantTableId == table ? 0 : 1)
+            .ThenBy(r => Math.Abs(EF.Functions.DateDiffMinute(now, r.StartTime)));
+
     public async Task<int> LatestOrderAsync(int visitId) => await db.Orders.Where(o => o.TableServiceSessionId == visitId)
         .Select(o => (int?)o.Id).MaxAsync() ?? 0;
 
-    public async Task<(int? Id, string? Error)> BeginAsync(int tableId, string? customer)
+    public async Task<(int? Id, string? Error)> BeginAsync(int tableId, string? customer, int? confirmedBooking = null, int? ignoredBooking = null)
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         await LockAsync();
@@ -29,10 +37,30 @@ public class DiningOrderService(ApplicationDbContext db)
         if (!await db.RestaurantTables.AnyAsync(t => t.Id == tableId && t.IsActive && t.DiningArea!.IsActive))
             return (null, "Ask Staff to pair this tablet again.");
         await ArrivalService.ExpireAsync(db, now);
+        if (confirmedBooking.HasValue)
+        {
+            var reservation = await db.Reservations.SingleOrDefaultAsync(r => r.Id == confirmedBooking &&
+                r.CustomerUserId == customer && customer != null && r.Status == ReservationStatus.Confirmed &&
+                r.StartTime >= now.AddHours(-1) && r.StartTime <= now.AddHours(1) && r.EndTime > now);
+            if (reservation == null) return (null, "This reservation is no longer available. Ask staff to check your booking.");
+            if (reservation.RestaurantTableId != tableId) return (null, "Your reservation is at another table. Ask staff to take you to your reserved table.");
+            if (await db.TableServiceSessions.AnyAsync(s => s.RestaurantTableId == tableId && s.ReservationId != reservation.Id &&
+                s.StartTime < reservation.EndTime && s.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)) ||
+                await db.Reservations.AnyAsync(r => r.Id != reservation.Id && r.RestaurantTableId == tableId &&
+                r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
+                r.StartTime < reservation.EndTime && r.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)))
+                return (null, "This table is still occupied or being prepared. Please ask staff for help.");
+            var reservedVisit = await BookingSessionAsync(db, reservation);
+            if (reservedVisit.StartTime > now) reservedVisit.StartTime = now;
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
+            return (reservedVisit.Id, null);
+        }
         var bookings = await db.Reservations.Where(r => r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
+            r.Id != ignoredBooking &&
             r.StartTime <= now && now < r.EndTime && (r.RestaurantTableId == tableId ||
             (customer != null && r.CustomerUserId == customer))).ToListAsync();
-        var booking = bookings.FirstOrDefault(r => customer != null && r.CustomerUserId == customer && r.RestaurantTableId == tableId && r.Status == ReservationStatus.Confirmed);
+        var booking = ignoredBooking.HasValue ? null : bookings.FirstOrDefault(r => customer != null && r.CustomerUserId == customer && r.RestaurantTableId == tableId && r.Status == ReservationStatus.Confirmed);
         if (booking == null && bookings.Count > 0)
             return (null, "This table or reservation does not match. Check your table number and scan your account QR.");
         TableServiceSession visit;
@@ -41,7 +69,7 @@ public class DiningOrderService(ApplicationDbContext db)
         {
             if (await ActiveVisits().AnyAsync(s => s.RestaurantTableId == tableId))
                 return (null, "This table has an active visit. Finish the current visit before starting another.");
-            var next = await db.Reservations.Where(r => r.RestaurantTableId == tableId && r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow && r.StartTime > now)
+            var next = await db.Reservations.Where(r => r.Id != ignoredBooking && r.RestaurantTableId == tableId && r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow && r.StartTime > now)
                 .Select(r => (DateTime?)r.StartTime).MinAsync();
             var end = now.AddMinutes(ReservationRules.SlotMinutes);
             if (next.HasValue && next.Value.AddMinutes(-ReservationRules.TurnaroundMinutes) < end)
@@ -94,6 +122,9 @@ public class DiningOrderService(ApplicationDbContext db)
         await LockAsync();
         var visit = await ActiveVisits().Include(s => s.Reservation).SingleOrDefaultAsync(s => s.Id == visitId && s.RestaurantTableId == expectedTable);
         if (visit == null) return (null, "This dining visit has ended. Ask Staff to check the table.");
+        var settings = await db.RestaurantSettings.AsNoTracking().FirstOrDefaultAsync();
+        if (settings == null || DiningHours.At(settings, ReservationRules.MalaysiaNow).Locked)
+            return (null, "Ordering is closed. Last call is 30 minutes before closing. You can still view your bill.");
         var preorder = visit.ReservationId.HasValue ? await db.Orders.Include(o => o.Items)
             .SingleOrDefaultAsync(o => o.ReservationId == visit.ReservationId && o.Status == OrderStatus.AwaitingArrival) : null;
         if (preorder != null && (preorder.CustomerId != customer || preorder.RestaurantTableId != visit.RestaurantTableId ||

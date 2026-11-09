@@ -72,9 +72,9 @@ namespace KOMA.Pages.Admin.Reports
         private async Task BuildAsync()
         {
             if (!Ranges.Any(r => r.Days == Days)) Days = 30;
-            To = DateTime.Today.AddDays(1);
+            To = KOMA.Services.DemoClock.Shared.MalaysiaNow.Date.AddDays(1);
             From = To.AddDays(-Days);
-            var now = DateTime.Now;
+            var now = KOMA.Services.DemoClock.Shared.MalaysiaNow;
 
             var res = await _db.Reservations.AsNoTracking()
                 .Where(r => r.StartTime >= From && r.StartTime < To && r.Status != ReservationStatus.Cancelled)

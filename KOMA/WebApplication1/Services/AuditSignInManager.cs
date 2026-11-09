@@ -29,7 +29,7 @@ public class AuditSignInManager(
                 {
                     db.ActivityLogs.Add(new ActivityLog
                     {
-                        At = DateTime.Now, UserId = user.Id, UserRole = role,
+                        At = KOMA.Services.DemoClock.Shared.MalaysiaNow, UserId = user.Id, UserRole = role,
                         UserName = user.FullName ?? user.Email ?? userName,
                         Area = ActivityLog.Areas.SignIns,
                         Action = result.Succeeded ? "Signed in" : result.IsLockedOut ? "Locked out" : "Failed sign-in",

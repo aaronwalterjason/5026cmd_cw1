@@ -1,0 +1,30 @@
+@model KOMA.Pages.Dining.MenuModel
+@using KOMA.Models
+@using KOMA.Services
+@{
+    var chargeable = Model.Orders.Where(o => o.Status != OrderStatus.Cancelled && o.PaymentStatus != PaymentStatus.Refunded).ToList();
+}
+<div id="visit-bill-state" data-now="@(new DateTimeOffset(Model.ServerNow, TimeSpan.FromHours(8)).ToString("O"))" data-cutoff="@(new DateTimeOffset(Model.Hours.LastCall, TimeSpan.FromHours(8)).ToString("O"))" data-locked="@Model.Hours.Locked.ToString().ToLowerInvariant()" data-visit="@Model.Visit.Id">
+    @if (Model.Orders.Count == 0) { <p>No orders yet. Confirm your selection to send it to the kitchen.</p> }
+    @foreach (var order in Model.Orders)
+    {
+        <article class="mb-3 border-bottom pb-3">
+            <h3 class="h6">@order.OrderNumber · @order.Status.DisplayName() · @order.PaymentStatus</h3>
+            @foreach (var item in order.Items.OrderBy(i => i.Id))
+            {
+                var status = OrderWorkflowService.EffectiveDishStatus(order, item);
+                var active = order.Status != OrderStatus.Cancelled && order.PaymentStatus != PaymentStatus.Refunded;
+                var label = !active ? "Cancelled / refunded" : order.Status is OrderStatus.AwaitingArrival or OrderStatus.Pending or OrderStatus.QueuedForKitchen ? order.Status.DisplayName() : status.DisplayName();
+                <div class="visit-bill-line">
+                    <div><strong>@item.Quantity × @item.DishName</strong><br/><span>@label</span></div>
+                    <strong>RM @item.LineTotal.ToString("F2")</strong>
+                    <label><input type="checkbox" data-serve-dish="@item.Id" checked="@(status == DishStatus.Served)" disabled="@(!active || status != DishStatus.Ready)" /> Served</label>
+                </div>
+            }
+        </article>
+    }
+    <p class="d-flex justify-content-between"><strong>Total bill</strong><strong>RM @chargeable.Sum(o => o.TotalAmount).ToString("F2")</strong></p>
+    <p class="d-flex justify-content-between"><span>Paid</span><span>RM @chargeable.Where(o => o.PaymentStatus == PaymentStatus.Paid).Sum(o => o.TotalAmount).ToString("F2")</span></p>
+    <p class="d-flex justify-content-between"><strong>Amount due</strong><strong>RM @chargeable.Where(o => o.PaymentStatus == PaymentStatus.Unpaid).Sum(o => o.TotalAmount).ToString("F2")</strong></p>
+    <small>Includes preorders and all confirmed add-ons for this visit. Unconfirmed selections are not included. Staff PIN required to mark ready dishes served.</small>
+</div>

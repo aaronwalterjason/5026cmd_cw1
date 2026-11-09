@@ -149,7 +149,7 @@
     host.addEventListener("click", event => {
         const button = event.target.closest("[data-open-table]");
 
-        if (button) openTable(button.dataset.openTable);
+        if (button) openTable(button.dataset.openTable, null, null, button.dataset.ready === "true" ? "#food-tab" : null);
     });
 
     body.addEventListener("click", event => {
@@ -159,7 +159,7 @@
         if (button) openTable(tableId, button.dataset.booking, button.dataset.session);
     });
     body.addEventListener("submit", async event => {
-        const form = event.target.closest(".payment-form, .walk-in-move, .arrival-form");
+        const form = event.target.closest(".payment-form, .walk-in-move, .arrival-form, .serve-dish-form");
         if (!form) return;
         event.preventDefault();
         const data = new FormData(form);
@@ -168,6 +168,11 @@
         submit.disabled = true;
         try {
             const response = await fetch(form.action, { method: "POST", body: data });
+            if (form.matches(".serve-dish-form")) {
+                if (!response.ok || response.redirected) throw new Error("Could not mark this dish served. Reopen the table to check its status.");
+                await openTable(data.get("TableId"), data.get("BookingId"), data.get("SessionId"), "#food-tab");
+                return;
+            }
             if (form.matches(".arrival-form")) {
                 if (!response.ok || response.redirected) throw new Error(response.status === 409 ? await response.text() : "Could not update arrival.");
                 location.reload();

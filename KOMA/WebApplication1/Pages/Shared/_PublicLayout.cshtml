@@ -53,7 +53,7 @@
     <footer class="footer footer-feedback">
         <a class="brand" asp-area="" asp-page="/Index">KOMA</a>
         <button type="button" class="feedback-link" data-feedback-open="landing-feedback">Share your feedback</button>
-        <div>© @DateTime.Now.Year KOMA · <a asp-area="" asp-page="/Privacy">Privacy</a></div>
+        <div>© @KOMA.Services.DemoClock.Shared.MalaysiaNow.Year KOMA · <a asp-area="" asp-page="/Privacy">Privacy</a></div>
     </footer>
     <dialog id="landing-feedback" class="feedback-dialog" aria-label="Share your feedback">
         <button type="button" class="feedback-close" data-feedback-close>Close</button>
@@ -61,5 +61,6 @@
     </dialog>
     <script src="~/js/feedback.js" asp-append-version="true" defer></script>
     <script src="~/js/koma-home.js" asp-append-version="true" defer></script>
+    <partial name="_DemoClock" />
 </body>
 </html>
