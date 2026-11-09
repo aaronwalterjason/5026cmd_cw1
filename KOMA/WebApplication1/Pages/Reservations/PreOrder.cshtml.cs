@@ -28,7 +28,8 @@ public class PreOrderModel(ApplicationDbContext context, DiningOrderService dini
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId == null) return null;
         var booking = await context.Reservations.SingleOrDefaultAsync(r => r.Id == Id);
-        if (booking == null || (!IsStaff && booking.CustomerUserId != userId)) return null;
+        if (booking == null || (!IsStaff && (booking.CustomerUserId != userId ||
+            booking.StartTime < ReservationRules.MalaysiaNow.AddMonths(-1)))) return null;
         Booking = booking;
         ExistingOrder = await context.Orders.Include(o => o.Items).ThenInclude(i => i.MenuItem)
             .SingleOrDefaultAsync(o => o.ReservationId == Id);
