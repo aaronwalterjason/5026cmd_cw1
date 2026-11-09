@@ -15,7 +15,7 @@
     <h1 class="mb-0">Orders</h1>
     @if (!Model.IsAll)
     {
-        <input type="search" id="ob-search" class="ob-search" aria-label="Search tables, names or dishes" autocomplete="off" />
+        <input type="search" placeholder="Search" id="ob-search" class="ob-search" aria-label="Search tables, names or dishes" autocomplete="off" />
     }
     <a class="koma-go @(Model.IsAll ? "ms-auto" : "")" asp-page="/Admin/Revenue/Index">Revenue<span class="koma-go-disc" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
 </div>
@@ -247,7 +247,7 @@
 
             <form method="get" class="ord-filters" id="ord-filters" onsubmit="return false">
                 <label class="visually-hidden" for="search">Search orders</label>
-                <input type="search" id="search" name="search" value="@Model.Search" class="form-control ord-search" autocomplete="off" />
+                <input type="search" placeholder="Search" id="search" name="search" value="@Model.Search" class="form-control ord-search" autocomplete="off" />
                 <div class="ord-dates">
                     <label class="small text-muted" for="from">From</label>
                     <input type="date" id="from" name="from" value="@(Model.From?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />

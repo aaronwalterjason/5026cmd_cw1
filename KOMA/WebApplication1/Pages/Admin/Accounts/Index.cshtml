@@ -47,7 +47,7 @@ else
         <a asp-page="./Index" class="acc-back">← All accounts</a>
         <h1 class="mb-0">@g.Title</h1>
         <span class="acc-sub">@Model.CountFor(g) @g.Subtitle</span>
-        <input type="search" id="acc-search" class="acc-search" hidden="@Model.IsSchedule" aria-label="Search @g.Title.ToLowerInvariant()" autocomplete="off" />
+        <input type="search" placeholder="Search" id="acc-search" class="acc-search" hidden="@Model.IsSchedule" aria-label="Search @g.Title.ToLowerInvariant()" autocomplete="off" />
     </div>
 
     @if (g.Role == "Staff")
