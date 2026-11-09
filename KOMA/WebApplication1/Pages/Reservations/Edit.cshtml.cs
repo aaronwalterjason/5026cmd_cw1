@@ -102,7 +102,7 @@ public class EditModel(ApplicationDbContext context, ReservationService reservat
         if (own != null && !IsStaff && own.CustomerUserId != User.FindFirstValue(ClaimTypes.NameIdentifier)) return Forbid();
         var settings = await context.RestaurantSettings.FirstAsync();
         var result = new List<string>();
-        foreach (var slot in ReservationRules.Slots(settings))
+        foreach (var slot in ReservationRules.Slots(settings, date))   // none on closed days / closed dates
         {
             var start = date.ToDateTime(slot);
             var choices = ReservationService.AvailableTables(context, guests, own?.Id, start, start, start.AddMinutes(ReservationRules.SlotMinutes));

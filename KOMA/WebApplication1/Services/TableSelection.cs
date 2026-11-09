@@ -32,10 +32,12 @@ public record TableSelection(
 
             var clock = TimeOnly.FromDateTime(instant);
 
+            var plan = settings?.For(DateOnly.FromDateTime(instant));   // per-day hours and closed dates
             var isOpen =
-                settings != null &&
-                clock >= settings.OpeningTime &&
-                clock < settings.ClosingTime;
+                plan != null &&
+                plan.IsOpen &&
+                clock >= plan.Opens &&
+                clock < plan.Closes;
 
             return new TableSelection(
                 instant,

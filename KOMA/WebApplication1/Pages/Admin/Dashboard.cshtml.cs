@@ -163,10 +163,13 @@ namespace KOMA.Pages.Admin
             // Opening hours (single settings row; defaults if it's missing).
             var settings = await _db.RestaurantSettings.AsNoTracking().FirstOrDefaultAsync() ?? new RestaurantSettings();
             var nowTime = TimeOnly.FromDateTime(Now);
-            IsOpen = nowTime >= settings.OpeningTime && nowTime < settings.ClosingTime;
-            OpenText = IsOpen
-                ? $"Open until {ShortTime(settings.ClosingTime)}"
-                : nowTime < settings.OpeningTime ? $"Closed · opens {ShortTime(settings.OpeningTime)}" : "Closed for today";
+            var todayHours = settings.For(DateOnly.FromDateTime(Now));   // per-day hours and closed dates
+            IsOpen = todayHours.IsOpen && nowTime >= todayHours.Opens && nowTime < todayHours.Closes;
+            OpenText = !todayHours.IsOpen
+                ? (todayHours.ClosedReason is null ? "Closed today" : $"Closed today · {todayHours.ClosedReason}")
+                : IsOpen
+                    ? $"Open until {ShortTime(todayHours.Closes)}"
+                    : nowTime < todayHours.Opens ? $"Closed · opens {ShortTime(todayHours.Opens)}" : "Closed for today";
 
             // Sales so far vs the same time of day on earlier dates.
             var sinceStart = Now - today;
