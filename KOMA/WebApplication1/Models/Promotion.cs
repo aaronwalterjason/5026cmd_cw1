@@ -50,6 +50,18 @@ namespace KOMA.Models
             return t <= EndTime ? "Live" : (EndDate.Date > now.Date ? "Scheduled" : "Ended");
         }
 
+        // Does the discount apply to food served at this time? (date range, weekday, time window, not paused)
+        // Pre-orders use the booking's start time; table-tablet orders use the time they are placed.
+        public bool AppliesAt(DateTime when)
+        {
+            if (!IsActive || DiscountPercent <= 0) return false;
+            if (when.Date < StartDate.Date || when.Date > EndDate.Date) return false;
+            if (!RunsOn(DayIndex(when.DayOfWeek))) return false;
+            if (AllDay) return true;
+            var t = TimeOnly.FromDateTime(when);
+            return t >= StartTime!.Value && t <= EndTime!.Value;
+        }
+
         public string DaysText()
         {
             if (Days == 127) return "Every day";

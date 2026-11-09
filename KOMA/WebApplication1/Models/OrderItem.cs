@@ -30,6 +30,10 @@ namespace KOMA.Models
         [Display(Name = "Unit price (RM)")]
         public decimal UnitPrice { get; set; }
 
+        // Promotion on this line: the normal menu price and the promotion's name (both empty = full price).
+        [Column(TypeName = "decimal(8,2)")] public decimal? ListPrice { get; set; }
+        [StringLength(100)] public string? PromotionTitle { get; set; }
+
         // Where this dish is: Preparing -> Ready (plated, waiting at the pass) -> Served.
         // Served can be confirmed by staff/admin (Admin > Orders) or by the customer on the table tablet.
         public DishStatus Status { get; set; } = DishStatus.Preparing;
