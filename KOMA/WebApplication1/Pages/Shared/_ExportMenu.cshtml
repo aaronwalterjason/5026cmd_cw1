@@ -1,0 +1,31 @@
+@model KOMA.Services.Reporting.ExportMenu
+@{
+    // Links to the page's Export handler for the period on screen, e.g. ?handler=Export&format=pdf&period=week&date=2026-11-09
+    string Href(string format)
+    {
+        var values = new Microsoft.AspNetCore.Routing.RouteValueDictionary();
+        foreach (var kv in Model.Route) values[kv.Key] = kv.Value;
+        values["format"] = format;
+        return Url.Page(Model.Page, "Export", values) ?? "#";
+    }
+}
+<details class="ex-menu">
+    <summary aria-label="Export this report">
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        Export
+    </summary>
+    <div class="ex-list">
+        <a href="@Href("pdf")"><span class="ex-tag is-pdf">PDF</span>Report</a>
+        <a href="@Href("xlsx")"><span class="ex-tag is-xlsx">XLSX</span>Excel</a>
+        <a href="@Href("csv")"><span class="ex-tag is-csv">CSV</span>Data</a>
+    </div>
+</details>
+<script>
+    // Close the menu on a choice, an outside click or Esc.
+    (function () {
+        var menu = document.currentScript.previousElementSibling;
+        menu.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', function () { menu.open = false; }); });
+        document.addEventListener('click', function (e) { if (menu.open && !menu.contains(e.target)) menu.open = false; });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && menu.open) { menu.open = false; menu.querySelector('summary').focus(); } });
+    })();
+</script>

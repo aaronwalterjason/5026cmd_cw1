@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using KOMA.Data;
 using KOMA.Models;
+using KOMA.Services.Reporting;
 
 namespace KOMA.Pages.Admin.Reports
 {
@@ -18,14 +19,17 @@ namespace KOMA.Pages.Admin.Reports
         private readonly ApplicationDbContext _db;
         public IndexModel(ApplicationDbContext db) => _db = db;
 
-        public static readonly (int Days, string Label)[] Ranges = { (7, "Last 7 days"), (30, "Last 30 days"), (90, "Last 90 days"), (365, "Last 12 months") };
         public const int GuestsPerStaff = 18;   // Team: more guests than this per person on shift = not enough staff
 
-        [BindProperty(SupportsGet = true)] public int Days { get; set; } = 30;
+        // ?period=day|week|month&date=yyyy-MM-dd&month=yyyy-MM (default: this month)
+        [BindProperty(SupportsGet = true)] public string? Period { get; set; }
+        [BindProperty(SupportsGet = true)] public DateTime? Date { get; set; }
+        [BindProperty(SupportsGet = true)] public string? Month { get; set; }
+        public ReportPeriod P { get; private set; } = null!;
         public DateTime From { get; private set; }
         public DateTime To { get; private set; }      // exclusive
 
-        public record Bar(string Label, double Value, string Text, bool Hot = false);
+        public record Bar(string Label, double Value, string Text, bool Hot = false, string? Full = null);   // Full: label for exports, e.g. "1 pm"
         public record Part(string Key, string Title, string Sub, string Link, string LinkPage, bool Empty)
         {
             public List<Bar> Bars { get; init; } = new();
@@ -47,6 +51,10 @@ namespace KOMA.Pages.Admin.Reports
         public int StaffShare { get; private set; }          // Serve: % served by staff
         public List<double> TeamStaff { get; private set; } = new();   // Team: staff on shift per hour (avg), same order as Team.Bars
 
+        // For the exported report: key figures and one generated sentence per stage.
+        public List<ReportFigure> Figures { get; } = new();
+        public Dictionary<string, string> Leads { get; } = new();
+
         public async Task OnGetAsync() => await BuildAsync();
 
         public async Task<IActionResult> OnGetCsvAsync(string part)
@@ -61,8 +69,55 @@ namespace KOMA.Pages.Admin.Reports
             sb.AppendLine();
             sb.AppendLine(string.Join(",", new[] { "Chart", "Value" }.Select(Q)));
             foreach (var b in p.Bars) sb.AppendLine(Q(b.Label) + "," + Q(b.Text));
-            var name = $"koma-{p.Key}-{From:yyyyMMdd}-{To.AddDays(-1):yyyyMMdd}.csv";
+            var name = $"koma-{p.Key}-{P.FileTag}.csv";
             return File(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray(), "text/csv", name);
+        }
+
+        // Whole report as PDF, Excel or CSV: ?handler=Export&format=pdf|xlsx|csv (+ the period).
+        public async Task<IActionResult> OnGetExportAsync(string format)
+        {
+            await BuildAsync();
+            var doc = new ReportDocument
+            {
+                Title = "Operations report",
+                Period = P.LongLabel,
+                FileName = $"koma-operations-{P.FileTag}",
+                GeneratedBy = User.Identity?.Name ?? ""
+            };
+            doc.Summary.AddRange(Figures);
+
+            var titles = new Dictionary<string, (string Section, string Chart, string[] ChartHead, string Table)>
+            {
+                ["book"] = ("Bookings", "Booking funnel", new[] { "Stage", "Bookings" }, "Show-up rate"),
+                ["arrive"] = ("Arrivals", "Arrival against booked time", new[] { "Arrival", "Bookings" }, "No-shows by weekday"),
+                ["order"] = ("Dishes ordered", "Most ordered dishes", new[] { "Dish", "Ordered" }, "Least ordered dishes"),
+                ["kitchen"] = ("Kitchen", "Order to ready, by hour ordered", new[] { "Hour", "Average" }, "Slowest dishes"),
+                ["serve"] = ("Service", "Ready to table, by day", new[] { "Day", "Average" }, "Served by"),
+                ["help"] = ("Help requests", "Requests by type", new[] { "Type", "Requests" }, "Time to answer"),
+                ["team"] = ("Staffing", "Guests and staff on shift, by hour (daily average)", new[] { "Hour", "Guests", "Staff", "Enough staff" }, "Busiest hours per staff member"),
+            };
+            foreach (var p in Parts)
+            {
+                var tt = titles[p.Key];
+                var section = new ReportSection(tt.Section, p.Empty ? "No activity in this period." : Leads.GetValueOrDefault(p.Key));
+                if (!p.Empty)
+                {
+                    List<string[]> chart = p.Key == "team"
+                        ? p.Bars.Select((b, i) => new[] { b.Full ?? b.Label, b.Value.ToString("0.#"), TeamStaff[i].ToString("0.#"), b.Hot ? "No" : "Yes" }).ToList()
+                        : p.Bars.Select(b => new[] { b.Full ?? b.Label, b.Text }).ToList();
+                    if (chart.Count > 0) section.Tables.Add(new ReportTable(tt.Chart, tt.ChartHead, chart));
+                    if (p.Rows.Count > 0) section.Tables.Add(new ReportTable(tt.Table, p.Head, p.Rows));
+                }
+                doc.Sections.Add(section);
+            }
+            doc.Notes.Add("Cancelled bookings and cancelled orders are left out.");
+            doc.Notes.Add("Arrival is the time the table's QR code was scanned. A booking is a no-show when nobody was seated or ordered 30 minutes after the booked time.");
+            doc.Notes.Add("Kitchen time runs from the order to the dish being marked ready; service time from ready to served.");
+            doc.Notes.Add($"Staffing uses the published duty schedule. An hour is short-staffed when there are more than {GuestsPerStaff} guests per staff member on shift.");
+            doc.Notes.Add("Sales and money are in the separate Sales report (Admin > Revenue).");
+
+            var file = ReportExport.Build(doc, format);
+            return file is null ? BadRequest() : File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName);
         }
 
         private static string Min(double m) => m < 1 ? "<1 min" : $"{Math.Round(m)} min";
@@ -71,10 +126,10 @@ namespace KOMA.Pages.Admin.Reports
 
         private async Task BuildAsync()
         {
-            if (!Ranges.Any(r => r.Days == Days)) Days = 30;
-            To = KOMA.Services.DemoClock.Shared.MalaysiaNow.Date.AddDays(1);
-            From = To.AddDays(-Days);
-            var now = KOMA.Services.DemoClock.Shared.MalaysiaNow;
+            var now = DateTime.Now;
+            P = new ReportPeriod(Period, Date, Month, now);
+            From = P.Start;
+            To = P.End;
 
             var res = await _db.Reservations.AsNoTracking()
                 .Where(r => r.StartTime >= From && r.StartTime < To && r.Status != ReservationStatus.Cancelled)
@@ -109,6 +164,12 @@ namespace KOMA.Pages.Admin.Reports
                 Head = new() { "Type", "Visits", "Showed up" },
                 Rows = new() { new[] { "Booked", showed.ToString("N0"), due == 0 ? "—" : $"{showed * 100 / due}%" }, new[] { "Walk-in", walkIns.ToString("N0"), "—" } }
             };
+            Figures.Add(new("Bookings", booked.ToString("N0"), $"{walkIns:N0} walk-ins"));
+            Figures.Add(new("Show-up rate", due == 0 ? "—" : $"{showed * 100 / due}%", due == 0 ? "no bookings due yet" : $"{showed:N0} of {due:N0} due"));
+            Leads["book"] = booked == 0
+                ? $"There were no bookings in this period{(walkIns > 0 ? $"; {walkIns:N0} tables were walk-ins" : "")}."
+                : $"{booked:N0} bookings were made for this period. {arrived:N0} arrived, {ordered:N0} ordered and {paid:N0} paid"
+                  + (walkIns > 0 ? $"; there were also {walkIns:N0} walk-in tables." : ".");
 
             // ---------- Arrive: QR scan (table seated) vs booked time ----------
             var startOf = res.ToDictionary(r => r.Id, r => r.StartTime);
@@ -129,6 +190,12 @@ namespace KOMA.Pages.Admin.Reports
                 Rows = noShows.GroupBy(r => r.StartTime.DayOfWeek).OrderByDescending(g => g.Count()).Take(4)
                     .Select(g => new[] { g.Key.ToString()[..3], g.Count().ToString() }).ToList()
             };
+            var onTime = late.Count(m => m >= -5 && m <= 5);
+            Figures.Add(new("No-shows", noShows.Count.ToString("N0"), late.Count == 0 ? null : $"{onTime * 100 / late.Count}% arrived on time"));
+            Leads["arrive"] = late.Count == 0
+                ? $"No booked tables were seated in this period. {noShows.Count:N0} bookings were no-shows."
+                : $"{onTime * 100 / late.Count}% of seated bookings arrived within 5 minutes of the booked time and {late.Count(m => m > 15):N0} arrived more than 15 minutes late. "
+                  + (noShows.Count == 0 ? "There were no no-shows." : $"{noShows.Count:N0} bookings were no-shows.");
 
             // ---------- Order: most / least ordered dishes ----------
             var dishes = KOMA.Services.DishPopularity.Rank(items.Select(i => ((string?)i.Name, i.Quantity)));
@@ -138,17 +205,29 @@ namespace KOMA.Pages.Admin.Reports
                 Head = new() { "Least ordered", "Dishes" },
                 Rows = dishes.Count <= 6 ? new() : dishes.TakeLast(3).OrderBy(d => d.Qty).Select(d => new[] { d.Name, d.Qty.ToString("N0") }).ToList()
             };
+            Figures.Add(new("Dishes ordered", dishes.Sum(d => d.Qty).ToString("N0"), dishes.Count == 0 ? null : $"top: {dishes[0].Name}"));
+            if (dishes.Count > 0)
+                Leads["order"] = $"{dishes.Sum(d => d.Qty):N0} dishes were ordered across {dishes.Count:N0} menu items. "
+                    + $"{dishes[0].Name} was ordered most ({dishes[0].Qty:N0})"
+                    + (dishes.Count > 6 ? $" and {dishes[^1].Name} least ({dishes[^1].Qty:N0})." : ".");
 
             // ---------- Kitchen: order -> ready ----------
             var cooked = items.Where(i => i.ReadyAt != null && i.ReadyAt >= i.OrderedAt).Select(i => new { i.Name, i.OrderedAt.Hour, M = (i.ReadyAt!.Value - i.OrderedAt).TotalMinutes }).ToList();
             var kHours = cooked.GroupBy(c => c.Hour).OrderBy(g => g.Key).ToList();
             Kitchen = new Part("kitchen", "Kitchen", cooked.Count == 0 ? "" : $"{Min(cooked.Average(c => c.M))} to ready", "Orders", "/Admin/Orders/Index", cooked.Count == 0)
             {
-                Bars = kHours.Select(g => new Bar(HourShort(g.Key), g.Average(c => c.M), Min(g.Average(c => c.M)))).ToList(),
+                Bars = kHours.Select(g => new Bar(HourShort(g.Key), g.Average(c => c.M), Min(g.Average(c => c.M)), Full: Hour(g.Key))).ToList(),
                 Head = new() { "Dish", "To ready" },
                 Rows = cooked.GroupBy(c => c.Name).Where(g => g.Count() >= 1).OrderByDescending(g => g.Average(c => c.M)).Take(4)
                     .Select(g => new[] { g.Key ?? "", Min(g.Average(c => c.M)) }).ToList()
             };
+            Figures.Add(new("Order to ready", cooked.Count == 0 ? "—" : Min(cooked.Average(c => c.M)), "kitchen average"));
+            if (cooked.Count > 0)
+            {
+                var slowHour = kHours.OrderByDescending(g => g.Average(c => c.M)).First();
+                Leads["kitchen"] = $"Dishes took {Min(cooked.Average(c => c.M))} on average from order to ready. "
+                    + $"The slowest hour was {Hour(slowHour.Key)} at {Min(slowHour.Average(c => c.M))}.";
+            }
 
             // ---------- Serve: staff vs tablet, ready -> served ----------
             var served = items.Where(i => i.ServedAt != null).ToList();
@@ -162,6 +241,10 @@ namespace KOMA.Pages.Admin.Reports
                 Head = new() { "Served", "Dishes" },
                 Rows = new() { new[] { "By staff", byStaff.ToString("N0") }, new[] { "On the tablet", byTablet.ToString("N0") } }
             };
+            Figures.Add(new("Ready to table", waits.Count == 0 ? "—" : Min(waits.Average(w => w.M)), $"{StaffShare}% served by staff"));
+            if (served.Count > 0)
+                Leads["serve"] = (waits.Count == 0 ? "" : $"Ready dishes reached the table in {Min(waits.Average(w => w.M))} on average. ")
+                    + $"{StaffShare}% of dishes were served by staff and {100 - StaffShare}% were confirmed on the table tablet.";
 
             // ---------- Help: requests by type, time to answer ----------
             var types = Enum.GetValues<HelpType>();
@@ -172,6 +255,14 @@ namespace KOMA.Pages.Admin.Reports
                 Rows = types.Select(t => (t, list: help.Where(h => h.Type == t && (h.TakenAt ?? h.DoneAt) != null).Select(h => ((h.TakenAt ?? h.DoneAt)!.Value - h.CreatedAt).TotalMinutes).ToList()))
                     .Where(x => x.list.Count > 0).Select(x => new[] { x.t.DisplayName(), Min(x.list.Average()) }).ToList()
             };
+            var answered = help.Where(h => (h.TakenAt ?? h.DoneAt) != null).Select(h => ((h.TakenAt ?? h.DoneAt)!.Value - h.CreatedAt).TotalMinutes).ToList();
+            Figures.Add(new("Help requests", help.Count.ToString("N0"), answered.Count == 0 ? null : $"{Min(answered.Average())} to answer"));
+            if (help.Count > 0)
+            {
+                var topType = types.OrderByDescending(x => help.Count(h => h.Type == x)).First();
+                Leads["help"] = $"Guests sent {help.Count:N0} help requests, most often {topType.DisplayName().ToLowerInvariant()}. "
+                    + (answered.Count == 0 ? "None were answered yet." : $"Staff answered in {Min(answered.Average())} on average; {help.Count - answered.Count:N0} were not answered.");
+            }
 
             // ---------- Team: guests per hour vs staff on shift (schedule) ----------
             var fromD = DateOnly.FromDateTime(From); var toD = DateOnly.FromDateTime(To);
@@ -202,7 +293,7 @@ namespace KOMA.Pages.Admin.Reports
             {
                 var guests = openDays == 0 ? 0 : sessions.Where(s => s.StartTime.Hour == h).Sum(s => s.GuestCount) / (double)openDays;
                 var staff = schedDays == 0 ? 0 : shifts.Count(s => OnAt(s.Starts, s.Ends, h)) / (double)schedDays;
-                team.Bars.Add(new Bar(HourShort(h), guests, $"{guests:0.#} guests · {staff:0.#} staff", schedDays > 0 && guests > staff * GuestsPerStaff));
+                team.Bars.Add(new Bar(HourShort(h), guests, $"{guests:0.#} guests · {staff:0.#} staff", schedDays > 0 && guests > staff * GuestsPerStaff, Hour(h)));
                 TeamStaff.Add(staff);
             }
             var worst = teamRows.Where(r => r.Guests > 0).OrderByDescending(r => r.Staff == 0 ? double.MaxValue : r.Guests / r.Staff).Take(4).ToList();
@@ -216,6 +307,14 @@ namespace KOMA.Pages.Admin.Reports
             }
             var shortHours = team.Bars.Count(b => b.Hot);
             Team = team with { Sub = schedDays == 0 ? "no schedule yet" : shortHours == 0 ? "enough staff" : $"{shortHours} short hours" };
+            Figures.Add(new("Short-staffed hours", schedDays == 0 ? "—" : shortHours.ToString(), schedDays == 0 ? "no schedule for this period" : "of 13 opening hours"));
+            if (sessions.Count > 0)
+                Leads["team"] = schedDays == 0
+                    ? "No duty schedule was published for this period, so staffing could not be compared with guest numbers."
+                    : shortHours == 0
+                        ? $"Every opening hour had enough staff on shift (at most {GuestsPerStaff} guests per staff member)."
+                        : $"{shortHours} opening hour{(shortHours == 1 ? " was" : "s were")} short-staffed: "
+                          + string.Join(", ", team.Bars.Where(b => b.Hot).Select(b => b.Full)) + ".";
         }
     }
 }

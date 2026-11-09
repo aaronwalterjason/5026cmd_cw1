@@ -13,12 +13,12 @@
         var first = snaps.FirstOrDefault();
         return log.Area switch
         {
+            ActivityLog.Areas.Menu when log.Title.StartsWith("Promotion:") || snaps.Any(x => x.Type.EndsWith(".Promotion")) => Url.Page("/Admin/Promotions/Index")!,
             ActivityLog.Areas.Menu => Url.Page("/Admin/MenuItems/Index")!,
             ActivityLog.Areas.Floors => Url.Page("/Admin/Layouts/Index")!,
             ActivityLog.Areas.Bookings when first?.Key.TryGetValue("Id", out var rid) == true => Url.Page("/Reservations/Details", new { id = rid.GetInt32() })!,
             ActivityLog.Areas.Bookings => Url.Page("/Staff/Reservation/Index")!,
             ActivityLog.Areas.Settings when first?.Type == "Role" => Url.Page("/Admin/Accounts/Index")!,
-            ActivityLog.Areas.Settings when first?.Type.EndsWith("LandingPageContent") == true => Url.Page("/Admin/LandingPage/Index")!,
             ActivityLog.Areas.Settings => Url.Page("/Admin/Settings/Index")!,
             _ => Url.Page("/Admin/Accounts/Index")!
         };
@@ -75,7 +75,7 @@
                 <option value="0" selected="@(Model.Days == 0)">All time</option>
             </select>
             <label class="visually-hidden" for="act-q">Search</label>
-            <input id="act-q" type="search" aria-label="Search activity" name="q" value="@Model.Q" class="act-search" />
+            <input id="act-q" type="search" placeholder="Search" aria-label="Search activity" name="q" value="@Model.Q" class="act-search" />
         </form>
 
         <div class="card act-list">

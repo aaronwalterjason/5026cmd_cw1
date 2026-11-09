@@ -16,7 +16,7 @@ public class DiningOrderService(ApplicationDbContext db)
             s.Reservation.RestaurantTableId == s.RestaurantTableId)));
     }
 
-    public IQueryable<MenuItem> Menu() => db.MenuItems.Where(m => m.IsAvailable && m.MenuCategory!.IsActive);
+    public IQueryable<MenuItem> Menu() => db.MenuItems.Include(m => m.Promotion).Where(m => m.IsAvailable && m.MenuCategory!.IsActive);   // Promotion: for MenuPricing
 
     public IQueryable<Reservation> NearbyReservations(string customer, int table, DateTime now) =>
         db.Reservations.AsNoTracking().Where(r => r.CustomerUserId == customer &&
@@ -138,7 +138,7 @@ public class DiningOrderService(ApplicationDbContext db)
         var ids = selected.Keys.ToArray();
         var dishes = await Menu().Where(m => ids.Contains(m.Id)).ToListAsync();
         if (dishes.Count != selected.Count) return (null, "A selected dish is no longer available. Review the menu.");
-        var lines = OrderingMenu.BuildLines(dishes, selected);
+        var lines = OrderingMenu.BuildLines(dishes, selected, ReservationRules.MalaysiaNow);   // tablet (dine-in): promotions running now
         var total = lines.Sum(i => i.LineTotal);
         if (total + (preorder?.TotalAmount ?? 0) != expectedTotal || total > 99999999.99m)
             return (null, "Review the current prices and total before sending.");

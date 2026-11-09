@@ -53,7 +53,8 @@ public class ArrivalService(ApplicationDbContext db, DiningOrderService dining, 
                 var end = arrival.AddMinutes(ReservationRules.SlotMinutes);
                 var ready = end.AddMinutes(ReservationRules.TurnaroundMinutes);
                 var settings = await db.RestaurantSettings.FirstAsync();
-                if (arrival <= now || ready.Date != now.Date || TimeOnly.FromDateTime(ready) > settings.ClosingTime)
+                var today = settings.For(DateOnly.FromDateTime(now));   // today's hours (Admin > Settings)
+                if (arrival <= now || ready.Date != now.Date || !today.IsOpen || TimeOnly.FromDateTime(ready) > today.Closes)
                     return "Choose a future arrival today with time for dining and turnaround before closing.";
                 var choices = await ReservationService.AvailableTables(db, r.GuestCount, id, r.StartTime, now, end)
                     .OrderBy(t => t.TableNumber).Select(t => new { t.Id, t.TableNumber }).ToListAsync();

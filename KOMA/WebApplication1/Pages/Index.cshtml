@@ -3,7 +3,7 @@
 @{
     Layout = "_PublicLayout";
     ViewData["Title"] = "Good food. Good company.";
-    var c = Model.Content;   // wording + photo edited in Admin > Website
+    var c = Model.Content;   // saved landing-page wording + photo (no longer editable)
     var heroImage = string.IsNullOrWhiteSpace(c.HeroImageUrl) ? Url.Content("~/images/koma/japanese-table.jpg") : c.HeroImageUrl;
 }
 @functions {

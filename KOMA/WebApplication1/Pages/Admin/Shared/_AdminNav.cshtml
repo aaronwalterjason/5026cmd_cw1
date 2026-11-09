@@ -17,7 +17,6 @@
     var floors = Under("/Admin/Layouts", "/Admin/DiningAreas", "/Admin/Tables");
     var menu = Under("/Admin/MenuItems", "/Admin/MenuCategories");
     var promos = Under("/Admin/Promotions");
-    var website = Under("/Admin/LandingPage");
     var activity = Under("/Admin/Activity");
     var feedback = Under("/Admin/Feedback");
     var reports = Under("/Admin/Reports");
@@ -87,13 +86,6 @@
             <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Promotions</div>
         </li>
 
-        <li class="admin-rail-group @Current(website)">
-            <a class="admin-rail-btn" asp-area="" asp-page="/Admin/LandingPage/Index" aria-current="@Aria(website)">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                <span class="admin-rail-label">Website</span>
-            </a>
-            <div class="admin-flyout admin-flyout-tip" aria-hidden="true">Customer landing page</div>
-        </li>
 
         <li class="admin-rail-divider" aria-hidden="true"></li>
 

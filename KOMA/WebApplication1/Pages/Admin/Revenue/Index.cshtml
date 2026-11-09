@@ -18,6 +18,7 @@
     <div class="rv-tools">
         <nav class="rv-pills" aria-label="Period">
             <a asp-page="./Index" asp-route-period="day" class="@(Model.Period == "day" ? "is-on" : "")" aria-current="@(Model.Period == "day" ? "page" : null)">Day</a>
+            <a asp-page="./Index" asp-route-period="week" class="@(Model.Period == "week" ? "is-on" : "")" aria-current="@(Model.Period == "week" ? "page" : null)">Week</a>
             <a asp-page="./Index" asp-route-period="month" class="@(Model.Period == "month" ? "is-on" : "")" aria-current="@(Model.Period == "month" ? "page" : null)">Month</a>
             <a asp-page="./Index" asp-route-period="year" class="@(Model.Period == "year" ? "is-on" : "")" aria-current="@(Model.Period == "year" ? "page" : null)">Year</a>
         </nav>
@@ -27,14 +28,14 @@
             @* The period label is the picker itself: changing it reloads the page (no Show button). *@
             <form method="get" class="rv-picker">
                 <input type="hidden" name="period" value="@Model.Period" />
-                @if (Model.Period == "day")
+                @if (Model.Period == "day" || Model.Period == "week")
                 {
-                    <input type="date" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" max="@KOMA.Services.DemoClock.Shared.MalaysiaNow.Date.ToString("yyyy-MM-dd")"
-                           aria-label="Choose a day" onchange="this.form.submit()" />
+                    <input type="date" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" max="@DateTime.Today.ToString("yyyy-MM-dd")"
+                           aria-label="@(Model.Period == "week" ? "Choose any day in the week" : "Choose a day")" onchange="this.form.submit()" />
                 }
                 else if (Model.Period == "month")
                 {
-                    <input type="month" name="month" value="@Model.Month" max="@KOMA.Services.DemoClock.Shared.MalaysiaNow.Date.ToString("yyyy-MM")"
+                    <input type="month" name="month" value="@Model.Month" max="@DateTime.Today.ToString("yyyy-MM")"
                            aria-label="Choose a month" onchange="this.form.submit()" />
                 }
                 else
@@ -57,6 +58,8 @@
                 <span class="rv-arrow is-disabled" aria-hidden="true">›</span>
             }
         </div>
+
+        <partial name="_ExportMenu" model='new KOMA.Services.Reporting.ExportMenu("/Admin/Revenue/Index", Model.Route)' />
 
         <a asp-page="/Admin/Orders/Index" class="koma-go">Orders<span class="koma-go-disc" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
     </div>
@@ -171,7 +174,7 @@
                                 else
                                 {
                                     <div class="rv-bar" style="height:@(b.Amount > 0 ? Model.Pct(b.Amount) : "2px");--i:@i">
-                                        <div class="rv-tip" role="presentation">@(b.IsCurrent ? (Model.Period == "day" ? "Now · " : Model.Period == "month" ? "Today · " : "This month · ") : "")@tip</div>
+                                        <div class="rv-tip" role="presentation">@(b.IsCurrent ? (Model.Period == "day" ? "Now · " : Model.Period is "month" or "week" ? "Today · " : "This month · ") : "")@tip</div>
                                     </div>
                                 }
                             </div>

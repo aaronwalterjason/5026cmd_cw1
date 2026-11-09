@@ -1,28 +1,225 @@
 @page
 @model KOMA.Pages.Admin.Settings.IndexModel
+@using KOMA.Models
 @{
-    ViewData["Title"] = "Restaurant Settings";
+    ViewData["Title"] = "Settings";
+    var M = Model;
+    var times = KOMA.Pages.Admin.Settings.IndexModel.TimeOptions.ToList();
+    var firstOutside = M.Outside.FirstOrDefault();
 }
-
-<h1>Restaurant Settings</h1>
-
+@*
+    Admin > Settings (design A · week table): open/closed + hours per day, last booking time with a preview of the
+    booking times customers see, closed dates, announcement. The save bar appears only when something changed.
+*@
 @if (TempData["StatusMessage"] is string status)
 {
-    <div class="alert alert-success">@status</div>
+    <div class="mn-toast" id="mn-toast" role="status" aria-live="polite">
+        <span class="mn-toast-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+        <span class="mn-toast-text"><strong>Done</strong><span>@status</span></span>
+        <button type="button" class="mn-toast-close" aria-label="Close">&times;</button>
+    </div>
+}
+@if (TempData["StatusError"] is string err)
+{
+    <div class="alert alert-danger" role="alert">@err</div>
 }
 
-<form method="post" class="col-md-6">
-    <div class="mb-3">
-        <label asp-for="OpeningTime" class="form-label">Opening time</label>
-        <input asp-for="OpeningTime" type="time" class="form-control" />
+<h1 class="st-title">Settings</h1>
+
+@if (M.Outside.Count > 0)
+{
+    <div class="st-warn" role="status">
+        <span class="st-warn-ic" aria-hidden="true">!</span>
+        <span>
+            @M.Outside.Count upcoming booking@(M.Outside.Count == 1 ? " is" : "s are") outside the opening hours or on a closed date
+            (first: @firstOutside.Start.ToString("ddd d MMM, h:mm tt"), @firstOutside.Name). Guests are not moved automatically.
+        </span>
+        <a class="st-warn-link" asp-page="/Staff/Reservation/Index">Review bookings</a>
     </div>
-    <div class="mb-3">
-        <label asp-for="ClosingTime" class="form-label">Closing time</label>
-        <input asp-for="ClosingTime" type="time" class="form-control" />
+}
+@if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
+{
+    <div class="alert alert-danger" role="alert">@ViewData.ModelState[string.Empty]!.Errors[0].ErrorMessage</div>
+}
+
+<div class="st-grid">
+    @* ---------- Opening hours (part of the main form) ---------- *@
+    <form method="post" id="st-form" class="st-card st-hours" novalidate>
+        <h2 class="st-h2">Opening hours <span>per day</span></h2>
+        <div class="st-days">
+            @for (var i = 0; i < 7; i++)
+            {
+                var d = M.Days[i];
+                var e = M.DayError(i);
+                <div class="st-day @(d.Open ? "" : "is-closed") @(e != null ? "has-error" : "")" data-day="@i">
+                    <span class="st-day-name">@RestaurantSettings.DayNames[i]</span>
+                    <label class="st-switch">
+                        <input type="checkbox" asp-for="Days[i].Open" class="st-open" aria-label="@RestaurantSettings.DayNames[i] open" />
+                        <span class="st-switch-ui" aria-hidden="true"></span>
+                    </label>
+                    <span class="st-state">@(d.Open ? "Open" : "Closed")</span>
+                    <span class="st-times">
+                        <select asp-for="Days[i].Opens" class="st-time st-opens" aria-label="@RestaurantSettings.DayNames[i] opens">
+                            @foreach (var t in times.Where(t => t != "23:59")) { <option value="@t" selected="@(t == d.Opens)">@KOMA.Pages.Admin.Settings.IndexModel.Label12(t)</option> }
+                        </select>
+                        <span class="st-dash">–</span>
+                        <select asp-for="Days[i].Closes" class="st-time st-closes @(e != null ? "is-bad" : "")" aria-label="@RestaurantSettings.DayNames[i] closes">
+                            @foreach (var t in times) { <option value="@t" selected="@(t == d.Closes)">@KOMA.Pages.Admin.Settings.IndexModel.Label12(t)</option> }
+                        </select>
+                    </span>
+                    <span class="st-closed-text">Closed all day</span>
+                    <span class="st-err" role="alert">@e</span>
+                </div>
+            }
+        </div>
+        <div class="st-quick">
+            <button type="button" class="st-chip" id="st-copy">Copy <span id="st-copy-day">first open day</span> to all open days</button>
+            <button type="button" class="st-chip" id="st-all">Open every day</button>
+        </div>
+    </form>
+
+    <div class="st-side">
+        @* ---------- Bookings (also in the main form via form="st-form") ---------- *@
+        <section class="st-card">
+            <h2 class="st-h2">Bookings</h2>
+            <label class="st-row">
+                <span>Last booking</span>
+                <select asp-for="LastBookingMinutes" form="st-form" class="st-time st-last">
+                    @foreach (var o in KOMA.Pages.Admin.Settings.IndexModel.LastOptions)
+                    {
+                        <option value="@o.Minutes" selected="@(o.Minutes == M.LastBookingMinutes)">@o.Label</option>
+                    }
+                </select>
+            </label>
+            <p class="st-help">Each booking is a 1-hour slot plus 15 minutes to reset the table, so 1 h 15 min keeps the last guests inside opening hours.</p>
+            <div class="st-preview">
+                <div class="st-help">Booking times customers see on
+                    <select id="st-preview-day" class="st-mini" aria-label="Preview day">
+                        @for (var i = 0; i < 7; i++) { <option value="@i">@RestaurantSettings.DayNames[i]</option> }
+                    </select>
+                </div>
+                <div class="st-slots" id="st-slots" aria-live="polite"></div>
+                <div class="st-help" id="st-slots-note"></div>
+            </div>
+        </section>
+
+        @* ---------- Closed dates (own small forms, saved straight away) ---------- *@
+        <section class="st-card" id="closed">
+            <h2 class="st-h2">Closed dates <span>holidays, events</span></h2>
+            @if (M.Closed.Count == 0)
+            {
+                <p class="st-help">No closed dates coming up.</p>
+            }
+            @foreach (var c in M.Closed)
+            {
+                <div class="st-closed">
+                    <span class="st-closed-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15"><path d="M4 6h16v14H4zM4 10h16M9 3v4M15 3v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+                    <span class="st-closed-txt"><b>@c.Label</b><span>@c.Reason</span></span>
+                    <form method="post" asp-page-handler="RemoveClosed" class="ms-auto">
+                        <input type="hidden" name="from" value="@c.From.ToString("yyyy-MM-dd")" />
+                        <input type="hidden" name="to" value="@c.To.ToString("yyyy-MM-dd")" />
+                        <button type="submit" class="st-x" aria-label="Remove @c.Label">&times;</button>
+                    </form>
+                </div>
+            }
+            <details class="st-add">
+                <summary class="st-chip">+ Add closed date</summary>
+                <form method="post" asp-page-handler="AddClosed" class="st-add-form">
+                    <label>From<input type="date" name="NewFrom" required min="@DateTime.Today.ToString("yyyy-MM-dd")" /></label>
+                    <label>To <small>(optional)</small><input type="date" name="NewTo" min="@DateTime.Today.ToString("yyyy-MM-dd")" /></label>
+                    <label class="st-add-reason">Reason<input type="text" name="NewReason" maxlength="60" required placeholder="e.g. Christmas" /></label>
+                    <button type="submit" class="st-btn">Add</button>
+                </form>
+            </details>
+        </section>
+
+        @* ---------- Announcement ---------- *@
+        <section class="st-card">
+            <h2 class="st-h2">Announcement <span>shown to customers</span></h2>
+            <textarea asp-for="AnnouncementText" form="st-form" class="st-text" rows="2" maxlength="300" placeholder="e.g. Closed for a private event on 14 Sep"></textarea>
+            <span asp-validation-for="AnnouncementText" class="st-err d-block"></span>
+        </section>
     </div>
-    <div class="mb-3">
-        <label asp-for="AnnouncementText" class="form-label">Announcement banner</label>
-        <textarea asp-for="AnnouncementText" class="form-control" rows="2" placeholder="e.g. Closed for a private event on 14 Sep"></textarea>
-    </div>
-    <button type="submit" class="btn btn-primary">Save settings</button>
-</form>
+</div>
+
+@* ---------- Save bar: only when something changed ---------- *@
+<div class="st-savebar" id="st-savebar" hidden>
+    <span class="st-dot" aria-hidden="true"></span>
+    <span id="st-changes">Unsaved changes</span>
+    <a class="st-btn is-ghost ms-auto" id="st-discard" asp-page="./Index">Discard</a>
+    <button type="submit" form="st-form" class="st-btn">Save settings</button>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const form = document.getElementById('st-form');
+            const bar = document.getElementById('st-savebar');
+            const fields = () => [...document.querySelectorAll('[form="st-form"], #st-form input, #st-form select')].filter(f => f.name && f.type !== 'hidden');
+            const value = f => f.type === 'checkbox' ? f.checked : f.value;
+            const start = new Map(fields().map(f => [f, value(f)]));
+            const days = [...document.querySelectorAll('.st-day')];
+            const mins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+            const label = m => { const h = Math.floor(m / 60), mm = m % 60, hh = h % 12 || 12; return hh + (mm ? ':' + String(mm).padStart(2, '0') : '') + (h < 12 ? ' am' : ' pm'); };
+
+            function refresh() {
+                // save bar
+                const changed = fields().filter(f => start.get(f) !== value(f)).length;
+                bar.hidden = changed === 0;
+                document.getElementById('st-changes').textContent = changed === 1 ? '1 unsaved change' : changed + ' unsaved changes';
+                document.body.classList.toggle('st-has-bar', changed > 0);
+                // rows: open/closed state + live check
+                days.forEach(row => {
+                    const open = row.querySelector('.st-open').checked;
+                    row.classList.toggle('is-closed', !open);
+                    row.querySelector('.st-state').textContent = open ? 'Open' : 'Closed';
+                    const o = mins(row.querySelector('.st-opens').value), c = mins(row.querySelector('.st-closes').value);
+                    const msg = !open ? '' : c <= o ? 'Closing must be after opening.' : c - o < 60 ? 'Open for at least 1 hour.' : '';
+                    row.querySelector('.st-err').textContent = msg;
+                    row.classList.toggle('has-error', !!msg);
+                    row.querySelector('.st-closes').classList.toggle('is-bad', !!msg);
+                });
+                const first = days.find(r => r.querySelector('.st-open').checked);
+                document.getElementById('st-copy-day').textContent = first ? first.querySelector('.st-day-name').textContent : 'first open day';
+                preview();
+            }
+
+            // Same rule as ReservationRules.Slots: whole hours from opening; last start = closing - max(last booking, 60).
+            function preview() {
+                const i = +document.getElementById('st-preview-day').value;
+                const row = days[i], box = document.getElementById('st-slots'), note = document.getElementById('st-slots-note');
+                const name = row.querySelector('.st-day-name').textContent;
+                if (!row.querySelector('.st-open').checked) { box.innerHTML = ''; note.textContent = 'Closed every ' + name + ' — no bookings.'; return; }
+                const o = mins(row.querySelector('.st-opens').value), c = mins(row.querySelector('.st-closes').value);
+                const lastMin = c - Math.max(+document.querySelector('.st-last').value, 60);
+                const out = [];
+                for (let m = Math.ceil(o / 60) * 60; m <= lastMin; m += 60) out.push(m);
+                box.innerHTML = out.map(m => '<span>' + label(m) + '</span>').join('');
+                note.textContent = out.length ? 'Last booking ' + label(out[out.length - 1]) + ' · closes ' + (c >= 1439 ? 'midnight' : label(c)) : 'No booking times fit these hours.';
+            }
+
+            document.getElementById('st-copy').addEventListener('click', () => {
+                const first = days.find(r => r.querySelector('.st-open').checked);
+                if (!first) return;
+                const o = first.querySelector('.st-opens').value, c = first.querySelector('.st-closes').value;
+                days.forEach(r => { if (r.querySelector('.st-open').checked) { r.querySelector('.st-opens').value = o; r.querySelector('.st-closes').value = c; } });
+                refresh();
+            });
+            document.getElementById('st-all').addEventListener('click', () => { days.forEach(r => r.querySelector('.st-open').checked = true); refresh(); });
+            form.addEventListener('input', refresh);
+            document.addEventListener('input', e => { if (e.target.getAttribute('form') === 'st-form' || e.target.id === 'st-preview-day') refresh(); });
+            document.getElementById('st-preview-day').value = String(Math.max(0, days.findIndex(r => r.querySelector('.st-open').checked)));
+            window.addEventListener('beforeunload', e => { if (!bar.hidden && !window.__stSaving) { e.preventDefault(); e.returnValue = ''; } });
+            form.addEventListener('submit', () => window.__stSaving = true);
+            document.getElementById('st-discard').addEventListener('click', () => window.__stSaving = true);
+            refresh();
+
+            const toast = document.getElementById('mn-toast');
+            if (toast) {
+                const hide = () => { toast.classList.add('is-leaving'); setTimeout(() => toast.remove(), 300); };
+                toast.querySelector('.mn-toast-close').addEventListener('click', hide);
+                setTimeout(hide, 3200);
+            }
+        })();
+    </script>
+}

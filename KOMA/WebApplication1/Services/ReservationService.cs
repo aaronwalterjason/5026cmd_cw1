@@ -35,13 +35,28 @@ public static class ReservationRules
     public const int SpacingMinutes = 120;
     public const int TurnaroundMinutes = 15;
     public const int SlotMinutes = 60;
-    public static DateTime MalaysiaNow => DemoClock.Shared.MalaysiaNow;
-    public static IReadOnlyList<TimeOnly> Slots(RestaurantSettings settings)
+    public static DateTime MalaysiaNow => TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "Singapore Standard Time");
+    // Every booking time used on any open day of the week (for lists where no date is chosen yet).
+    public static IReadOnlyList<TimeOnly> Slots(RestaurantSettings settings) =>
+        settings.Week().Where(d => d.IsOpen)
+            .SelectMany(d => SlotsBetween(d.Opens, d.Closes, settings.LastBookingMinutes))
+            .Distinct().OrderBy(t => t).ToList();
+
+    // Booking times on one date: none on a closed weekday or closed date (Admin > Settings).
+    public static IReadOnlyList<TimeOnly> Slots(RestaurantSettings settings, DateOnly date)
+    {
+        var plan = settings.For(date);
+        return plan.IsOpen ? SlotsBetween(plan.Opens, plan.Closes, settings.LastBookingMinutes) : [];
+    }
+
+    // Whole hours from opening; the last start leaves the "last booking" time before closing
+    // (default 75 min = 1-hour slot + 15-min turnaround).
+    private static List<TimeOnly> SlotsBetween(TimeOnly opens, TimeOnly closes, int lastBookingMinutes)
     {
         var slots = new List<TimeOnly>();
-        var opening = settings.OpeningTime.ToTimeSpan().TotalMinutes;
-        var closing = settings.ClosingTime.ToTimeSpan().TotalMinutes;
-        for (var minute = Math.Ceiling(opening / 60) * 60; minute + SlotMinutes + TurnaroundMinutes <= closing; minute += SlotMinutes)
+        var opening = opens.ToTimeSpan().TotalMinutes;
+        var lastStart = closes.ToTimeSpan().TotalMinutes - Math.Max(lastBookingMinutes, SlotMinutes);
+        for (var minute = Math.Ceiling(opening / 60) * 60; minute <= lastStart; minute += SlotMinutes)
             slots.Add(TimeOnly.FromTimeSpan(TimeSpan.FromMinutes(minute)));
         return slots;
     }
@@ -52,7 +67,15 @@ public static class ReservationRules
             return errors[0].ErrorMessage;
         if (input.Date == default || input.Date == DateOnly.MaxValue) return "Choose a valid reservation date.";
         if (!keepActiveSlot && input.Date.ToDateTime(input.Time) <= now) return "Choose a future date and time.";
-        if (!keepActiveSlot && !Slots(settings).Contains(input.Time)) return "Choose a one-hour slot within the restaurant's opening hours.";
+        if (!keepActiveSlot)
+        {
+            var plan = settings.For(input.Date);
+            if (!plan.IsOpen)
+                return plan.ClosedReason is null
+                    ? $"The restaurant is closed on {input.Date:dddd}s. Choose another day."
+                    : $"The restaurant is closed on {input.Date:ddd d MMM} ({plan.ClosedReason}). Choose another day.";
+            if (!Slots(settings, input.Date).Contains(input.Time)) return "Choose a one-hour slot within the restaurant's opening hours.";
+        }
         if (input.GuestCount > capacity) return $"This table seats at most {capacity} guests.";
         return null;
     }
@@ -261,6 +284,8 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
                 .ExecuteUpdateAsync(u => u.SetProperty(o => o.RestaurantTableId, (int?)table.Id)
                     .SetProperty(o => o.CustomerName, booking.CustomerName));
         }
+        // Pre-orders are always at the menu price (promotions apply to tablet orders only), so a new time never changes the total.
+        (decimal Old, decimal New)? repriced = null;
         if (isNew) await emails.QueueConfirmedAsync(booking);
         else if (before != null)
         {
@@ -281,6 +306,7 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
                 static string Seat(RestaurantTable? t) => t == null ? "—" : (t.DiningArea == null ? "" : t.DiningArea.Name + " · ") + "Table " + t.TableNumber;
                 changes["Seating"] = (Seat(oldTable), Seat(table));
             }
+            if (repriced is { } rp) changes["Pre-order"] = ($"RM {rp.Old:0.00}", $"RM {rp.New:0.00}");
             await emails.QueueUpdatedAsync(booking, changes, byCustomer: !IsStaff(actor));
         }
         await _context.SaveChangesAsync();

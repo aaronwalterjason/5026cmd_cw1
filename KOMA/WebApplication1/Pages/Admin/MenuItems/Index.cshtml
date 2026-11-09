@@ -75,7 +75,7 @@
         <form method="get" class="mn-search">
             @if (Model.Cat.HasValue) { <input type="hidden" name="cat" value="@Model.Cat" /> }
             <label class="visually-hidden" for="mn-q">Search dishes</label>
-            <input id="mn-q" type="search" aria-label="Search dishes" name="q" value="@Model.Q" class="form-control" />
+            <input id="mn-q" type="search" placeholder="Search" aria-label="Search dishes" name="q" value="@Model.Q" class="form-control" />
         </form>
 
         <div class="mn-items">

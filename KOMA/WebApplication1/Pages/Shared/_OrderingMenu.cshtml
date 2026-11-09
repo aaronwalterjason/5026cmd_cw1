@@ -12,14 +12,16 @@
                     <div class="po-grid">
                         @foreach (var item in Model.Menu)
                         {
-                            <article class="po-dish" data-id="@item.Id" data-category="@item.MenuCategoryId" data-name="@item.Name" data-description="@item.Description" data-price="@item.Price.ToString(CultureInfo.InvariantCulture)">
+                            var price = Model.PriceOf(item);   // promotion price if one runs at Model.At (Services/MenuPricing.cs)
+                            <article class="po-dish" data-id="@item.Id" data-category="@item.MenuCategoryId" data-name="@item.Name" data-description="@item.Description" data-price="@price.Unit.ToString(CultureInfo.InvariantCulture)">
                                 <div class="po-photo">
                                     <span class="po-photo-fallback">KOMA<span>Photo coming soon</span></span>
                                     @if (!string.IsNullOrWhiteSpace(item.ImageUrl)) { <img src="@item.ImageUrl" alt="@item.Name" loading="lazy" /> }
                                     @if (item.IsRecommended || item.IsSeasonal) { <span class="po-badge">@(item.IsSeasonal ? "Seasonal special" : "KOMA favourite")</span> }
+                                    @if (price.Discounted) { <span class="po-off" title="@price.Promo!.Title">@price.Percent% off</span> }
                                 </div>
                                 <div class="po-dish-body"><p class="po-category">@item.MenuCategory?.Name</p><h3>@item.Name</h3><p class="po-description">@item.Description</p>
-                                    <div class="po-dish-bottom"><strong>RM @item.Price.ToString("N2")</strong><div class="po-stepper">
+                                    <div class="po-dish-bottom"><span class="po-price">@if (price.Discounted) {<s>RM @price.List.ToString("N2")</s>}<strong>RM @price.Unit.ToString("N2")</strong></span><div class="po-stepper">
                                         <button type="button" data-delta="-1" aria-label="Remove one @item.Name">−</button>
                                         <input id="dish-@item.Id" aria-label="Quantity of @item.Name" name="Quantities[@item.Id]" type="number" min="0" max="99" value="@Model.Quantities.GetValueOrDefault(item.Id)" />
                                         <button type="button" data-delta="1" aria-label="Add one @item.Name">+</button>

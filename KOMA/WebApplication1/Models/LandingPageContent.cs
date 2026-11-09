@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace KOMA.Models
 {
     // Owned by Engineer B. Single-row table with the editable text and photo of the customer landing page
-    // (Pages/Index.cshtml). Edited from Admin > Website (/Admin/LandingPage). If the row does not exist yet,
+    // (Pages/Index.cshtml). The Admin > Website editor was removed; the last saved row is still used. If the row does not exist yet,
     // the landing page uses these defaults - they match the original hardcoded wording.
     // In the text boxes, a new line becomes a line break on the page. Optional fields left empty are hidden.
     public class LandingPageContent

@@ -13,7 +13,7 @@ public class IndexModel(ApplicationDbContext db) : PageModel
     public List<MenuItem> Dishes { get; private set; } = [];
     public List<MenuItem> RecommendedDishes { get; private set; } = [];
     public List<Promotion> Promotions { get; private set; } = [];
-    // Editable wording/photo (Admin > Website). Falls back to the original defaults if nothing is saved yet.
+    // Saved wording/photo (the Admin > Website editor was removed). Falls back to the original defaults if nothing is saved yet.
     public LandingPageContent Content { get; private set; } = new();
     public async Task<IActionResult> OnGetAsync()
     {

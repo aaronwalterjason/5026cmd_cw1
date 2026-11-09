@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace KOMA.Services;
 
-// Writes an Activity log entry whenever an ADMIN or STAFF member saves a change to the menu, bookings,
-// floor layouts or settings. Customers' own actions and startup seeding (no signed-in user) are not logged.
+// Writes an Activity log entry whenever an ADMIN or STAFF member saves a change to the menu (incl. promotions),
+// bookings, floor layouts or settings. Customers' own actions and startup seeding (no signed-in user) are not logged.
 // How: just before saving, remember the old values of every changed row; just after saving, turn them into
 // ActivityLog rows (one per area) and save those too.
 public class AuditInterceptor(IHttpContextAccessor http) : SaveChangesInterceptor
@@ -23,10 +23,10 @@ public class AuditInterceptor(IHttpContextAccessor http) : SaveChangesIntercepto
 
     public static string? AreaOf(Type t) => t.Name switch
     {
-        nameof(MenuItem) or nameof(MenuCategory) => ActivityLog.Areas.Menu,
+        nameof(MenuItem) or nameof(MenuCategory) or nameof(Promotion) => ActivityLog.Areas.Menu,
         nameof(Reservation) => ActivityLog.Areas.Bookings,
         nameof(FloorLayout) or nameof(DiningArea) or nameof(RestaurantTable) => ActivityLog.Areas.Floors,
-        nameof(RestaurantSettings) or nameof(LandingPageContent) => ActivityLog.Areas.Settings,
+        nameof(RestaurantSettings) => ActivityLog.Areas.Settings,
         _ => null
     };
 
@@ -140,13 +140,52 @@ public class AuditInterceptor(IHttpContextAccessor http) : SaveChangesIntercepto
         nameof(RestaurantTable) => $"Table {v["TableNumber"]}",
         nameof(Reservation) => $"R-{v["Id"]:D5} · {v["CustomerName"]}",
         nameof(RestaurantSettings) => "Opening hours & announcement",
-        nameof(LandingPageContent) => "Landing page",
+        nameof(Promotion) => $"Promotion: {v["Title"]}",
         _ => t.Name
     };
 
     private static async Task<(string Title, string Action, string? Summary)> DescribeAsync(
         DbContext ctx, string area, List<Pending> items, List<ActivitySnapshot> snaps, CancellationToken ct)
     {
+        // Promotions: the promo itself plus any dishes moved into or out of it, in one entry.
+        var promo = items.FirstOrDefault(i => i.Entry.Metadata.ClrType == typeof(Promotion));
+        if (promo is not null)
+        {
+            var promoSnap = snaps[items.IndexOf(promo)];
+            var promoId = promo.Entry.Property("Id").CurrentValue;
+            var movedDishes = items.Where(i => i.Entry.Metadata.ClrType == typeof(MenuItem) && i.State == "Modified" && i.Changed.Contains("PromotionId")).ToList();
+            var dishesIn = movedDishes.Count(i => Equals(i.Entry.Property("PromotionId").CurrentValue, promoId));
+            var dishesOut = movedDishes.Count - dishesIn;
+            var bits = new List<string>();
+            if (promo.State == "Modified")
+                bits.AddRange(promo.Changed.Take(3).Select(f =>
+                    $"{ActivityFormat.Label(typeof(Promotion), f)}: {ActivityFormat.Value(f, promo.Before![f])} → {ActivityFormat.Value(f, promo.Entry.Property(f).CurrentValue)}"));
+            if (dishesIn > 0) bits.Add($"{dishesIn} dish{(dishesIn == 1 ? "" : "es")} added");
+            if (dishesOut > 0) bits.Add($"{dishesOut} dish{(dishesOut == 1 ? "" : "es")} removed");
+            var promoAction = promo.State switch
+            {
+                "Added" => "Created",
+                "Deleted" => "Deleted",
+                _ when promo.Changed.SequenceEqual(new[] { "IsActive" }) && movedDishes.Count == 0
+                    => (bool)promo.Entry.Property("IsActive").CurrentValue! ? "Resumed" : "Paused",
+                _ => "Edited"
+            };
+            return (promoSnap.Label, promoAction, bits.Count == 0 ? null : string.Join(" · ", bits));
+        }
+
+        // Only dishes moved into / out of a promotion (the promo's own fields didn't change): name it after the promotion.
+        if (items.Count > 1 && items.All(i => i.Entry.Metadata.ClrType == typeof(MenuItem) && i.State == "Modified" && i.Changed.SequenceEqual(new[] { "PromotionId" })))
+        {
+            var target = items.Select(i => i.Entry.Property("PromotionId").CurrentValue).FirstOrDefault(v => v is not null)
+                         ?? items.Select(i => i.Before!["PromotionId"]).FirstOrDefault(v => v is not null);
+            var name = target is int tid && await ctx.Set<Promotion>().FindAsync([tid], ct) is { } tp ? tp.Title : "promotion";
+            var joined = items.Count(i => Equals(i.Entry.Property("PromotionId").CurrentValue, target));
+            var parts2 = new List<string>();
+            if (joined > 0) parts2.Add($"{joined} dish{(joined == 1 ? "" : "es")} added");
+            if (items.Count - joined > 0) parts2.Add($"{items.Count - joined} dish{(items.Count - joined == 1 ? "" : "es")} removed");
+            return ($"Promotion: {name}", "Edited", string.Join(" · ", parts2));
+        }
+
         if (items.Count == 1)
         {
             var p = items[0]; var s = snaps[0]; var type = p.Entry.Metadata.ClrType;
@@ -159,7 +198,17 @@ public class AuditInterceptor(IHttpContextAccessor http) : SaveChangesIntercepto
             if (c.SequenceEqual(new[] { "Status" }))
                 return (s.Label, ActivityFormat.Value("Status", p.Entry.Property("Status").CurrentValue), Change("Status"));
             if (c.SequenceEqual(new[] { "Price" })) return (s.Label, "Price changed", Change("Price"));
-            if (type == typeof(RestaurantSettings) && c.All(f => f.EndsWith("Time"))) return (s.Label, "Hours changed", string.Join(" · ", c.Select(Change)));
+            if (c.SequenceEqual(new[] { "PromotionId" }))   // a dish moved into / out of a promotion from another page
+            {
+                async Task<string> PromoName(object? id) => id is int pid && await ctx.Set<Promotion>().FindAsync([pid], ct) is { } pr ? pr.Title : "(none)";
+                var now = p.Entry.Property("PromotionId").CurrentValue;
+                return (s.Label, now is null ? "Removed from promotion" : "Added to promotion",
+                        $"{await PromoName(p.Before!["PromotionId"])} → {await PromoName(now)}");
+            }
+            if (type == typeof(RestaurantSettings) && c.All(f => f.EndsWith("Time") || f is "WeeklyHours" or "LastBookingMinutes"))
+                return (s.Label, "Hours changed", string.Join(" · ", c.Select(Change)));
+            if (type == typeof(RestaurantSettings) && c.SequenceEqual(new[] { "ClosedDates" }))
+                return (s.Label, "Closed dates changed", Change("ClosedDates"));
             return (s.Label, "Edited", string.Join(" · ", c.Take(3).Select(f => $"{ActivityFormat.Label(type, f)}: {Change(f)}")));
         }
 

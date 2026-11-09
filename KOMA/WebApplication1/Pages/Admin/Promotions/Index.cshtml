@@ -37,7 +37,7 @@ else
 
 <div class="pr-shell">
     <aside class="pr-list">
-        <input type="search" id="pr-search" class="pr-search" aria-label="Search promotions" autocomplete="off" />
+        <input type="search" placeholder="Search" id="pr-search" class="pr-search" aria-label="Search promotions" autocomplete="off" />
         @if (!Model.Promotions.Any())
         {
             <partial name="_Empty" model='new EmptyState("tag", "No promotions yet", null, null, null, true)' />

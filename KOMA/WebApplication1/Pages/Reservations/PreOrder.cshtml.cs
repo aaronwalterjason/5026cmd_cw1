@@ -69,7 +69,7 @@ public class PreOrderModel(ApplicationDbContext context, DiningOrderService dini
             if (selected.Any(q => !Menu.Any(m => m.Id == q.Key)))
                 ModelState.AddModelError("", "One of your dishes is no longer available. Please review your selection.");
             if (!ModelState.IsValid) return Page();
-            var lines = OrderingMenu.BuildLines(Menu, Quantities);
+            var lines = OrderingMenu.BuildLines(Menu, Quantities, null);   // pre-orders: menu price (promotions are for tablet orders only)
             var currentTotal = lines.Sum(i => i.LineTotal);
             if (ExpectedTotal.HasValue && ExpectedTotal.Value != currentTotal)
             {
