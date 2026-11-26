@@ -11,6 +11,23 @@ public sealed class TabletAccess(ApplicationDbContext db, IMemoryCache cache, ID
     private readonly IDataProtector protector = keys.CreateProtector("KOMA.Dining.Device.v2");
     private const string DeviceCookie = "Koma.Tablet.Device";
     private const string VisitCookie = "Koma.Tablet.Visit";
+    private const string PauseCookie = "Koma.Tablet.Pause";
+    private readonly IDataProtector pauseProtector = keys.CreateProtector("KOMA.Dining.Pause.v1");
+    private sealed record PausedVisit(Guid Device, int Visit, int Table, string? Customer, DateTime Expires);
+    private Grant? ReadPaused(HttpContext http, Guid device)
+    {
+        if (!http.Request.Cookies.TryGetValue(PauseCookie, out var value)) return null;
+        try
+        {
+            var paused = System.Text.Json.JsonSerializer.Deserialize<PausedVisit>(pauseProtector.Unprotect(value));
+            return paused != null && paused.Device == device && paused.Expires > DateTime.UtcNow
+                ? new Grant(paused.Visit, paused.Table, paused.Customer) : null;
+        }
+        catch (Exception error) when (error is CryptographicException or System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
     private static readonly object Gate = new();
     private sealed record Grant(int Visit, int Table, string? Customer);
     private static CookieOptions Options(HttpContext http) => new() { HttpOnly = true, Secure = http.Request.IsHttps, SameSite = SameSiteMode.Lax, Path = "/" };
@@ -38,7 +55,7 @@ public sealed class TabletAccess(ApplicationDbContext db, IMemoryCache cache, ID
         var active = dining.ActiveVisits().Where(s => s.RestaurantTableId == tableId);
         if (old.HasValue && old == table.TabletDeviceId)
         {
-            var paused = cache.Get<Grant>("tablet-paused:" + old);
+            var paused = ReadPaused(http, old.Value);
             if (paused?.Table == tableId && await active.AnyAsync(s => s.Id == paused.Visit))
                 resume = paused;
         }
@@ -59,7 +76,7 @@ public sealed class TabletAccess(ApplicationDbContext db, IMemoryCache cache, ID
         var options = Options(http); options.MaxAge = TimeSpan.FromDays(365);
         http.Response.Cookies.Append(DeviceCookie, protector.Protect(device.ToString()), options);
         End(http);
-        if (old.HasValue) cache.Remove("tablet-paused:" + old);
+        http.Response.Cookies.Delete(PauseCookie, Options(http));
         if (resume != null) Open(http, tableId, resume.Visit, resume.Customer);
         return true;
     }
@@ -127,7 +144,12 @@ public sealed class TabletAccess(ApplicationDbContext db, IMemoryCache cache, ID
         var device = DeviceId(http);
         var table = await TableAsync(http);
         if (visit.HasValue && device.HasValue && table.HasValue)
-            cache.Set("tablet-paused:" + device, new Grant(visit.Value.Visit, table.Value, visit.Value.Customer), TimeSpan.FromHours(6));
+        {
+            var paused = new PausedVisit(device.Value, visit.Value.Visit, table.Value, visit.Value.Customer, DateTime.UtcNow.AddHours(6));
+            var options = Options(http);
+            options.MaxAge = TimeSpan.FromHours(6);
+            http.Response.Cookies.Append(PauseCookie, pauseProtector.Protect(System.Text.Json.JsonSerializer.Serialize(paused)), options);
+        }
         End(http);
     }
 
