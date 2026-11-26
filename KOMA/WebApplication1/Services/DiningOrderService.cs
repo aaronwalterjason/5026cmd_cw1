@@ -137,8 +137,9 @@ public class DiningOrderService(ApplicationDbContext db)
         var visit = await ActiveVisits().Include(s => s.Reservation).SingleOrDefaultAsync(s => s.Id == visitId && s.RestaurantTableId == expectedTable);
         if (visit == null) return (null, "This dining visit has ended. Ask Staff to check the table.");
         var settings = await db.RestaurantSettings.AsNoTracking().FirstOrDefaultAsync();
-        if (settings == null || DiningHours.At(settings, ReservationRules.MalaysiaNow).Locked)
-            return (null, "Ordering is closed. Last call is 30 minutes before closing. You can still view your bill.");
+        var hours = settings == null ? null : DiningHours.At(settings, ReservationRules.MalaysiaNow);   // that day's hours (Admin > Settings)
+        if (hours == null || hours.Locked)
+            return (null, hours?.ClosedMessage ?? "Ordering is closed. You can still view your bill.");
         var preorder = visit.ReservationId.HasValue ? await db.Orders.Include(o => o.Items)
             .SingleOrDefaultAsync(o => o.ReservationId == visit.ReservationId && o.Status == OrderStatus.AwaitingArrival) : null;
         if (preorder != null && (preorder.CustomerId != customer || preorder.RestaurantTableId != visit.RestaurantTableId ||

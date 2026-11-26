@@ -201,13 +201,6 @@
             form.addEventListener('submit', () => window.__stSaving = true);
             document.getElementById('st-discard').addEventListener('click', () => window.__stSaving = true);
             refresh();
-
-            const toast = document.getElementById('mn-toast');
-            if (toast) {
-                const hide = () => { toast.classList.add('is-leaving'); setTimeout(() => toast.remove(), 300); };
-                toast.querySelector('.mn-toast-close').addEventListener('click', hide);
-                setTimeout(hide, 3200);
-            }
         })();
     </script>
 }

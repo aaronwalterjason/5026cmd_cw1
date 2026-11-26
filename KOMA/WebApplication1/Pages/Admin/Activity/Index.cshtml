@@ -232,13 +232,6 @@
             if (q?.value) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
 
             document.querySelector('.act-row.is-selected')?.scrollIntoView({ block: 'nearest' });
-
-            const toast = document.getElementById('mn-toast');
-            if (toast) {
-                const hide = () => { toast.classList.add('is-leaving'); setTimeout(() => toast.remove(), 300); };
-                toast.querySelector('.mn-toast-close').addEventListener('click', hide);
-                setTimeout(hide, 3200);
-            }
         })();
     </script>
 }

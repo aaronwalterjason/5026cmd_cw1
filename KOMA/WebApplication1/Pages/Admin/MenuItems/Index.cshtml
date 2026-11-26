@@ -376,15 +376,6 @@
             dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
         })();
 
-        // ---------- Green "saved" popup ----------
-        (() => {
-            const toast = document.getElementById('mn-toast');
-            if (!toast) return;
-            const hide = () => { toast.classList.add('is-leaving'); setTimeout(() => toast.remove(), 300); };
-            toast.querySelector('.mn-toast-close').addEventListener('click', hide);
-            setTimeout(hide, 3200);
-        })();
-
         // Show the chosen photo straight away, before saving.
         document.getElementById('mn-photo-input')?.addEventListener('change', e => {
             const file = e.target.files && e.target.files[0];
