@@ -10,6 +10,7 @@
 </div>
 
 
+<div asp-validation-summary="All" class="text-danger" role="alert"></div>
 <table class="table table-striped">
     <thead><tr><th>Table #</th><th>Floor</th><th>Dining Area</th><th>Capacity</th><th>Shape</th><th>Active</th><th></th></tr></thead>
     <tbody>
@@ -30,6 +31,15 @@
             <td>
                 <a class="btn btn-sm btn-outline-secondary" asp-page="./Edit" asp-route-id="@t.Id">Edit</a>
                 <a class="btn btn-sm btn-outline-danger" asp-page="./Delete" asp-route-id="@t.Id">Remove</a>
+                @foreach (var visit in Model.OpenVisits.Where(v => v.RestaurantTableId == t.Id))
+                {
+                    <form method="post" asp-page-handler="EndVisit" class="d-inline" onsubmit="return confirm('End this visit and make the table available?')">
+                        <input type="hidden" name="tableId" value="@t.Id" />
+                        <input type="hidden" name="visitId" value="@visit.Id" />
+                        <button type="submit" class="btn btn-sm btn-outline-primary">End visit</button>
+                        <span class="small">@visit.CustomerName · @visit.StartTime.ToString("dd MMM HH:mm")</span>
+                    </form>
+                }
             </td>
         </tr>
     }
