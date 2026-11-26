@@ -176,7 +176,8 @@
             if (form.matches(".arrival-form, .release-visit")) {
                 if (!response.ok || response.redirected) throw new Error(response.status === 409 ? await response.text() : "Could not update arrival.");
                 const done = { arrived: "Guest checked in.", called: "Call logged.", eta: "Arrival time confirmed.", cancel: "Reservation cancelled. The table is free again." };
-                window.KomaToast?.next(done[submit.value] || "Arrival updated.");   // shown after the reload
+                const message = form.matches(".release-visit") ? "Visit ended. The table is available again." : done[submit.value] || "Arrival updated.";
+                window.KomaToast?.next(message);   // shown after the reload
                 location.reload();
                 return;
             }

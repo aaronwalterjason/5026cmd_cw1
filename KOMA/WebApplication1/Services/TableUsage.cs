@@ -30,18 +30,20 @@ public static class TableUsage
 
         var numbers = await db.RestaurantTables.AsNoTracking().Where(t => ids.Contains(t.Id))
             .Select(t => new { t.Id, t.TableNumber }).ToDictionaryAsync(t => t.Id, t => t.TableNumber);
+        // A booking whose visit was released early (staff "Make table available") is finished, not upcoming.
         var bookings = await db.Reservations.AsNoTracking().Where(r => ids.Contains(r.RestaurantTableId))
-            .Select(r => new { r.RestaurantTableId, r.Status, r.StartTime, r.EndTime, r.GuestCount }).ToListAsync();
+            .Select(r => new { r.RestaurantTableId, r.Status, r.StartTime, r.EndTime, r.GuestCount,
+                Released = db.TableServiceSessions.Any(s => s.ReservationId == r.Id && s.IsReleased) }).ToListAsync();
         var visits = await db.TableServiceSessions.AsNoTracking().Where(s => ids.Contains(s.RestaurantTableId))
-            .Select(s => new { s.RestaurantTableId, s.StartTime, s.EndTime }).ToListAsync();
+            .Select(s => new { s.RestaurantTableId, s.StartTime, s.EndTime, s.IsReleased }).ToListAsync();
         var ordered = (await db.Orders.AsNoTracking().Where(o => o.RestaurantTableId != null && ids.Contains(o.RestaurantTableId.Value))
             .Select(o => o.RestaurantTableId!.Value).Distinct().ToListAsync()).ToHashSet();
 
         var result = new Dictionary<int, Info>();
         foreach (var id in ids)
         {
-            var upcoming = bookings.Where(b => b.RestaurantTableId == id && Live(b.Status) && b.EndTime > now).OrderBy(b => b.StartTime).ToList();
-            var seated = visits.Any(v => v.RestaurantTableId == id && v.StartTime <= now && v.EndTime > now);
+            var upcoming = bookings.Where(b => b.RestaurantTableId == id && Live(b.Status) && !b.Released && b.EndTime > now).OrderBy(b => b.StartTime).ToList();
+            var seated = visits.Any(v => v.RestaurantTableId == id && !v.IsReleased && v.StartTime <= now && v.EndTime > now);
             var history = bookings.Any(b => b.RestaurantTableId == id) || visits.Any(v => v.RestaurantTableId == id) || ordered.Contains(id);
             result[id] = new Info(id, numbers.GetValueOrDefault(id, "?"), upcoming.Count, upcoming.FirstOrDefault()?.StartTime,
                 upcoming.Count == 0 ? 0 : upcoming.Max(b => b.GuestCount), seated, history);

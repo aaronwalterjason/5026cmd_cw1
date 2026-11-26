@@ -505,7 +505,7 @@ namespace KOMA.Pages.Admin.Accounts
                 if (role == "Customer" && oldRole != "Customer")
                 {
                     // A customer has no duty roster: drop their shifts and leave from today on (past shifts stay for Reports > Team).
-                    var today = DateOnly.FromDateTime(DateTime.Today);
+                    var today = DateOnly.FromDateTime(KOMA.Services.DemoClock.Shared.MalaysiaNow.Date);   // same clock as the schedule
                     var future = await _db.ShiftAssignments.Where(a => a.UserId == user.Id && a.Date >= today).ToListAsync();
                     if (future.Count > 0)
                     {

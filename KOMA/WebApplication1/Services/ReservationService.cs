@@ -382,7 +382,8 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
 
         var bookings = await _context.Reservations
             .Where(r => r.RestaurantTableId == tableId && r.EndTime > now &&
-                (r.Status == ReservationStatus.Pending || r.Status == ReservationStatus.Confirmed))
+                (r.Status == ReservationStatus.Pending || r.Status == ReservationStatus.Confirmed) &&
+                !_context.TableServiceSessions.Any(s => s.ReservationId == r.Id && s.IsReleased))   // released early = finished
             .OrderBy(r => r.StartTime).ToListAsync();
         foreach (var booking in bookings)
         {
