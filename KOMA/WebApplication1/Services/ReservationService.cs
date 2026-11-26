@@ -14,7 +14,7 @@ public class ReservationInput
     [Display(Name = "Dining area preference")] public string? PreferredZone { get; set; }
     [Required, StringLength(100), Display(Name = "Customer name")]
     public string CustomerName { get; set; } = "";
-    [Required, Phone, StringLength(30), Display(Name = "Contact number")]
+    [Required, RegularExpression(PhoneRules.Pattern, ErrorMessage = PhoneRules.Message), StringLength(30), Display(Name = "Contact number")]
     public string ContactNumber { get; set; } = "";
     [EmailAddress, StringLength(256)] public string? Email { get; set; }
     [DataType(DataType.Date)] public DateOnly Date { get; set; }
@@ -357,6 +357,63 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
         return null;
+    }
+
+    // Admin > floor designer / Tables: "Move upcoming bookings" off a table that is being closed, shrunk or removed.
+    // Each upcoming booking (not yet checked in) goes to another free table that fits the party, using the same
+    // availability rules as a normal booking: same dining area first, then the same zone, then anywhere; smallest
+    // table that fits. Its pre-order follows it and the customer gets the usual "booking updated" email.
+    // Bookings that can't be moved (no free table, or guests already checked in) are listed so staff can call them.
+    public record MoveResult(List<string> Moved, List<string> NotMoved);
+
+    public async Task<MoveResult> MoveOffTableAsync(int tableId, ClaimsPrincipal actor)
+    {
+        var moved = new List<string>();
+        var notMoved = new List<string>();
+        if (!IsStaff(actor)) { notMoved.Add("You do not have permission to move bookings."); return new(moved, notMoved); }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+        await LockAsync();
+        var now = ReservationRules.MalaysiaNow;
+        var source = await _context.RestaurantTables.Include(t => t.DiningArea).SingleOrDefaultAsync(t => t.Id == tableId);
+        if (source == null) { notMoved.Add("Table not found."); return new(moved, notMoved); }
+        static string Seat(RestaurantTable? t) => t == null ? "—" : (t.DiningArea == null ? "" : t.DiningArea.Name + " · ") + "Table " + t.TableNumber;
+        static string Who(Reservation r) => $"{r.StartTime:ddd d MMM, h:mm tt} · {r.CustomerName} ({r.GuestCount} guest{(r.GuestCount == 1 ? "" : "s")})";
+
+        var bookings = await _context.Reservations
+            .Where(r => r.RestaurantTableId == tableId && r.EndTime > now &&
+                (r.Status == ReservationStatus.Pending || r.Status == ReservationStatus.Confirmed))
+            .OrderBy(r => r.StartTime).ToListAsync();
+        foreach (var booking in bookings)
+        {
+            if (await _context.TableServiceSessions.AnyAsync(s => s.ReservationId == booking.Id))
+            {
+                notMoved.Add($"{Who(booking)} - already checked in");
+                continue;
+            }
+            // AvailableTables already leaves out inactive, archived (archived are inactive) and too-small tables
+            // and anything booked or occupied at that time. Earlier moves in this loop are saved, so they count.
+            var candidates = await AvailableTables(_context, booking.GuestCount, booking.Id, booking.StartTime, booking.StartTime, booking.EndTime)
+                .Where(t => t.Id != tableId && !t.IsArchived)
+                .ToListAsync();
+            var target = candidates
+                .OrderBy(t => t.DiningAreaId == source.DiningAreaId ? 0 : t.DiningArea!.Zone == source.DiningArea!.Zone ? 1 : 2)
+                .ThenBy(t => t.Capacity).ThenBy(t => t.Id)
+                .FirstOrDefault();
+            if (target == null)
+            {
+                notMoved.Add($"{Who(booking)} - no free table for this party");
+                continue;
+            }
+            booking.RestaurantTableId = target.Id;
+            await _context.Orders.Where(o => o.ReservationId == booking.Id)
+                .ExecuteUpdateAsync(u => u.SetProperty(o => o.RestaurantTableId, (int?)target.Id));
+            await emails.QueueUpdatedAsync(booking, new Dictionary<string, (string, string)> { ["Seating"] = (Seat(source), Seat(target)) }, byCustomer: false);
+            await _context.SaveChangesAsync();
+            moved.Add($"{Who(booking)} → Table {target.TableNumber}");
+        }
+        await transaction.CommitAsync();
+        return new(moved, notMoved);
     }
 
     private Task LockAsync() => _context.Database.ExecuteSqlRawAsync("""

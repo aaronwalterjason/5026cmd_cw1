@@ -11,7 +11,8 @@ namespace KOMA.Pages.Admin.Tables
     {
         public IActionResult OnGet()
         {
-            TempData["StatusMessage"] = "Open a floor layout and use the Add table tool inside a dining area to create a table.";
+            TempData["StatusTitle"] = "Use the floor designer";
+            TempData["StatusError"] = "Open a floor layout and use the Add table tool inside a dining area to create a table.";
             return RedirectToPage("/Admin/Layouts/Index");
         }
 

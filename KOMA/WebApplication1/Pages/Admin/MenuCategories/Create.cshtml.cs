@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -19,6 +20,9 @@ namespace KOMA.Pages.Admin.MenuCategories
 
         public async Task<IActionResult> OnPostAsync()
         {
+            Category.Name = (Category.Name ?? "").Trim();   // category names are unique (case-insensitive)
+            if (Category.Name.Length > 0 && await _db.MenuCategories.AnyAsync(c => c.Name == Category.Name))
+                ModelState.AddModelError("Category.Name", $"A category called '{Category.Name}' already exists.");
             if (!ModelState.IsValid)
             {
                 return Page();

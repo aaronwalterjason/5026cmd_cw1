@@ -21,8 +21,15 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
         options.SignIn.RequireConfirmedAccount = false;   // turn on once email sending is wired up
         options.Password.RequireNonAlphanumeric = false;  // relaxed for coursework demo logins
+        options.User.RequireUniqueEmail = true;           // one account per email (also blocks changing to an email already in use)
+        // Password guessing: 5 wrong passwords in a row lock the account for 15 minutes (Login uses lockoutOnFailure: true).
+        // An admin's manual Lock (Admin > Accounts) has no end date and lasts until an admin unlocks it.
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        options.Lockout.AllowedForNewUsers = true;
     })
     .AddTokenProvider<DataProtectorTokenProvider<ApplicationUser>>(TokenOptions.DefaultProvider)
+    .AddTokenProvider<InviteTokenProvider>(InviteTokenProvider.ProviderName)   // staff/admin invitation link (24 h)
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager<AuditSignInManager>();   // also logs admin/staff sign-ins to Admin > Activity
 

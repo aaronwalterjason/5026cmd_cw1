@@ -27,6 +27,9 @@ public class EditModel(ApplicationDbContext _db, MenuImageService images) : Page
         var existing = await _db.MenuItems.FindAsync(id); if (existing is null) return NotFound();
         if (!await _db.MenuCategories.AnyAsync(c => c.Id == Item.MenuCategoryId))
             ModelState.AddModelError("Item.MenuCategoryId", "Choose an existing category.");
+        Item.Name = (Item.Name ?? "").Trim();   // dish names are unique (case-insensitive), same rule as Admin > Menu
+        if (Item.Name.Length > 0 && await _db.MenuItems.AnyAsync(m => m.Id != id && m.Name == Item.Name))
+            ModelState.AddModelError("Item.Name", $"A dish called '{Item.Name}' already exists.");
         string? imageUrl = existing.ImageUrl;
         if (ModelState.IsValid && Photo is not null)
         {

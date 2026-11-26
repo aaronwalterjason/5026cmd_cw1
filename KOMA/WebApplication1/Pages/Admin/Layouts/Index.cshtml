@@ -9,10 +9,6 @@
     <a class="btn btn-primary" asp-page="./Create">+ New floor layout</a>
 </div>
 
-@if (TempData["StatusMessage"] is string status)
-{
-    <div class="alert alert-info">@status</div>
-}
 
 <p class="text-muted">
     Each floor has its own layout. Open a floor to draw its dining areas and add tables inside them.

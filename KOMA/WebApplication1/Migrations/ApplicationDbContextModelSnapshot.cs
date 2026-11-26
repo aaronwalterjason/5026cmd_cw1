@@ -950,6 +950,9 @@ namespace KOMA.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
+
                     b.Property<double>("LayoutHeight")
                         .HasColumnType("float");
 

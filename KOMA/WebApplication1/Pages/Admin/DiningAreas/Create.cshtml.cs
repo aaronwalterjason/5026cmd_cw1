@@ -11,7 +11,8 @@ namespace KOMA.Pages.Admin.DiningAreas
     {
         public IActionResult OnGet()
         {
-            TempData["StatusMessage"] = "Open a floor layout and use the Draw dining area tool to create a dining area.";
+            TempData["StatusTitle"] = "Use the floor designer";
+            TempData["StatusError"] = "Open a floor layout and use the Draw dining area tool to create a dining area.";
             return RedirectToPage("/Admin/Layouts/Index");
         }
 

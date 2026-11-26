@@ -23,6 +23,7 @@ public class SetupModel(ApplicationDbContext db, TabletAccess tablet, SignInMana
     {
         if (!await tablet.PairAsync(HttpContext, TableId)) { await OnGetAsync(); ModelState.AddModelError("", "Choose an active table."); return Page(); }
         await signIn.SignOutAsync();
+        TempData["DiningNotice"] = "This tablet is now paired with the table.";
         return RedirectToPage("Activate");
     }
 }

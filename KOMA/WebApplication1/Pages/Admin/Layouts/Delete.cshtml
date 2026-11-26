@@ -6,16 +6,26 @@
 
 <h1>Delete Floor</h1>
 
-<div class="alert alert-warning">
-    Are you sure you want to delete <strong>@Model.Floor.Name</strong>?
-    @if (Model.AreaCount > 0)
-    {
-        <text>This will also delete its <strong>@Model.AreaCount dining area(s)</strong> and <strong>@Model.TableCount table(s)</strong>.</text>
-    }
-    This cannot be undone.
-</div>
-
-<form method="post">
-    <button type="submit" class="btn btn-danger">Delete floor</button>
+@if (Model.Blocked is not null)
+{
+    @* Tables with bookings or history would be deleted with the floor, so it is blocked. *@
+    <div class="alert alert-warning">@Model.Blocked</div>
+    <a asp-page="./Designer" asp-route-id="@Model.Floor.Id" class="btn btn-primary">Open the floor designer</a>
     <a asp-page="./Index" class="btn btn-link">Cancel</a>
-</form>
+}
+else
+{
+    <div class="alert alert-warning">
+        Are you sure you want to delete <strong>@Model.Floor.Name</strong>?
+        @if (Model.AreaCount > 0)
+        {
+            <text>This will also delete its <strong>@Model.AreaCount dining area(s)</strong> and <strong>@Model.TableCount table(s)</strong>. None of them has ever been booked.</text>
+        }
+        This cannot be undone.
+    </div>
+
+    <form method="post">
+        <button type="submit" class="btn btn-danger">Delete floor</button>
+        <a asp-page="./Index" class="btn btn-link">Cancel</a>
+    </form>
+}

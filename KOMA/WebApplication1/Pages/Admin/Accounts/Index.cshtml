@@ -4,11 +4,7 @@
     ViewData["Title"] = Model.CurrentGroup is null ? "Accounts" : Model.CurrentGroup.Title + " · Accounts";
 }
 
-@if (TempData["StatusMessage"] is string status)
-{
-    <div class="alert alert-success">@status</div>
-}
-<div asp-validation-summary="All" class="text-danger"></div>
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
 @if (Model.CurrentGroup is null)
 {
@@ -48,7 +44,40 @@ else
         <h1 class="mb-0">@g.Title</h1>
         <span class="acc-sub">@Model.CountFor(g) @g.Subtitle</span>
         <input type="search" placeholder="Search" id="acc-search" class="acc-search" hidden="@Model.IsSchedule" aria-label="Search @g.Title.ToLowerInvariant()" autocomplete="off" />
+        @if (Model.CanInvite)
+        {
+            <button type="button" class="acc-add" id="acc-add-open"><span aria-hidden="true">+</span> @KOMA.Pages.Admin.Accounts.IndexModel.InviteLabel(g)</button>
+        }
     </div>
+
+    @if (Model.CanInvite)
+    {
+        var isAdmin = g.Role == "Administrator";
+        @* Invite staff / Invite admin pop-up: email only. The role comes from this group (server side), not from the form.
+           The person fills in their name, phone and password from the invitation email (Identity/Account/AcceptInvite). *@
+        <dialog class="kc acc-new" id="acc-new" aria-labelledby="acc-new-title" data-tone="navy" data-open="@(Model.ShowInvite ? "1" : "0")">
+            <form method="post" asp-page-handler="Invite" asp-route-group="@g.Key" class="kc-form" novalidate>
+                <div class="kc-band" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></svg></div>
+                <div class="kc-body">
+                    <h2 class="kc-title" id="acc-new-title">@(isAdmin ? "Invite an admin" : "Invite a staff member")</h2>
+                    <p class="kc-text">We'll email them a link to complete registration with their name, phone number and password. The link works for 24 hours.@(isAdmin ? " Admins can change everything, including accounts." : "")</p>
+                    @if (ViewData.ModelState.TryGetValue("Invite", out var formErrors) && formErrors.Errors.Count > 0)
+                    {
+                        <ul class="text-danger small mb-0 ps-3">@foreach (var err in formErrors.Errors) { <li>@err.ErrorMessage</li> }</ul>
+                    }
+                    <div>
+                        <label asp-for="Invite.Email" class="form-label acc-new-label"></label>
+                        <input asp-for="Invite.Email" type="email" class="form-control" autocomplete="off" placeholder="name@example.com" />
+                        <span asp-validation-for="Invite.Email" class="text-danger small"></span>
+                    </div>
+                    <div class="kc-actions">
+                        <button type="button" class="btn btn-outline-primary" id="acc-new-cancel">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Send invitation</button>
+                    </div>
+                </div>
+            </form>
+        </dialog>
+    }
 
     @if (g.Role == "Staff")
     {
@@ -66,7 +95,7 @@ else
     {
     if (!Model.Shown.Any())
     {
-        <partial name="_Empty" model='new EmptyState("people", $"No {g.Title.ToLowerInvariant()} yet", g.Role == "Customer" ? "Customers appear here when they sign up." : null)' />
+        <partial name="_Empty" model='new EmptyState("people", $"No {g.Title.ToLowerInvariant()} yet", g.Role == "Customer" ? "Customers appear here when they sign up." : $"Use {KOMA.Pages.Admin.Accounts.IndexModel.InviteLabel(g)} to add the first one.")' />
     }
     else
     {
@@ -85,11 +114,15 @@ else
                         {
                             <span class="acc-badge-you">YOU</span>
                         }
+                        @if (a.Pending)
+                        {
+                            <span class="acc-badge-pending" title="Invitation sent - hasn't completed registration yet">INVITED</span>
+                        }
                     </div>
                     <span class="acc-badge-av" aria-hidden="true">@KOMA.Pages.Admin.Accounts.IndexModel.Initials(a)</span>
                     <h2 class="acc-badge-name" title="@name">@name</h2>
                     <div class="acc-badge-mail" title="@a.Email">@a.Email</div>
-                    <div class="acc-badge-phone">@(string.IsNullOrWhiteSpace(a.Phone) ? "No phone number" : a.Phone)</div>
+                    <div class="acc-badge-phone">@(a.Pending ? "Waiting to complete registration" : string.IsNullOrWhiteSpace(a.Phone) ? "No phone number" : a.Phone)</div>
                     <div class="acc-badge-stats">
                         <div><b>@stats.First.Value</b><span>@stats.First.Label</span></div>
                         <div><b>@stats.Second.Value</b><span>@stats.Second.Label</span></div>
@@ -133,14 +166,29 @@ else
             const current = form.dataset.current, who = form.dataset.email;
             if (role === current || !window.KomaConfirm) return;
             e.preventDefault();
-            const toAdmin = role === 'Administrator';
+            const toAdmin = role === 'Administrator', toCustomer = role === 'Customer';
             KomaConfirm.open({
-                tone: 'warn', icon: 'shield',
+                tone: toCustomer ? 'danger' : 'warn', icon: 'shield',
                 title: toAdmin ? `Make ${who} an Administrator?` : `Change ${who} to ${role}?`,
-                ok: 'Confirm', no: 'Cancel',
+                text: toCustomer ? 'They lose access to the staff and admin pages and their upcoming shifts are removed. A customer can\'t be made Staff or Admin from here - if this is a mistake, use Revert on this change in Admin › Activity.' : undefined,
+                ok: toCustomer ? 'Change to Customer' : 'Confirm', no: 'Cancel',
                 onOk: () => HTMLFormElement.prototype.submit.call(form)
             });
         }));
+
+        // Invite staff / Invite admin pop-up. Re-opens by itself when the server sent the form back with errors.
+        (() => {
+            const dlg = document.getElementById('acc-new');
+            if (!dlg) return;
+            const open = () => { dlg.showModal(); dlg.querySelector('input:not([type=hidden])')?.focus(); };
+            document.getElementById('acc-add-open')?.addEventListener('click', open);
+            document.getElementById('acc-new-cancel')?.addEventListener('click', () => dlg.close());
+            dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+            if (dlg.dataset.open === '1') {
+                open();
+                dlg.querySelector('.input-validation-error')?.focus();
+            }
+        })();
 
         // Search the badges on this page by name, email or phone (no reload).
         (() => {
@@ -363,13 +411,29 @@ else
                     if (role === roleForm.dataset.current) { e.preventDefault(); return; }
                     if (!window.KomaConfirm) return;
                     e.preventDefault();
-                    const toAdmin = role === 'Administrator';
+                    const toAdmin = role === 'Administrator', toCustomer = role === 'Customer';
                     KomaConfirm.open({
-                        tone: 'warn', icon: 'shield',
-                        title: toAdmin ? `Make ${roleForm.dataset.email} an Admin?` : `Change ${roleForm.dataset.email} to Staff?`,
-                        text: toAdmin ? 'Admins can change everything, including accounts.' : 'They will lose access to admin-only pages.',
-                        ok: 'Confirm', no: 'Cancel',
+                        tone: toCustomer ? 'danger' : 'warn', icon: 'shield',
+                        title: toAdmin ? `Make ${roleForm.dataset.email} an Admin?` : toCustomer ? `Change ${roleForm.dataset.email} to Customer?` : `Change ${roleForm.dataset.email} to Staff?`,
+                        text: toAdmin ? 'Admins can change everything, including accounts.'
+                            : toCustomer ? 'They lose access to the staff and admin pages and their upcoming shifts are removed. A customer can\'t be made Staff or Admin from here - if this is a mistake, use Revert on this change in Admin › Activity.'
+                            : 'They will lose access to admin-only pages.',
+                        ok: toCustomer ? 'Change to Customer' : 'Confirm', no: 'Cancel',
                         onOk: () => HTMLFormElement.prototype.submit.call(roleForm)
+                    });
+                });
+
+                // Cancel a pending invitation asks first (it deletes the account).
+                wrap.querySelector('form.js-cp-cancel')?.addEventListener('submit', e => {
+                    const f = e.currentTarget;
+                    if (!window.KomaConfirm) return;
+                    e.preventDefault();
+                    KomaConfirm.open({
+                        tone: 'danger', icon: 'shield',
+                        title: `Cancel the invitation for ${f.dataset.email}?`,
+                        text: 'The account is removed and the invitation link stops working.',
+                        ok: 'Cancel invitation', no: 'Keep',
+                        onOk: () => HTMLFormElement.prototype.submit.call(f)
                     });
                 });
 
@@ -395,6 +459,7 @@ else
                     const input = wrap.querySelector('.cp-reset-out input');
                     try { await navigator.clipboard.writeText(input.value); } catch (_) { input.select(); document.execCommand('copy'); }
                     e.currentTarget.textContent = 'Copied';
+                    window.KomaToast?.show({ title: 'Copied', text: 'The link is on your clipboard. Pass it on to them.' });
                 });
 
                 wrap.querySelector('[data-cp-close]')?.focus({ preventScroll: true });

@@ -39,17 +39,39 @@ public class AccountEmailService(
         return await SendAsync(user, BookingEmailType.PasswordReset, linkFor(code));
     }
 
-    private async Task<bool> SendAsync(ApplicationUser user, BookingEmailType type, string link)
+    // Staff / admin invitation: the code for the "Complete registration" link (valid 24 hours, see InviteTokenProvider).
+    public async Task<string> InviteCodeAsync(ApplicationUser user) =>
+        Encode(await users.GenerateUserTokenAsync(user, KOMA.Services.InviteTokenProvider.ProviderName, KOMA.Services.InviteTokenProvider.Purpose));
+
+    public async Task<bool> IsInviteCodeValidAsync(ApplicationUser user, string? code) =>
+        Decode(code) is { } token &&
+        await users.VerifyUserTokenAsync(user, KOMA.Services.InviteTokenProvider.ProviderName, KOMA.Services.InviteTokenProvider.Purpose, token);
+
+    // linkFor(code) builds the AcceptInvite address. role: "Staff" or "Administrator".
+    public async Task<bool> SendInviteAsync(ApplicationUser user, string role, string invitedBy, Func<string, string> linkFor)
+    {
+        if (string.IsNullOrEmpty(user.Email)) return false;
+        var link = linkFor(await InviteCodeAsync(user));
+        var built = BookingEmailTemplates.BuildInvite(role == "Administrator" ? "Admin" : "Staff", invitedBy, link, options.CurrentValue);
+        return await SendAsync(user, BookingEmailType.StaffInvite, built);
+    }
+
+    private Task<bool> SendAsync(ApplicationUser user, BookingEmailType type, string link)
+    {
+        var name = !string.IsNullOrWhiteSpace(user.FirstName) ? user.FirstName! : (user.FullName ?? user.Email!).Split(' ')[0];
+        return SendAsync(user, type, BookingEmailTemplates.BuildAccount(type, name, link, options.CurrentValue));
+    }
+
+    private async Task<bool> SendAsync(ApplicationUser user, BookingEmailType type, BookingEmailTemplates.Built built)
     {
         var now = ReservationRules.MalaysiaNow;
         var since = now - MinGap;
         if (await db.BookingEmails.AnyAsync(e => e.Type == type && e.ToEmail == user.Email && e.CreatedAt >= since)) return false;
 
-        var name = !string.IsNullOrWhiteSpace(user.FirstName) ? user.FirstName! : (user.FullName ?? user.Email!).Split(' ')[0];
-        var built = BookingEmailTemplates.BuildAccount(type, name, link, options.CurrentValue);
+        var name = user.FullName ?? user.Email!.Split('@')[0];
         var row = new BookingEmail
         {
-            Type = type, ToEmail = user.Email, ToName = user.FullName ?? name, CreatedAt = now, SendAfter = now,
+            Type = type, ToEmail = user.Email, ToName = name, CreatedAt = now, SendAfter = now,
             Subject = built.Subject, Attempts = 1
         };
         try

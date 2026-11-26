@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using KOMA.Data;
 using KOMA.Models;
+using KOMA.Services;
 
 namespace KOMA.Pages.Admin.Layouts
 {
@@ -88,6 +89,9 @@ namespace KOMA.Pages.Admin.Layouts
                 return Page();
             }
 
+            // What every existing table on this floor is used for (bookings, visits, orders) - see Services/TableUsage.cs.
+            _usage = await TableUsage.ForTablesAsync(_db, floor.DiningAreas.SelectMany(a => a.Tables).Select(t => t.Id));
+
             Errors = await ValidateAsync(floor, layout);
             if (Errors.Count > 0)
             {
@@ -96,19 +100,48 @@ namespace KOMA.Pages.Admin.Layouts
                 return Page();
             }
 
-            Apply(floor, layout);
-            await _db.SaveChangesAsync();
+            var archived = Apply(floor, layout);
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // Safety net: a table started being used while the admin was editing.
+                Errors.Add("A table you removed is now in use (a new booking or visit), so nothing was saved. Reload the page and try again.");
+                await BuildDesignerJsonAsync(layout);
+                return Page();
+            }
 
             TempData["StatusMessage"] =
-                $"Layout saved: {layout.Areas.Count} dining area(s), {layout.Tables.Count} table(s), {layout.Tables.Sum(t => t.Capacity)} seats.";
+                $"Layout saved: {layout.Areas.Count} dining area(s), {layout.Tables.Count} table(s), {layout.Tables.Sum(t => t.Capacity)} seats."
+                + (archived.Count > 0 ? $" Archived (kept for booking history): table {string.Join(", ", archived)}." : "");
+
+            // Saved, but closed or shrunk tables that still have upcoming bookings: tell the admin (amber pop-up).
+            var areaActive = layout.Areas.ToDictionary(a => a.Id, a => a.IsActive);
+            var warnings = layout.Tables
+                .Where(t => t.Id > 0 && _usage.TryGetValue(t.Id, out var u) && u.Upcoming > 0 &&
+                            (!t.IsActive || !areaActive.GetValueOrDefault(t.AreaId, true) || t.Capacity < u.MaxGuests))
+                .Select(t => _usage[t.Id])
+                .Select(u => TableUsage.UpcomingText(u))
+                .ToList();
+            if (warnings.Count > 0)
+            {
+                TempData["StatusNoteTitle"] = "Check these bookings";
+                TempData["StatusError"] = string.Join("; ", warnings)
+                    + ". The table is closed or too small now, but the customers keep it until you move them (select the table › Move upcoming bookings).";
+            }
             return RedirectToPage(new { id });
         }
 
         // ------------------------------------------------------------------
 
+        private Dictionary<int, TableUsage.Info> _usage = new();
+
+        // Archived tables are not part of the drawing (and are left alone when the layout is saved).
         private Task<FloorLayout?> LoadFloorAsync(int id, bool tracking)
         {
-            IQueryable<FloorLayout> q = _db.FloorLayouts.Include(f => f.DiningAreas).ThenInclude(a => a.Tables);
+            IQueryable<FloorLayout> q = _db.FloorLayouts.Include(f => f.DiningAreas).ThenInclude(a => a.Tables.Where(t => !t.IsArchived));
             if (!tracking) q = q.AsNoTracking();
             return q.FirstOrDefaultAsync(f => f.Id == id);
         }
@@ -134,8 +167,17 @@ namespace KOMA.Pages.Admin.Layouts
 
             // Table numbers used on OTHER floors, so the page can suggest numbers that aren't taken.
             var otherNumbers = await _db.RestaurantTables
-                .Where(t => t.DiningArea!.FloorLayoutId != Floor.Id)
+                .Where(t => t.DiningArea!.FloorLayoutId != Floor.Id && !t.IsArchived)
                 .Select(t => t.TableNumber).ToListAsync();
+
+            // Bookings per table, so the page can warn before a table is closed, shrunk or removed,
+            // and offer "Move upcoming bookings". Areas in areasWithHistory can't be removed (a table in them,
+            // archived ones included, has booking history).
+            var floorTables = await _db.RestaurantTables.Where(t => t.DiningArea!.FloorLayoutId == Floor.Id)
+                .Select(t => new { t.Id, t.DiningAreaId, t.IsArchived }).ToListAsync();
+            var allUsage = await TableUsage.ForTablesAsync(_db, floorTables.Select(t => t.Id));
+            var usage = floorTables.Where(t => !t.IsArchived).Select(t => allUsage[t.Id]).ToList();
+            var areasWithHistory = floorTables.Where(t => allUsage[t.Id].HasHistory).Select(t => t.DiningAreaId).Distinct().ToList();
 
             DesignerJson = JsonSerializer.Serialize(new
             {
@@ -143,6 +185,10 @@ namespace KOMA.Pages.Admin.Layouts
                 zones = DiningArea.ZoneOptions,
                 shapes = Enum.GetNames<TableShape>(),
                 otherTableNumbers = otherNumbers,
+                usage = usage.Select(u => new { id = u.TableId, upcoming = u.Upcoming, next = u.NextText, maxGuests = u.MaxGuests, seated = u.Seated, history = u.HasHistory }),
+                areasWithHistory,
+                moveBase = Url.Content("~/Admin/Tables/Delete/"),
+                returnUrl = Url.Page("/Admin/Layouts/Designer", new { id = Floor.Id }),
                 areas = layout.Areas,
                 tables = layout.Tables
             }, Json);
@@ -175,7 +221,7 @@ namespace KOMA.Pages.Admin.Layouts
                         errors.Add($"'{layout.Areas[i].Name}' and '{layout.Areas[j].Name}' overlap.");
 
             var otherFloorNumbers = (await _db.RestaurantTables
-                    .Where(t => t.DiningArea!.FloorLayoutId != floor.Id)
+                    .Where(t => t.DiningArea!.FloorLayoutId != floor.Id && !t.IsArchived)
                     .Select(t => t.TableNumber).ToListAsync())
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var existingTableIds = floor.DiningAreas.SelectMany(a => a.Tables).Select(t => t.Id).ToHashSet();
@@ -213,10 +259,36 @@ namespace KOMA.Pages.Admin.Layouts
                         errors.Add($"Tables {layout.Tables[i].Number} and {layout.Tables[j].Number} are too close - their chairs overlap.");
                 }
 
+            // Tables taken off the drawing: blocked while they have upcoming bookings or seated guests
+            // (tables with only past history are archived on save instead of deleted).
+            var keptTableIds = layout.Tables.Where(t => t.Id > 0).Select(t => t.Id).ToHashSet();
+            foreach (var t in floor.DiningAreas.SelectMany(a => a.Tables).Where(t => !keptTableIds.Contains(t.Id)))
+                if (_usage.TryGetValue(t.Id, out var u) && TableUsage.BlockReason(u) is { } reason)
+                    errors.Add($"Table {t.TableNumber} can't be removed: {reason}");
+
+            // Dining areas taken off the drawing delete their tables too, so none of them (archived included) may have history.
+            var keptAreaIds = layout.Areas.Where(a => a.Id > 0).Select(a => a.Id).ToHashSet();
+            var removedAreas = floor.DiningAreas.Where(a => !keptAreaIds.Contains(a.Id)).ToList();
+            if (removedAreas.Count > 0)
+            {
+                var removedIds = removedAreas.Select(a => a.Id).ToList();
+                var areaUsage = await TableUsage.ForAreasAsync(_db, removedIds);
+                // Projection (not tracked), so archived tables don't get attached to the floor being saved.
+                var tableArea = await _db.RestaurantTables.Where(t => removedIds.Contains(t.DiningAreaId))
+                    .Select(t => new { t.Id, t.DiningAreaId }).ToDictionaryAsync(t => t.Id, t => t.DiningAreaId);
+                foreach (var area in removedAreas)
+                {
+                    var reason = KOMA.Pages.Admin.DiningAreas.DeleteModel.Reason($"'{area.Name}'",
+                        areaUsage.Values.Where(u => tableArea.GetValueOrDefault(u.TableId) == area.Id));
+                    if (reason is not null) errors.Add(reason + " (Put it back and untick Active.)");
+                }
+            }
+
             return errors.Distinct().ToList();
         }
 
-        private void Apply(FloorLayout floor, LayoutDto layout)
+        // Returns the numbers of tables that were archived instead of deleted.
+        private List<string> Apply(FloorLayout floor, LayoutDto layout)
         {
             var existingAreas = floor.DiningAreas.ToDictionary(a => a.Id);
             var existingTables = floor.DiningAreas.SelectMany(a => a.Tables).ToDictionary(t => t.Id);
@@ -261,13 +333,19 @@ namespace KOMA.Pages.Admin.Layouts
             }
 
             // 3. Delete tables and areas the admin removed from the layout.
+            //    Tables with booking history are archived instead (they stay in their area, hidden).
+            var archived = new List<string>();
             var keptTables = layout.Tables.Where(t => t.Id > 0).Select(t => t.Id).ToHashSet();
             foreach (var t in existingTables.Values.Where(t => !keptTables.Contains(t.Id)))
-                _db.RestaurantTables.Remove(t);
+            {
+                if (_usage.TryGetValue(t.Id, out var u) && u.HasHistory) { TableUsage.Archive(t); archived.Add(t.TableNumber); }
+                else _db.RestaurantTables.Remove(t);
+            }
 
             var keptAreas = layout.Areas.Where(a => a.Id > 0).Select(a => a.Id).ToHashSet();
             foreach (var a in existingAreas.Values.Where(a => !keptAreas.Contains(a.Id)))
                 _db.DiningAreas.Remove(a);
+            return archived;
         }
 
         // Space each shape needs around it for chairs, in metres (left, top, right, bottom).

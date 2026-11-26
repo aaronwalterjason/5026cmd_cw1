@@ -99,7 +99,7 @@ public class IndexModel(ApplicationDbContext context) : PageModel
         Floors = await context.FloorLayouts
             .AsNoTracking()
             .Include(f => f.DiningAreas)
-            .ThenInclude(a => a.Tables)
+            .ThenInclude(a => a.Tables.Where(t => !t.IsArchived))   // archived tables (Admin) are not on the floor
             .OrderBy(f => f.Level)
             .ThenBy(f => f.Name)
             .ToListAsync();

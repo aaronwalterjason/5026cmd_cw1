@@ -140,7 +140,7 @@
         <section id="cp-t-acct" role="tabpanel" hidden>
             <div class="cp-acct">
                 <div><span>Failed sign-ins</span><span>@p.FailedSignIns</span></div>
-                <div><span>Status</span><span><span class="cp-dot @(p.Locked ? "bad" : "ok")"></span>@(p.Locked ? "Locked" : "Active")</span></div>
+                <div><span>Status</span><span><span class="cp-dot @(p.Locked ? "bad" : "ok")"></span>@KOMA.Pages.Admin.Accounts.IndexModel.LockText(p.Locked, p.LockoutEnd)</span></div>
             </div>
             <form method="post" asp-page="./Index" asp-page-handler="Lock" class="js-cp-lock" data-name="@p.Name" data-lock="@(p.Locked ? "0" : "1")">
                 <input type="hidden" name="userId" value="@p.Id" />

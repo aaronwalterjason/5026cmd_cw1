@@ -1,10 +1,28 @@
 @page
 @model LockoutModel
 @{
-    ViewData["Title"] = "Locked out";
+    ViewData["Title"] = "Account locked";
+    Layout = "/Pages/Shared/_Layout.cshtml";
 }
-
-<header>
-    <h1 class="text-danger">@ViewData["Title"]</h1>
-    <p class="text-danger">This account has been locked out, please try again later.</p>
-</header>
+<link rel="stylesheet" href="~/css/koma-login.css" asp-append-version="true" />
+<div class="koma-login">
+    <div class="koma-login-shell">
+        <partial name="_AuthBrand" />
+        <section class="koma-login-form-panel" aria-labelledby="lo-title">
+            <div class="koma-login-form-content">
+                <p class="koma-login-eyebrow">YOUR ACCOUNT</p>
+                <h2 id="lo-title">Account locked</h2>
+                @* Two ways to get here: 5 wrong passwords in a row (locked for 15 minutes, Program.cs options.Lockout)
+                   or an admin locked the account (Admin > Accounts, lasts until an admin unlocks it). *@
+                <p class="koma-login-intro">For your security, this account can't sign in right now.</p>
+                <ul class="koma-login-intro">
+                    <li>If you entered the wrong password several times, wait <strong>15 minutes</strong> and try again.</li>
+                    <li>Forgotten your password? Reset it now, then sign in once the 15 minutes are up.</li>
+                    <li>If the restaurant locked your account, contact the KOMA manager.</li>
+                </ul>
+                <a asp-page="./ForgotPassword" class="koma-login-submit">Reset my password <span aria-hidden="true">↗</span></a>
+                <a asp-page="./Login" class="koma-login-back">← Back to log in</a>
+            </div>
+        </section>
+    </div>
+</div>

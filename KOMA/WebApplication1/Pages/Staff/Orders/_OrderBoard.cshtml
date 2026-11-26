@@ -35,12 +35,6 @@
         </div>
     }
 
-    @if (TempData["OrderSuccess"] is string message)
-    {
-        <div class="alert alert-success" role="status">
-            @message
-        </div>
-    }
 
     <nav class="staff-nav" aria-label="Order status">
         @foreach (var status in Model.VisibleStatuses)

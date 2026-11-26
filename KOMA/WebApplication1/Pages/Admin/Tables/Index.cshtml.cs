@@ -16,7 +16,8 @@ namespace KOMA.Pages.Admin.Tables
 
         public async Task OnGetAsync()
         {
-            Tables = await _db.RestaurantTables.Include(t => t.DiningArea).ThenInclude(a => a!.FloorLayout).OrderBy(t => t.TableNumber).ToListAsync();
+            // Archived tables are hidden (kept only for booking history).
+            Tables = await _db.RestaurantTables.Where(t => !t.IsArchived).Include(t => t.DiningArea).ThenInclude(a => a!.FloorLayout).OrderBy(t => t.TableNumber).ToListAsync();
         }
     }
 }

@@ -38,10 +38,16 @@ public class RegisterModel(AccountService accounts, SignInManager<ApplicationUse
         var result = await accounts.CreateAsync(user, Input.Password, "Customer");
         if (!result.Succeeded)
         {
-            foreach (var error in result.Errors) ModelState.AddModelError(string.Empty, error.Description);
+            // Username = email, so a used email fails twice (DuplicateUserName + DuplicateEmail): show one plain message.
+            if (result.Errors.Any(e => e.Code is "DuplicateEmail" or "DuplicateUserName"))
+                ModelState.AddModelError("Input.Email", "An account with this email already exists. Log in or reset your password instead.");
+            foreach (var error in result.Errors.Where(e => e.Code is not ("DuplicateEmail" or "DuplicateUserName")))
+                ModelState.AddModelError(string.Empty, error.Description);
             return Page();
         }
         await signIn.SignInAsync(user, isPersistent: false);
+        TempData["StatusTitle"] = "Account created";
+        TempData["StatusMessage"] = $"Welcome to KOMA, {user.FirstName}. Check your inbox to confirm your email.";
         // "Confirm your email" - they can use the site straight away; a banner reminds them until they confirm.
         await emails.SendConfirmAsync(user, code =>
             Url.Page("/Account/ConfirmEmail", null, new { area = "Identity", userId = user.Id, code }, Request.Scheme)!);

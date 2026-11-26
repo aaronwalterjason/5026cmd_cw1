@@ -368,3 +368,6 @@ body:has(.koma-login) {
 .koma-login .koma-login-brand h1 {
     color: #f4f1e9;
 }
+
+/* Complete registration (AcceptInvite): the invited email is shown but can't be changed */
+.koma-login-field input[readonly] { background: rgba(38, 59, 73, .06); color: #6f7a76; cursor: default; }

@@ -6,10 +6,7 @@
     ViewData["ActivePage"] = "Index";
 }
 <h2>Profile</h2>
-@if (!string.IsNullOrEmpty(Model.StatusMessage))
-{
-    <div class="alert alert-success" role="status">@Model.StatusMessage</div>
-}
+@* "Your profile has been updated." shows as the shared pop-up (Pages/Shared/_Toast.cshtml). *@
 <div class="row">
     <div class="col-md-8">
         <form method="post">
@@ -29,8 +26,8 @@
                 <span asp-validation-for="Input.LastName" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="Input.PhoneNumber" class="form-label"></label>
-                <input asp-for="Input.PhoneNumber" class="form-control" autocomplete="tel" />
+                <label asp-for="Input.PhoneNumber" class="form-label">Phone number @(Model.PhoneRequired ? "" : "(optional)")</label>
+                <input asp-for="Input.PhoneNumber" class="form-control" autocomplete="tel" required="@Model.PhoneRequired" />
                 <span asp-validation-for="Input.PhoneNumber" class="text-danger"></span>
             </div>
             <button type="submit" class="w-100 btn btn-primary">Save</button>

@@ -77,6 +77,11 @@ public class IndexModel(ApplicationDbContext _db, MenuImageService images) : Pag
 
         if (!await _db.MenuCategories.AnyAsync(c => c.Id == Item.MenuCategoryId))
             ModelState.AddModelError("Item.MenuCategoryId", "Choose a category.");
+        // Dish names are unique (ignoring upper/lower case and spaces at the ends) so the menu, orders and reports
+        // never show two dishes that look the same.
+        Item.Name = (Item.Name ?? "").Trim();
+        if (Item.Name.Length > 0 && await _db.MenuItems.AnyAsync(m => m.Id != Item.Id && m.Name == Item.Name))
+            ModelState.AddModelError("Item.Name", $"A dish called '{Item.Name}' already exists.");
 
         var imageUrl = existing?.ImageUrl;
         if (ModelState.IsValid && Photo is not null)
@@ -148,6 +153,11 @@ public class IndexModel(ApplicationDbContext _db, MenuImageService images) : Pag
         var isNew = Category.Id == 0;
         var existing = isNew ? null : await _db.MenuCategories.FindAsync(Category.Id);
         if (!isNew && existing is null) return NotFound();
+
+        // Category names are unique too (ignoring upper/lower case and spaces at the ends).
+        Category.Name = (Category.Name ?? "").Trim();
+        if (Category.Name.Length > 0 && await _db.MenuCategories.AnyAsync(c => c.Id != Category.Id && c.Name == Category.Name))
+            ModelState.AddModelError("Category.Name", $"A category called '{Category.Name}' already exists.");
 
         if (!ModelState.IsValid)
         {

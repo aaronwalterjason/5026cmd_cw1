@@ -144,7 +144,7 @@ namespace KOMA.Pages.Admin.Accounts
                 .Where(a => a.Date >= src && a.Date <= src.AddDays(6) && !a.IsLeave && staffIds.Contains(a.UserId)).ToListAsync();
             if (source.Count == 0)
             {
-                TempData["StatusMessage"] = "Last week has no shifts to copy.";
+                TempData["StatusError"] = "Last week has no shifts to copy.";
             }
             else
             {

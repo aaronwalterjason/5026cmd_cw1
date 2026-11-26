@@ -11,18 +11,6 @@
     Admin > Settings (design A · week table): open/closed + hours per day, last booking time with a preview of the
     booking times customers see, closed dates, announcement. The save bar appears only when something changed.
 *@
-@if (TempData["StatusMessage"] is string status)
-{
-    <div class="mn-toast" id="mn-toast" role="status" aria-live="polite">
-        <span class="mn-toast-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
-        <span class="mn-toast-text"><strong>Done</strong><span>@status</span></span>
-        <button type="button" class="mn-toast-close" aria-label="Close">&times;</button>
-    </div>
-}
-@if (TempData["StatusError"] is string err)
-{
-    <div class="alert alert-danger" role="alert">@err</div>
-}
 
 <h1 class="st-title">Settings</h1>
 

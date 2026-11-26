@@ -9,10 +9,6 @@
     <a class="btn btn-primary" asp-page="/Admin/Layouts/Index">+ New table (on a floor layout)</a>
 </div>
 
-@if (TempData["StatusMessage"] is string status)
-{
-    <div class="alert alert-success">@status</div>
-}
 
 <table class="table table-striped">
     <thead><tr><th>Table #</th><th>Floor</th><th>Dining Area</th><th>Capacity</th><th>Shape</th><th>Active</th><th></th></tr></thead>
@@ -33,7 +29,7 @@
             <td>@(t.IsActive ? "Yes" : "No")</td>
             <td>
                 <a class="btn btn-sm btn-outline-secondary" asp-page="./Edit" asp-route-id="@t.Id">Edit</a>
-                <a class="btn btn-sm btn-outline-danger" asp-page="./Delete" asp-route-id="@t.Id">Delete</a>
+                <a class="btn btn-sm btn-outline-danger" asp-page="./Delete" asp-route-id="@t.Id">Remove</a>
             </td>
         </tr>
     }
