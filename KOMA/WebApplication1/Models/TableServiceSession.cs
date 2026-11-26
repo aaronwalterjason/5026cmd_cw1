@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace KOMA.Models;
@@ -28,6 +28,8 @@ public class TableServiceSession
 
     // Malaysia local date and time, matching existing reservations.
     public DateTime StartTime { get; set; }
+
+    public bool IsReleased { get; set; }
 
     public DateTime EndTime { get; set; }
 }

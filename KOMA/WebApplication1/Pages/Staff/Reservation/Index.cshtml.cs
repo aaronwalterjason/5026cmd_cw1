@@ -108,7 +108,7 @@ public class IndexModel(ApplicationDbContext context) : PageModel
         var start = Selection.Start;
         var end = Selection.End;
 
-        Bookings = await context.Reservations
+        Bookings = await DiningOrderService.UnreleasedReservations(context)
             .AsNoTracking()
             .Where(r =>
                 r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
@@ -130,9 +130,9 @@ public class IndexModel(ApplicationDbContext context) : PageModel
                 .Where(r => r.Status == ReservationStatus.Confirmed && r.HoldUntil > now && r.ContactAttemptAt == null &&
                     r.StartTime <= now.AddMinutes(-ReservationRules.CallMinutes) &&
                     !context.TableServiceSessions.Any(s => s.ReservationId == r.Id)).ToListAsync();
-            BlockedTables = (await context.Reservations.Where(r => r.Status == ReservationStatus.Confirmed &&
+            BlockedTables = (await DiningOrderService.UnreleasedReservations(context).Where(r => r.Status == ReservationStatus.Confirmed &&
                 r.EndTime <= now && r.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes))
-                .Select(r => r.RestaurantTableId).Union(context.TableServiceSessions.Where(s => s.EndTime <= now &&
+                .Select(r => r.RestaurantTableId).Union(context.TableServiceSessions.Where(s => !s.IsReleased && s.EndTime <= now &&
                     s.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)).Select(s => s.RestaurantTableId)).ToListAsync()).ToHashSet();
         }
         else
@@ -143,7 +143,7 @@ public class IndexModel(ApplicationDbContext context) : PageModel
         WalkIns = await context.TableServiceSessions
             .AsNoTracking()
             .Where(s =>
-                s.ReservationId == null &&
+                !s.IsReleased && s.ReservationId == null &&
                 (Now
                     ? s.StartTime <= start && s.EndTime > start
                     : s.StartTime < end && s.EndTime > start))

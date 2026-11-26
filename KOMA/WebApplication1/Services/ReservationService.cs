@@ -97,7 +97,7 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
         var latest = scheduled.AddMinutes(ReservationRules.SpacingMinutes);
         var ready = diningEnd.AddMinutes(ReservationRules.TurnaroundMinutes);
         var previousEnd = occupiedFrom.AddMinutes(-ReservationRules.TurnaroundMinutes);
-        return db.Reservations.Where(r => r.Id != (excludeId ?? 0) &&
+        return DiningOrderService.UnreleasedReservations(db).Where(r => r.Id != (excludeId ?? 0) &&
                 r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
                 ((r.StartTime > earliest && r.StartTime < latest) || (r.StartTime < ready && r.EndTime > previousEnd)));
     }
@@ -111,7 +111,7 @@ public class ReservationService(ApplicationDbContext context, KOMA.Services.Emai
         return db.RestaurantTables.Include(t => t.DiningArea)
             .Where(t => t.IsActive && t.DiningArea!.IsActive && t.Capacity >= guests)
             .Where(t => !blockers.Any(r => r.RestaurantTableId == t.Id))
-            .Where(t => !db.TableServiceSessions.Any(s => s.RestaurantTableId == t.Id && s.ReservationId == null &&
+            .Where(t => !db.TableServiceSessions.Any(s => !s.IsReleased && s.RestaurantTableId == t.Id && s.ReservationId == null &&
                 s.StartTime < ready && s.EndTime > previousEnd));
     }
 

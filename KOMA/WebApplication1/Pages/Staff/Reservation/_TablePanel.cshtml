@@ -35,6 +35,14 @@
         }
     </div>
 
+    @if (session != null && !session.IsReleased && session.StartTime <= ReservationRules.MalaysiaNow)
+    {
+        <form method="post" asp-page="TablePanel" asp-page-handler="Release" class="release-visit text-end mb-2" onsubmit="return confirm('End this visit and make the table available?')">
+            <input type="hidden" name="TableId" value="@Model.TableId" />
+            <input type="hidden" name="visitId" value="@session.Id" />
+            <button class="btn btn-outline-primary" type="submit">Make table available</button>
+        </form>
+    }
     <div class="panel-message" role="status" aria-live="polite"></div>
 
     @if (Model.Bookings.Count + Model.WalkIns.Count > 1)

@@ -22,6 +22,18 @@ public class MenuModel(DiningOrderService service, TabletAccess tablet, Applicat
     public List<Order> Orders { get; private set; } = [];
     public DiningHours Hours { get; private set; } = null!;
     public DateTime ServerNow { get; private set; }
+    public async Task<IActionResult> OnPostLeaveAsync()
+    {
+        var grant = await tablet.VisitAsync(HttpContext);
+        var tableId = await tablet.TableAsync(HttpContext);
+        if (!grant.HasValue || !tableId.HasValue) return RedirectToPage("Activate");
+        if (ReviewedVisit != grant.Value.Visit) return BadRequest("The visit has changed.");
+        var error = await service.ReleaseAsync(grant.Value.Visit, tableId.Value);
+        if (error != null) { TempData["ReleaseError"] = error; return RedirectToPage(); }
+        tablet.End(HttpContext);
+        return RedirectToPage("Activate");
+    }
+
     public async Task<IActionResult> OnGetBillAsync()
     {
         if (!await LoadAsync()) return Unauthorized();

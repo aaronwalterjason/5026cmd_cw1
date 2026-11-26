@@ -1,11 +1,12 @@
 using System.Security.Cryptography;
 using KOMA.Data;
+using KOMA.Models;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 namespace KOMA.Services;
 
-public sealed class TabletAccess(ApplicationDbContext db, IMemoryCache cache, IDataProtectionProvider keys)
+public sealed class TabletAccess(ApplicationDbContext db, IMemoryCache cache, IDataProtectionProvider keys, DiningOrderService dining)
 {
     private readonly IDataProtector protector = keys.CreateProtector("KOMA.Dining.Device.v2");
     private const string DeviceCookie = "Koma.Tablet.Device";
@@ -33,6 +34,24 @@ public sealed class TabletAccess(ApplicationDbContext db, IMemoryCache cache, ID
         var old = DeviceId(http);
         if (old.HasValue) await db.RestaurantTables.Where(t => t.Id != tableId && t.TabletDeviceId == old)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.TabletDeviceId, (Guid?)null));
+        Grant? resume = null;
+        var active = dining.ActiveVisits().Where(s => s.RestaurantTableId == tableId);
+        if (old.HasValue && old == table.TabletDeviceId)
+        {
+            var paused = cache.Get<Grant>("tablet-paused:" + old);
+            if (paused?.Table == tableId && await active.AnyAsync(s => s.Id == paused.Visit))
+                resume = paused;
+        }
+        if (resume == null)
+        {
+            // Staff can recover an anonymous bill left behind by an earlier tablet.
+            var guest = await active.Where(s => s.ReservationId == null && s.CustomerName == "Guest" &&
+                db.Orders.Any(o => o.TableServiceSessionId == s.Id) &&
+                !db.Orders.Any(o => o.TableServiceSessionId == s.Id &&
+                    (o.CustomerId != null || o.OrderType != OrderType.WalkIn)))
+                .Select(s => s.Id).Take(2).ToListAsync();
+            if (guest.Count == 1) resume = new Grant(guest[0], tableId, null);
+        }
         var device = Guid.NewGuid();
         table.TabletDeviceId = device;
         await db.SaveChangesAsync();
@@ -40,6 +59,8 @@ public sealed class TabletAccess(ApplicationDbContext db, IMemoryCache cache, ID
         var options = Options(http); options.MaxAge = TimeSpan.FromDays(365);
         http.Response.Cookies.Append(DeviceCookie, protector.Protect(device.ToString()), options);
         End(http);
+        if (old.HasValue) cache.Remove("tablet-paused:" + old);
+        if (resume != null) Open(http, tableId, resume.Visit, resume.Customer);
         return true;
     }
     private const string StaffExitPin = "123456";
@@ -97,9 +118,19 @@ public sealed class TabletAccess(ApplicationDbContext db, IMemoryCache cache, ID
         if (!http.Request.Cookies.TryGetValue(VisitCookie, out var token)) return null;
         var grant = cache.Get<Grant>("tablet-visit:" + token);
         if (grant == null || grant.Table != await TableAsync(http)) return null;
-        if (!await db.TableServiceSessions.AnyAsync(s => s.Id == grant.Visit && s.RestaurantTableId == grant.Table)) return null;
+        if (!await db.TableServiceSessions.AnyAsync(s => !s.IsReleased && s.Id == grant.Visit && s.RestaurantTableId == grant.Table)) return null;
         return (grant.Visit, grant.Customer);
     }
+    public async Task PauseAsync(HttpContext http)
+    {
+        var visit = await VisitAsync(http);
+        var device = DeviceId(http);
+        var table = await TableAsync(http);
+        if (visit.HasValue && device.HasValue && table.HasValue)
+            cache.Set("tablet-paused:" + device, new Grant(visit.Value.Visit, table.Value, visit.Value.Customer), TimeSpan.FromHours(6));
+        End(http);
+    }
+
     public void End(HttpContext http)
     {
         if (http.Request.Cookies.TryGetValue(VisitCookie, out var token)) cache.Remove("tablet-visit:" + token);

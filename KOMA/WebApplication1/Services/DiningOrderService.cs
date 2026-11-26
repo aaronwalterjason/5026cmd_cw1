@@ -10,7 +10,7 @@ public class DiningOrderService(ApplicationDbContext db)
     public IQueryable<TableServiceSession> ActiveVisits()
     {
         var now = ReservationRules.MalaysiaNow;
-        return db.TableServiceSessions.Where(s => s.StartTime <= now && now < s.EndTime &&
+        return db.TableServiceSessions.Where(s => !s.IsReleased && s.StartTime <= now && now < s.EndTime &&
             s.RestaurantTable.IsActive && s.RestaurantTable.DiningArea!.IsActive &&
             (s.ReservationId == null || (s.Reservation!.Status == ReservationStatus.Confirmed &&
             s.Reservation.RestaurantTableId == s.RestaurantTableId)));
@@ -19,7 +19,7 @@ public class DiningOrderService(ApplicationDbContext db)
     public IQueryable<MenuItem> Menu() => db.MenuItems.Include(m => m.Promotion).Where(m => m.IsAvailable && m.MenuCategory!.IsActive);   // Promotion: for MenuPricing
 
     public IQueryable<Reservation> NearbyReservations(string customer, int table, DateTime now) =>
-        db.Reservations.AsNoTracking().Where(r => r.CustomerUserId == customer &&
+        UnreleasedReservations(db).AsNoTracking().Where(r => r.CustomerUserId == customer &&
             r.Status == ReservationStatus.Confirmed && r.StartTime >= now.AddHours(-1) &&
             r.StartTime <= now.AddHours(1) && r.EndTime > now &&
             (r.HoldUntil == null || r.HoldUntil > now || db.TableServiceSessions.Any(s => s.ReservationId == r.Id)))
@@ -39,14 +39,14 @@ public class DiningOrderService(ApplicationDbContext db)
         await ArrivalService.ExpireAsync(db, now);
         if (confirmedBooking.HasValue)
         {
-            var reservation = await db.Reservations.SingleOrDefaultAsync(r => r.Id == confirmedBooking &&
+            var reservation = await UnreleasedReservations(db).SingleOrDefaultAsync(r => r.Id == confirmedBooking &&
                 r.CustomerUserId == customer && customer != null && r.Status == ReservationStatus.Confirmed &&
                 r.StartTime >= now.AddHours(-1) && r.StartTime <= now.AddHours(1) && r.EndTime > now);
             if (reservation == null) return (null, "This reservation is no longer available. Ask staff to check your booking.");
             if (reservation.RestaurantTableId != tableId) return (null, "Your reservation is at another table. Ask staff to take you to your reserved table.");
-            if (await db.TableServiceSessions.AnyAsync(s => s.RestaurantTableId == tableId && s.ReservationId != reservation.Id &&
+            if (await db.TableServiceSessions.AnyAsync(s => !s.IsReleased && s.RestaurantTableId == tableId && s.ReservationId != reservation.Id &&
                 s.StartTime < reservation.EndTime && s.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)) ||
-                await db.Reservations.AnyAsync(r => r.Id != reservation.Id && r.RestaurantTableId == tableId &&
+                await UnreleasedReservations(db).AnyAsync(r => r.Id != reservation.Id && r.RestaurantTableId == tableId &&
                 r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
                 r.StartTime < reservation.EndTime && r.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)))
                 return (null, "This table is still occupied or being prepared. Please ask staff for help.");
@@ -56,7 +56,7 @@ public class DiningOrderService(ApplicationDbContext db)
             await tx.CommitAsync();
             return (reservedVisit.Id, null);
         }
-        var bookings = await db.Reservations.Where(r => r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
+        var bookings = await UnreleasedReservations(db).Where(r => r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
             r.Id != ignoredBooking &&
             r.StartTime <= now && now < r.EndTime && (r.RestaurantTableId == tableId ||
             (customer != null && r.CustomerUserId == customer))).ToListAsync();
@@ -69,12 +69,12 @@ public class DiningOrderService(ApplicationDbContext db)
         {
             if (await ActiveVisits().AnyAsync(s => s.RestaurantTableId == tableId))
                 return (null, "This table has an active visit. Finish the current visit before starting another.");
-            var next = await db.Reservations.Where(r => r.Id != ignoredBooking && r.RestaurantTableId == tableId && r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow && r.StartTime > now)
+            var next = await UnreleasedReservations(db).Where(r => r.Id != ignoredBooking && r.RestaurantTableId == tableId && r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow && r.StartTime > now)
                 .Select(r => (DateTime?)r.StartTime).MinAsync();
             var end = now.AddMinutes(ReservationRules.SlotMinutes);
             if (next.HasValue && next.Value.AddMinutes(-ReservationRules.TurnaroundMinutes) < end)
                 end = next.Value.AddMinutes(-ReservationRules.TurnaroundMinutes);
-            if (end <= now || await db.TableServiceSessions.AnyAsync(s => s.RestaurantTableId == tableId && s.EndTime <= now && s.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)) || await db.Reservations.AnyAsync(r => r.RestaurantTableId == tableId &&
+            if (end <= now || await db.TableServiceSessions.AnyAsync(s => !s.IsReleased && s.RestaurantTableId == tableId && s.EndTime <= now && s.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)) || await UnreleasedReservations(db).AnyAsync(r => r.RestaurantTableId == tableId &&
                 r.Status == ReservationStatus.Confirmed && r.EndTime <= now && r.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)))
                 return (null, "This table is being prepared. Ask staff for another table.");
             var name = customer == null ? "Guest" : await db.Users.Where(u => u.Id == customer).Select(u => u.FullName).SingleAsync();
@@ -87,15 +87,29 @@ public class DiningOrderService(ApplicationDbContext db)
         return (visit.Id, null);
     }
 
-    public async Task EndAsync(int visitId)
+    internal static IQueryable<Reservation> UnreleasedReservations(ApplicationDbContext db) =>
+        db.Reservations.Where(r => !db.TableServiceSessions.Any(s => s.ReservationId == r.Id && s.IsReleased));
+
+    public async Task<string?> ReleaseAsync(int visitId, int tableId)
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         await LockAsync();
+        var visit = await db.TableServiceSessions.SingleOrDefaultAsync(s => s.Id == visitId && s.RestaurantTableId == tableId);
+        if (visit == null) return "The table visit changed. Reopen the table.";
+        if (visit.IsReleased) return null;
+        if (await db.Orders.AnyAsync(o => (o.TableServiceSessionId == visitId ||
+            (visit.ReservationId.HasValue && o.ReservationId == visit.ReservationId)) &&
+            o.PaymentStatus == PaymentStatus.Unpaid && o.Status != OrderStatus.Cancelled))
+            return "Please settle the outstanding bill before releasing this table.";
         var now = ReservationRules.MalaysiaNow;
-        await db.TableServiceSessions.Where(s => s.Id == visitId && s.ReservationId == null && s.EndTime > now && !db.Orders.Any(o => o.TableServiceSessionId == visitId))
-            .ExecuteUpdateAsync(u => u.SetProperty(s => s.EndTime, now));
+        if (visit.StartTime > now) return "This visit has not started.";
+        visit.IsReleased = true;
+        if (visit.EndTime > now) visit.EndTime = now;
+        await db.SaveChangesAsync();
         await tx.CommitAsync();
+        return null;
     }
+
     // Called inside the reservation write transaction.
     internal static async Task<TableServiceSession> BookingSessionAsync(ApplicationDbContext db, Reservation booking)
     {

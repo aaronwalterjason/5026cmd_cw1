@@ -8,6 +8,10 @@
     <button type="button" id="open-visit-bill" class="btn btn-primary" aria-label="View total bill and food status">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg> Bill
     </button>
+    <form method="post" asp-page-handler="Leave" onsubmit="return confirm('End this visit and clear the tablet for the next guest?')">
+        <input type="hidden" name="ReviewedVisit" value="@Model.Visit.Id" />
+        <button class="btn btn-outline-secondary" type="submit">End visit</button>
+    </form>
 </header>
 <p id="ordering-hours-message" class="alert alert-warning" role="status" hidden="@(!Model.Hours.Locked)">Ordering is closed. You can still view your bill and food status.</p>
 <dialog id="visit-bill-dialog" aria-labelledby="visit-bill-title">
@@ -16,6 +20,7 @@
 </dialog>
 <dialog id="last-call-dialog" aria-labelledby="last-call-title"><h2 id="last-call-title">Last call soon</h2><p id="last-call-text"></p><button type="button" id="close-last-call" class="btn btn-primary">Continue browsing</button></dialog>
 @if (TempData["DiningNotice"] is string notice) { <p class="alert alert-success" role="status">@notice</p> }
+@if (TempData["ReleaseError"] is string error) { <p class="alert alert-warning" role="alert">@error</p> }
 <div asp-validation-summary="All" class="text-danger" role="alert"></div>
 <section class="po"><form method="post" id="preorder-form">
     <input type="hidden" name="ReviewedVisit" value="@Model.Visit.Id"/>

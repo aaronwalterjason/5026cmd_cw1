@@ -159,8 +159,8 @@
         if (button) openTable(tableId, button.dataset.booking, button.dataset.session);
     });
     body.addEventListener("submit", async event => {
-        const form = event.target.closest(".payment-form, .walk-in-move, .arrival-form, .serve-dish-form");
-        if (!form) return;
+        const form = event.target.closest(".payment-form, .walk-in-move, .arrival-form, .serve-dish-form, .release-visit");
+        if (!form || event.defaultPrevented) return;
         event.preventDefault();
         const data = new FormData(form);
         const submit = event.submitter;
@@ -173,7 +173,7 @@
                 await openTable(data.get("TableId"), data.get("BookingId"), data.get("SessionId"), "#food-tab");
                 return;
             }
-            if (form.matches(".arrival-form")) {
+            if (form.matches(".arrival-form, .release-visit")) {
                 if (!response.ok || response.redirected) throw new Error(response.status === 409 ? await response.text() : "Could not update arrival.");
                 location.reload();
                 return;

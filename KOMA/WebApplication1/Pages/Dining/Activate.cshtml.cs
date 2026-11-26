@@ -39,9 +39,7 @@ public class ActivateModel(TabletAccess tablet, DiningOrderService service, Appl
     {
         var error = tablet.CheckExitPin(await tablet.TableAsync(HttpContext), pin);
         if (error != null) return new ContentResult { StatusCode = 403, Content = error, ContentType = "text/plain" };
-        var grant = await tablet.VisitAsync(HttpContext);
-        if (grant.HasValue) await service.EndAsync(grant.Value.Visit);
-        tablet.End(HttpContext);
+        await tablet.PauseAsync(HttpContext);
         return RedirectToPage("/Account/Login", new { area = "Identity", returnUrl = Url.Page("/Staff/Index") });
     }
     public Task<IActionResult> OnPostGuestAsync() => StartAsync(null, false);

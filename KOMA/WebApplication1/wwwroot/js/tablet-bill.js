@@ -41,6 +41,7 @@
         refreshing = true;
         try {
             const response = await fetch(url("Bill"), { cache: "no-store" });
+            if (response.status === 401) { location.reload(); return; }
             if (!response.ok || response.redirected) throw new Error("Unable to refresh this visit. Reload or ask staff for help.");
             const html = await response.text();
             const parsed = new DOMParser().parseFromString(html, "text/html");

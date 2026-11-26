@@ -48,9 +48,9 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining,
         var now = ReservationRules.MalaysiaNow;
         return db.RestaurantTables.Where(t => t.Id != visit.RestaurantTableId && t.IsActive &&
             t.DiningArea!.IsActive && t.Capacity >= visit.GuestCount &&
-            !db.Reservations.Any(r => r.RestaurantTableId == t.Id && r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
+            !DiningOrderService.UnreleasedReservations(db).Any(r => r.RestaurantTableId == t.Id && r.Status != ReservationStatus.Cancelled && r.Status != ReservationStatus.NoShow &&
                 r.StartTime < visit.EndTime.AddMinutes(ReservationRules.TurnaroundMinutes) && r.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)) &&
-            !db.TableServiceSessions.Any(s => s.RestaurantTableId == t.Id && s.StartTime < visit.EndTime.AddMinutes(ReservationRules.TurnaroundMinutes) && s.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)));
+            !db.TableServiceSessions.Any(s => !s.IsReleased && s.RestaurantTableId == t.Id && s.StartTime < visit.EndTime.AddMinutes(ReservationRules.TurnaroundMinutes) && s.EndTime > now.AddMinutes(-ReservationRules.TurnaroundMinutes)));
     }
 
     public async Task<IActionResult> OnPostMoveWalkInAsync(int destination)
@@ -95,7 +95,7 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining,
         var start = selection.Start;
         var end = selection.End;
 
-        Bookings = await db.Reservations
+        Bookings = await DiningOrderService.UnreleasedReservations(db)
             .AsNoTracking()
             .Where(r =>
                 r.RestaurantTableId == TableId &&
@@ -110,7 +110,7 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining,
             .AsNoTracking()
             .Where(s =>
                 s.RestaurantTableId == TableId &&
-                s.ReservationId == null &&
+                !s.IsReleased && s.ReservationId == null &&
                 (selection.IsNow
                     ? s.StartTime <= start && s.EndTime > start
                     : s.StartTime < end && s.EndTime > start))
@@ -216,6 +216,12 @@ public class TablePanelModel(ApplicationDbContext db, DiningOrderService dining,
     {
         if (!ModelState.IsValid || !BookingId.HasValue) return BadRequest("Invalid arrival details.");
         var error = await arrivals.UpdateAsync(BookingId.Value, TableId, version, operation, eta, destination);
+        return error == null ? new OkResult() : new ConflictObjectResult(error);
+    }
+
+    public async Task<IActionResult> OnPostReleaseAsync(int visitId)
+    {
+        var error = await dining.ReleaseAsync(visitId, TableId);
         return error == null ? new OkResult() : new ConflictObjectResult(error);
     }
 
