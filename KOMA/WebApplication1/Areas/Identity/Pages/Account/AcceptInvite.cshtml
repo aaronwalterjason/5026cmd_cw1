@@ -1,0 +1,65 @@
+@page
+@model AcceptInviteModel
+@{
+    ViewData["Title"] = "Complete registration";
+    Layout = "/Pages/Shared/_Layout.cshtml";
+}
+<link rel="stylesheet" href="~/css/koma-login.css" asp-append-version="true" />
+<div class="koma-login">
+    <div class="koma-login-shell">
+        <partial name="_AuthBrand" />
+        <section class="koma-login-form-panel" aria-labelledby="ai-title">
+            <div class="koma-login-form-content">
+                <p class="koma-login-eyebrow">KOMA TEAM</p>
+                @if (!Model.LinkOk)
+                {
+                    <h2 id="ai-title">Invitation expired</h2>
+                    <p class="koma-login-intro">This invitation link has expired, was already used, or was replaced by a newer one. Ask your manager to send a new invitation.</p>
+                    <a asp-page="./Login" class="koma-login-submit">Go to log in <span aria-hidden="true">↗</span></a>
+                }
+                else
+                {
+                    <h2 id="ai-title">Complete your registration</h2>
+                    <p class="koma-login-intro">You've been invited to KOMA as <strong>@Model.RoleLabel</strong>. Fill in your details to finish setting up your account.</p>
+                    <form method="post">
+                        <input type="hidden" asp-for="UserId" />
+                        <input type="hidden" asp-for="Code" />
+                        <div asp-validation-summary="ModelOnly" class="koma-login-errors" role="alert"></div>
+                        <div class="koma-login-field">
+                            <label for="ai-email">Email address</label>
+                            <input id="ai-email" type="email" value="@Model.Email" readonly aria-readonly="true" autocomplete="username" />
+                        </div>
+                        <div class="koma-login-field">
+                            <label asp-for="Input.FirstName"></label>
+                            <input asp-for="Input.FirstName" autocomplete="given-name" />
+                            <span asp-validation-for="Input.FirstName" class="koma-login-field-error"></span>
+                        </div>
+                        <div class="koma-login-field">
+                            <label asp-for="Input.LastName"></label>
+                            <input asp-for="Input.LastName" autocomplete="family-name" />
+                            <span asp-validation-for="Input.LastName" class="koma-login-field-error"></span>
+                        </div>
+                        <div class="koma-login-field">
+                            <label asp-for="Input.PhoneNumber"></label>
+                            <input asp-for="Input.PhoneNumber" type="tel" autocomplete="tel" placeholder="e.g. 012-345 6789" />
+                            <span asp-validation-for="Input.PhoneNumber" class="koma-login-field-error"></span>
+                        </div>
+                        <div class="koma-login-field">
+                            <label asp-for="Input.Password"></label>
+                            <input asp-for="Input.Password" type="password" autocomplete="new-password" />
+                            <span asp-validation-for="Input.Password" class="koma-login-field-error"></span>
+                        </div>
+                        <div class="koma-login-field">
+                            <label asp-for="Input.ConfirmPassword"></label>
+                            <input asp-for="Input.ConfirmPassword" type="password" autocomplete="new-password" />
+                            <span asp-validation-for="Input.ConfirmPassword" class="koma-login-field-error"></span>
+                        </div>
+                        <button type="submit" class="koma-login-submit">Complete registration <span aria-hidden="true">↗</span></button>
+                    </form>
+                }
+                <a asp-area="" asp-page="/Index" class="koma-login-back">← Back to home</a>
+            </div>
+        </section>
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

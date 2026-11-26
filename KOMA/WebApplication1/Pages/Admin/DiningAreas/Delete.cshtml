@@ -6,13 +6,24 @@
 
 <h1>Delete Dining Area</h1>
 
-<div class="alert alert-warning">
-    Are you sure you want to delete <strong>@Model.DiningArea.Name</strong>?
-    All tables in this dining area will be deleted too. This cannot be undone.
-</div>
-
-<form method="post">
-    <input type="hidden" asp-for="DiningArea.Id" />
-    <button type="submit" class="btn btn-danger">Delete</button>
+@if (Model.Blocked is not null)
+{
+    @* Tables with bookings or history: deleting would remove them too, so it is blocked. *@
+    <div class="alert alert-warning">@Model.Blocked</div>
+    <a asp-page="./Edit" asp-route-id="@Model.DiningArea.Id" class="btn btn-primary">Edit area (make inactive)</a>
     <a asp-page="./Index" class="btn btn-link">Cancel</a>
-</form>
+}
+else
+{
+    <div class="alert alert-warning">
+        Are you sure you want to delete <strong>@Model.DiningArea.Name</strong>?
+        @if (Model.TableCount > 0) { <text>Its @Model.TableCount table(s) will be deleted too. None of them has ever been booked.</text> }
+        This cannot be undone.
+    </div>
+
+    <form method="post">
+        <input type="hidden" asp-for="DiningArea.Id" />
+        <button type="submit" class="btn btn-danger">Delete</button>
+        <a asp-page="./Index" class="btn btn-link">Cancel</a>
+    </form>
+}

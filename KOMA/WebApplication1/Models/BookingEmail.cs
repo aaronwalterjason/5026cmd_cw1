@@ -33,6 +33,6 @@ namespace KOMA.Models
         public string? Html { get; set; }                           // as sent, for "View" in the email log
     }
 
-    public enum BookingEmailType { Confirmed = 0, Updated = 1, Cancelled = 2, Reminder = 3, ConfirmEmail = 4, PasswordReset = 5 }   // 4-5: account emails (no booking)
+    public enum BookingEmailType { Confirmed = 0, Updated = 1, Cancelled = 2, Reminder = 3, ConfirmEmail = 4, PasswordReset = 5, StaffInvite = 6 }   // 4-6: account emails (no booking)
     public enum BookingEmailStatus { Waiting = 0, Sent = 1, Failed = 2, Skipped = 3 }
 }

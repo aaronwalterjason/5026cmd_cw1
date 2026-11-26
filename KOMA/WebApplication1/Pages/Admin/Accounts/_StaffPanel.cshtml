@@ -38,9 +38,9 @@
         <div class="cp-id">
             <span class="cp-av cp-av-staff" aria-hidden="true">@p.Initials</span>
             <div class="cp-who">
-                <h2 id="cp-name">@p.Name <span class="cp-dot @(p.Locked ? "bad" : "ok")" title="@(p.Locked ? "Locked" : "Active")"></span>@if (p.IsMe) {<span class="cp-you">YOU</span>}</h2>
+                <h2 id="cp-name">@p.Name <span class="cp-dot @(p.Pending ? "wait" : p.Locked ? "bad" : "ok")" title="@(p.Pending ? "Invitation pending" : p.Locked ? "Locked" : "Active")"></span>@if (p.IsMe) {<span class="cp-you">YOU</span>}</h2>
                 <div class="cp-meta">
-                    @(p.IsAdmin ? "Admin" : "Staff")@(p.FirstSeen is null ? "" : " since " + p.FirstSeen.Value.ToString("MMM yyyy"))@(p.LastActive is null ? "" : " · active " + IndexModel.Ago(p.LastActive))
+                    @(p.IsAdmin ? "Admin" : "Staff")@(p.Pending ? " · invited, not registered yet" : "")@(p.FirstSeen is null ? "" : " since " + p.FirstSeen.Value.ToString("MMM yyyy"))@(p.LastActive is null ? "" : " · active " + IndexModel.Ago(p.LastActive))
                 </div>
             </div>
         </div>
@@ -54,6 +54,42 @@
                 <a href="tel:@tel" title="Call"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>@p.Phone</a>
             }
         </div>
+        @if (p.Pending)
+        {
+            var expires = p.InviteSentAt?.Add(KOMA.Services.InviteTokenProvider.Lifespan);
+            var expired = expires is not null && expires < KOMA.Services.ReservationRules.MalaysiaNow;
+            @* Invited with just an email; they complete name, phone and password from the email (Identity/Account/AcceptInvite). *@
+            <div class="cp-invite">
+                <div class="cp-invite-text">
+                    <b>Invitation pending</b>
+                    <span>
+                        @if (p.InviteSentAt is null) { @:No invitation email recorded yet.
+                        }
+                        else if (!p.InviteSent) { @:The last email couldn't be sent (@(p.InviteSentAt.Value.ToString("d MMM, h:mm tt"))). Resend it or copy the link.
+                        }
+                        else if (expired) { @:Sent @(p.InviteSentAt.Value.ToString("d MMM, h:mm tt")) · the link has expired. Resend to give them a new one.
+                        }
+                        else { @:Sent @(p.InviteSentAt.Value.ToString("d MMM, h:mm tt")) · link works until @(expires!.Value.ToString("d MMM, h:mm tt")).
+                        }
+                    </span>
+                </div>
+                <div class="cp-invite-actions">
+                    <form method="post" asp-page="./Index" asp-page-handler="InviteResend">
+                        <input type="hidden" name="userId" value="@p.Id" />
+                        <button type="submit" class="cp-lock">Resend invite</button>
+                    </form>
+                    <form method="post" asp-page="./Index" asp-page-handler="InviteLink" class="js-cp-reset">
+                        <input type="hidden" name="userId" value="@p.Id" />
+                        <button type="submit" class="cp-lock">Copy invite link</button>
+                    </form>
+                    <form method="post" asp-page="./Index" asp-page-handler="InviteCancel" class="js-cp-cancel" data-email="@p.Email">
+                        <input type="hidden" name="userId" value="@p.Id" />
+                        <button type="submit" class="cp-lock is-bad">Cancel invite</button>
+                    </form>
+                </div>
+                <div class="cp-reset-out" hidden><input type="text" readonly aria-label="Invitation link" /><button type="button" data-cp-copy>Copy</button></div>
+            </div>
+        }
         <div class="cp-stats">
             <div><b>@(p.LastActive is null ? "—" : IndexModel.Ago(p.LastActive))</b><span>last active</span></div>
             <div><b>@p.Changes7</b><span>changes · 7 days</span></div>
@@ -162,7 +198,7 @@
                     <span>Role</span>
                     @if (p.IsMe || lastAdmin)
                     {
-                        <span class="cp-role-fixed"><span class="cp-seg is-off"><span class="@(p.IsAdmin ? "" : "is-on")">Staff</span><span class="@(p.IsAdmin ? "is-on" : "")">Admin</span></span><small>@(p.IsMe ? "can't change your own role" : "the only admin")</small></span>
+                        <span class="cp-role-fixed"><span class="cp-seg is-off"><span class="@(p.IsAdmin ? "" : "is-on")">Staff</span><span class="@(p.IsAdmin ? "is-on" : "")">Admin</span><span>Customer</span></span><small>@(p.IsMe ? "can't change your own role" : "the only admin")</small></span>
                     }
                     else
                     {
@@ -173,17 +209,29 @@
                             <span class="cp-seg">
                                 <button type="submit" data-role="Staff" class="@(p.IsAdmin ? "" : "is-on")" disabled="@(!p.IsAdmin)">Staff</button>
                                 <button type="submit" data-role="Administrator" class="@(p.IsAdmin ? "is-on" : "")" disabled="@p.IsAdmin">Admin</button>
+                                @if (!p.Pending)
+                                {
+                                    @* one-way: a customer can't be made Staff/Admin again (server checks too) *@
+                                    <button type="submit" data-role="Customer">Customer</button>
+                                }
                             </span>
                         </form>
                     }
                 </div>
-                <div><span>Status</span><span><span class="cp-dot @(p.Locked ? "bad" : "ok")"></span>@(p.Locked ? "Locked" : "Active")</span></div>
+                <div><span>Status</span><span><span class="cp-dot @(p.Pending ? "wait" : p.Locked ? "bad" : "ok")"></span>@(p.Pending ? "Invitation pending" : IndexModel.LockText(p.Locked, p.LockoutEnd))</span></div>
                 <div><span>Failed sign-ins</span><span>@p.FailedSignIns</span></div>
             </div>
+            @if (!p.Pending)
+            {
             <div class="cp-acct-actions">
+                @* Emails the reset link to their own inbox (same email as customers' Forgot password). Copy link stays as a fallback. *@
+                <form method="post" asp-page="./Index" asp-page-handler="ResetEmail">
+                    <input type="hidden" name="userId" value="@p.Id" />
+                    <button type="submit" class="cp-lock"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M3 6h18v12H3zM3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>Email password reset link</button>
+                </form>
                 <form method="post" asp-page="./Index" asp-page-handler="ResetLink" class="js-cp-reset" data-name="@p.Name">
                     <input type="hidden" name="userId" value="@p.Id" />
-                    <button type="submit" class="cp-lock"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8M3 3v5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>Password reset link</button>
+                    <button type="submit" class="cp-lock cp-lock-quiet"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8M3 3v5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>Copy reset link instead</button>
                 </form>
                 <div class="cp-reset-out" hidden><input type="text" readonly aria-label="Password reset link" /><button type="button" data-cp-copy>Copy</button></div>
                 @if (!p.IsMe)
@@ -198,6 +246,7 @@
                     </form>
                 }
             </div>
+            }
             <p class="cp-note">Staff can mark dishes sold out, manage bookings and serve orders. Admins can change everything, including accounts.</p>
         </section>
     </div>

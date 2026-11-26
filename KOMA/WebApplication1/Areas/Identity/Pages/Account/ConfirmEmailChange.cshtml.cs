@@ -27,7 +27,7 @@ public class ConfirmEmailChangeModel : PageModel
     ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
     ///     directly from your code. This API may change or be removed in future releases.
     /// </summary>
-    [TempData]
+    // Not [TempData]: this page shows the result itself (no redirect). As TempData it would also pop up on the next page.
     public string? StatusMessage { get; set; }
 
     public async Task<IActionResult> OnGetAsync(string userId, string email, string code)
@@ -47,7 +47,9 @@ public class ConfirmEmailChangeModel : PageModel
         var result = await _userManager.ChangeEmailAsync(user, email, code);
         if (!result.Succeeded)
         {
-            StatusMessage = "Error changing email.";
+            StatusMessage = result.Errors.Any(e => e.Code == "DuplicateEmail")
+                ? "Error: that email is already used by another account, so your email wasn't changed."
+                : "Error changing email.";
             return Page();
         }
 

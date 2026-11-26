@@ -416,17 +416,18 @@ namespace KOMA.Pages.Admin.Orders
         {
             try
             {
-                TempData["StatusMessage"] = await action() ?? success;
+                var error = await action();   // null = done, otherwise why it wasn't
+                TempData[error is null ? "StatusMessage" : "StatusError"] = error ?? success;
             }
             catch (Microsoft.Data.SqlClient.SqlException)
             {
-                TempData["StatusMessage"] =
+                TempData["StatusError"] =
                     "The database was busy or unavailable. "
                     + "Refresh and check the order before retrying.";
             }
             catch (DbUpdateException)
             {
-                TempData["StatusMessage"] =
+                TempData["StatusError"] =
                     "The order could not be updated. "
                     + "Refresh and check its current status.";
             }

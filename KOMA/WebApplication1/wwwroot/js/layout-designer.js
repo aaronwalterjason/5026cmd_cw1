@@ -9,6 +9,12 @@
     const data = JSON.parse(document.getElementById('layout-data').textContent);
     const floorW = data.floor.width, floorH = data.floor.height;
 
+    // Bookings per saved table (Services/TableUsage.cs): { upcoming, next, maxGuests, seated, history }.
+    // Used to warn before a table is closed, shrunk or removed, and for "Move upcoming bookings".
+    const usageOf = new Map((data.usage || []).map(u => [u.id, u]));
+    const areasWithHistory = new Set(data.areasWithHistory || []);   // these can't be removed (tables with history)
+    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
     const els = {
         wrap: document.getElementById('lay-wrap'),
         floor: document.getElementById('lay-floor'),
@@ -78,7 +84,7 @@
         const hints = {
             select: 'Click an area or table to edit it. Drag to move, drag the corner handle to resize. Arrow keys nudge, Delete removes.',
             area: 'Click and drag on the floor to draw a dining area.',
-            table: 'Click inside a dining area to add a table there.'
+            table: 'Click an empty spot inside a dining area to add a table. Click a table to select or move it.'
         };
         say(hints[tool], 'hint');
     }
@@ -229,7 +235,12 @@
             bind('p-name', 'input', e => { a.name = e.target.value; changed(false); });
             bind('p-zone', 'change', e => { a.zone = e.target.value; changed(true); });
             bind('p-desc', 'input', e => { a.description = e.target.value; markDirty(); });
-            bind('p-active', 'change', e => { a.isActive = e.target.checked; changed(false); });
+            bind('p-active', 'change', e => {
+                a.isActive = e.target.checked; changed(false);
+                const busy = tablesIn(a).map(t => usageOf.get(t.id)).filter(u => u && u.upcoming > 0);
+                if (!a.isActive && busy.length)
+                    say(`${plural(busy.reduce((s, u) => s + u.upcoming, 0), 'upcoming booking')} are on tables in this area. Closing it stops new bookings, but those customers keep their tables until you move them.`, 'error');
+            });
             bind('p-add-table', 'click', () => addTable(a, a.x + a.w / 2, a.y + a.h / 2));
             bind('p-delete', 'click', deleteSelected);
             bindSize(a, 'area');
@@ -259,6 +270,7 @@
                 <input id="p-active" type="checkbox" class="form-check-input" ${t.isActive ? 'checked' : ''} />
                 <label class="form-check-label small" for="p-active">Active (can be booked)</label>
             </div>
+            ${usageBox(t)}
             <p class="small text-muted">In <a href="#" id="p-area-link">${esc(area ? area.name : '?')}</a>. Drag the table into another area to move it there.</p>
             <div class="d-flex">
                 <button type="button" class="btn btn-sm btn-outline-danger ms-auto" id="p-delete">Delete table</button>
@@ -278,10 +290,60 @@
             else if (!tableFits(t, area) || tableClashes(t)) say('There is not enough room for the chairs of this shape here. Move or resize the table.', 'error');
             changed(true);
         });
-        bind('p-active', 'change', e => { t.isActive = e.target.checked; changed(false); });
+        bind('p-active', 'change', e => { t.isActive = e.target.checked; changed(true); warnTable(t); });
+        bind('p-cap', 'change', () => { renderProps(); warnTable(t); });
+        bind('p-move', 'click', () => moveBookings(t));
         bind('p-area-link', 'click', e => { e.preventDefault(); if (area) select('area', area.id); });
         bind('p-delete', 'click', deleteSelected);
         bindSize(t, 'table');
+    }
+
+    // Bookings box in the table panel: upcoming bookings (+ Move button), seated guests or past history.
+    function usageBox(t) {
+        const u = usageOf.get(t.id);
+        if (!u || (!u.upcoming && !u.seated && !u.history)) return '';
+        let html = '<div class="lay-usage">';
+        if (u.seated) html += '<p class="mb-1"><strong>Guests are seated here now.</strong></p>';
+        if (u.upcoming) {
+            html += `<p class="mb-1"><strong>${plural(u.upcoming, 'upcoming booking')}</strong> · next ${esc(u.next)} · up to ${plural(u.maxGuests, 'guest')}</p>`;
+            if (t.capacity < u.maxGuests) html += `<p class="mb-1 text-danger">Too small: the biggest party is ${u.maxGuests} guests.</p>`;
+            if (!t.isActive) html += '<p class="mb-1 text-danger">Inactive, but these customers keep this table until you move them.</p>';
+            html += '<button type="button" class="btn btn-sm btn-outline-primary" id="p-move">Move upcoming bookings</button>';
+        } else if (u.history) {
+            html += '<p class="mb-0">Has booking history. Removing it <strong>archives</strong> it: hidden, but kept for past bookings and reports.</p>';
+        }
+        return html + '</div>';
+    }
+
+    // Warning when a table with upcoming bookings is made inactive or smaller than its biggest booking.
+    function warnTable(t) {
+        const u = usageOf.get(t.id);
+        if (!u || !u.upcoming) return;
+        if (!t.isActive) say(`Table ${t.number} has ${plural(u.upcoming, 'upcoming booking')} (next ${u.next}). Inactive stops new bookings, but these customers keep this table until you move them.`, 'error');
+        else if (t.capacity < u.maxGuests) say(`Table ${t.number} has a booking for ${u.maxGuests} guests, more than ${t.capacity} seats. Move that booking or keep more seats.`, 'error');
+    }
+
+    // "Move upcoming bookings": sends the table to Admin > Tables (MoveOffTableAsync), then comes back here.
+    function moveBookings(t) {
+        const u = usageOf.get(t.id);
+        if (!u || !u.upcoming) return;
+        if (dirty) { say('Save or undo your layout changes first, then move the bookings.', 'error'); return; }
+        const go = () => {
+            const f = document.createElement('form');
+            f.method = 'post';
+            f.action = data.moveBase + t.id + '?handler=MoveBookings';
+            const token = els.form.querySelector('input[name="__RequestVerificationToken"]');
+            f.innerHTML = `<input type="hidden" name="__RequestVerificationToken" value="${esc(token ? token.value : '')}" />`
+                + `<input type="hidden" name="returnUrl" value="${esc(data.returnUrl)}" />`;
+            document.body.appendChild(f);
+            f.submit();
+        };
+        if (window.KomaConfirm) KomaConfirm.open({
+            tone: 'navy', icon: 'check', title: `Move ${plural(u.upcoming, 'booking')} off table ${t.number}?`,
+            text: 'Each goes to a free table that fits the party (same area first). Customers are emailed their new table. Any that can\'t be moved are listed for you.',
+            ok: 'Move', no: 'Cancel', onOk: go
+        });
+        else go();
     }
 
     function sizeFields(r) {
@@ -417,6 +479,9 @@
         if (selected.kind === 'area') {
             const a = findArea(selected.id);
             const count = tablesIn(a).length;
+            const busy = tablesIn(a).map(t => usageOf.get(t.id)).find(u => u && (u.upcoming || u.seated));
+            if (busy) { say(`'${a.name}' has tables with upcoming bookings or guests seated, so it can't be removed. Move the bookings first, or untick Active.`, 'error'); return; }
+            if (areasWithHistory.has(a.id)) { say(`'${a.name}' has tables with booking history, so it can't be removed (past bookings and reports need them). Untick Active to close it instead.`, 'error'); return; }
             const removeArea = () => {
                 for (let i = tables.length - 1; i >= 0; i--) if (tables[i].areaId === a.id) tables.splice(i, 1);
                 areas.splice(areas.indexOf(a), 1);
@@ -438,6 +503,24 @@
             return;
         } else {
             const t = findTable(selected.id);
+            const u = usageOf.get(t.id);
+            if (u && u.seated) { say(`Guests are seated at table ${t.number} right now, so it can't be removed.`, 'error'); return; }
+            if (u && u.upcoming) { say(`Table ${t.number} has ${plural(u.upcoming, 'upcoming booking')} (next ${u.next}). Use Move upcoming bookings first.`, 'error'); return; }
+            if (u && u.history) {
+                // Kept for history: removed from the drawing now, archived (not deleted) when the layout is saved.
+                const archive = () => {
+                    tables.splice(tables.indexOf(t), 1);
+                    say(`Table ${t.number} will be archived when you click Save layout.`, 'info');
+                    selected = null; markDirty(); renderAll();
+                };
+                if (window.KomaConfirm) KomaConfirm.open({
+                    tone: 'warn', icon: 'info', title: `Archive table ${t.number}?`,
+                    text: 'It has booking history, so it is archived instead of deleted: hidden from the floor plan and never bookable, but kept for past bookings, bills and reports.',
+                    ok: 'Archive', no: 'Cancel', onOk: archive
+                });
+                else archive();
+                return;
+            }
             tables.splice(tables.indexOf(t), 1);
             say(`Table ${t.number} removed. Click Save layout to keep this change.`, 'info');
         }
@@ -465,7 +548,13 @@
             ghost.className = 'lay-ghost';
             els.floor.appendChild(ghost);
             drag = { mode: 'draw', start, ghost };
-        } else if (tool === 'table') {
+        } else if (tool === 'table' && e.target.closest('[data-chair-of]')) {
+            // Clicking a table's chair while adding tables selects that table (no new table).
+            select('table', +e.target.closest('[data-chair-of]').dataset.chairOf);
+            return;
+        } else if (tool === 'table' && !(target && target.dataset.kind === 'table')) {
+            // Add table: clicking empty space in an area adds a table. Clicking an existing table (including the one
+            // just added) selects and drags it instead of adding another on top (handled by the branch below).
             const area = areaAt(p.x, p.y);
             if (!area) { say('Click inside a dining area to add a table.', 'error'); return; }
             addTable(area, p.x, p.y);

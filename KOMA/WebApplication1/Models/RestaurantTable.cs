@@ -22,6 +22,11 @@ namespace KOMA.Models
 
         public bool IsActive { get; set; } = true;
 
+        // Archived = removed by the admin but kept because bookings, bills or reports still point at it
+        // (see Services/TableUsage.cs). Archived tables are hidden from the designer, floor views and lists,
+        // are never bookable (IsActive is false too) and their number can be used again.
+        public bool IsArchived { get; set; }
+
         [ForeignKey(nameof(DiningArea))]
         public int DiningAreaId { get; set; }
         public DiningArea? DiningArea { get; set; }

@@ -140,7 +140,7 @@ namespace KOMA.Pages.Admin
 
             // Live seating: a table is taken if it has an open (unpaid, not cancelled) order.
             Floors = await _db.FloorLayouts.AsNoTracking()
-                .Include(f => f.DiningAreas).ThenInclude(a => a.Tables)
+                .Include(f => f.DiningAreas).ThenInclude(a => a.Tables.Where(t => !t.IsArchived))   // archived tables are hidden
                 .OrderBy(f => f.Level).ThenBy(f => f.Name)
                 .ToListAsync();
             SeatedOrderByTable = open.Where(o => o.RestaurantTableId != null)

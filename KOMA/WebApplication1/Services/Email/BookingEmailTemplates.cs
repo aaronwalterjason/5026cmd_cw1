@@ -119,6 +119,25 @@ public static class BookingEmailTemplates
         return new Built(subject, html, text, []);
     }
 
+    // ---------- staff / admin invitation ----------
+    // roleLabel: "Staff" or "Admin". The person's name isn't known yet - they enter it on the registration page.
+    public static Built BuildInvite(string roleLabel, string invitedBy, string link, EmailOptions o)
+    {
+        var subject = $"You're invited to join KOMA as {roleLabel}";
+        var title = "Complete your registration";
+        var intro = $"Hello, {H(invitedBy)} has created a KOMA {H(roleLabel.ToLowerInvariant())} account for this email address. "
+                  + "Complete your registration with your name, phone number and a password to start using it.";
+        var note = "This link works once and expires after 24 hours. If it has expired, ask your manager to send a new invitation. "
+                 + "If you weren't expecting this email, you can ignore it.";
+        var button = $"<a href=\"{H(link)}\" style=\"display:inline-block;padding:12px 26px;border-radius:99px;background:{Navy};color:#f4f1e9;font-size:13.5px;font-weight:700;text-decoration:none\">Complete registration</a>";
+        var body = $"<div style=\"margin:4px 0 20px\">{button}</div>"
+                 + $"<p style=\"margin:0;font-size:12.5px;line-height:1.55;color:{Muted}\">{H(note)}</p>"
+                 + $"<p style=\"margin:14px 0 0;font-size:11.5px;line-height:1.5;color:{Muted};word-break:break-all\">If the button doesn't work, copy this link into your browser:<br>{H(link)}</p>";
+        var html = Page("招", title, intro, body, [], o, null);
+        var text = $"{title}\n\n{WebUtility.HtmlDecode(intro)}\n\nComplete registration: {link}\n\n{note}\n\nKOMA · {o.Address} · {o.Phone}\n";
+        return new Built(subject, html, text, []);
+    }
+
     // ---------- pieces ----------
     private static string Label(string t) =>
         $"<div style=\"font-size:11px;font-weight:700;letter-spacing:.1em;color:{Muted};margin:16px 0 4px\">{H(t.ToUpperInvariant())}</div>";

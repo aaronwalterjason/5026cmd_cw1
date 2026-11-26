@@ -175,16 +175,20 @@
             }
             if (form.matches(".arrival-form, .release-visit")) {
                 if (!response.ok || response.redirected) throw new Error(response.status === 409 ? await response.text() : "Could not update arrival.");
+                const done = { arrived: "Guest checked in.", called: "Call logged.", eta: "Arrival time confirmed.", cancel: "Reservation cancelled. The table is free again." };
+                window.KomaToast?.next(done[submit.value] || "Arrival updated.");   // shown after the reload
                 location.reload();
                 return;
             }
             if (form.matches(".walk-in-move")) {
                 if (!response.ok || response.redirected) throw new Error("Could not move the guest. Reopen the table to check availability.");
+                window.KomaToast?.next("Guest moved to the new table.");
                 location.reload();
                 return;
             }
             form.closest("dialog").close();
             if (!response.ok || response.redirected) throw new Error("Payment could not be confirmed. Reopen Food orders to check the bill.");
+            window.KomaToast?.show({ title: "Payment recorded", text: "The bill is settled." });
             await openTable(data.get("TableId"), data.get("BookingId"), data.get("SessionId"), "#food-tab");
         } catch (error) {
             form.closest("dialog")?.close();

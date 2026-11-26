@@ -9,6 +9,17 @@
 <form method="post" class="col-md-6">
     <input type="hidden" asp-for="Table.Id" />
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    @if (Model.Warning is not null)
+    {
+        @* Shown once when closing or shrinking a table with upcoming bookings; ticking the box saves anyway. *@
+        <div class="alert alert-warning">
+            <p class="mb-2">@Model.Warning</p>
+            <div class="form-check mb-0">
+                <input asp-for="ConfirmedWarning" class="form-check-input" />
+                <label asp-for="ConfirmedWarning" class="form-check-label">I understand – save anyway</label>
+            </div>
+        </div>
+    }
 
     <div class="mb-3">
         <label asp-for="Table.TableNumber" class="form-label"></label>

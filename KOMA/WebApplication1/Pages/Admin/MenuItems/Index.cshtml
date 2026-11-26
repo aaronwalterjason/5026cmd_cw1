@@ -11,21 +11,6 @@
     var panelRoute = Model.Route(id: Model.Id);
 }
 
-@if (TempData["StatusMessage"] is string status)
-{
-    @* Green check popup - shown after a change was saved, fades out on its own. *@
-    <div class="mn-toast" id="mn-toast" role="status" aria-live="polite">
-        <span class="mn-toast-check" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
-        </span>
-        <span class="mn-toast-text"><strong>Changes saved</strong><span>@status</span></span>
-        <button type="button" class="mn-toast-close" aria-label="Close">&times;</button>
-    </div>
-}
-@if (TempData["StatusError"] is string error)
-{
-    <div class="alert alert-danger mn-flash" role="alert">@error</div>
-}
 
 <div class="mn-shell">
 

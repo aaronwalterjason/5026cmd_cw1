@@ -17,7 +17,7 @@ namespace KOMA.Pages.Admin.Layouts
         public async Task OnGetAsync()
         {
             Floors = await _db.FloorLayouts.AsNoTracking()
-                .Include(f => f.DiningAreas).ThenInclude(a => a.Tables)
+                .Include(f => f.DiningAreas).ThenInclude(a => a.Tables.Where(t => !t.IsArchived))
                 .OrderBy(f => f.Level).ThenBy(f => f.Name)
                 .ToListAsync();
         }

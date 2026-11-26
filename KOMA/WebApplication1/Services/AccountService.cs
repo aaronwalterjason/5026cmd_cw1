@@ -12,11 +12,13 @@ public class AccountService(ApplicationDbContext db, UserManager<ApplicationUser
 {
     public static readonly string[] Roles = ["Administrator", "Staff", "Customer"];
 
-    public async Task<IdentityResult> CreateAsync(ApplicationUser user, string password, string role)
+    // password = null: an invited staff/admin account. It has no password, so nobody can sign in to it
+    // until the person opens the invitation link and sets one (Identity/Account/AcceptInvite).
+    public async Task<IdentityResult> CreateAsync(ApplicationUser user, string? password, string role)
     {
         if (!Roles.Contains(role)) return Failure("Choose a valid account role.");
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        var result = await users.CreateAsync(user, password);
+        var result = password is null ? await users.CreateAsync(user) : await users.CreateAsync(user, password);
         if (!result.Succeeded) return result;
         result = await users.AddToRoleAsync(user, role);
         if (!result.Succeeded) return result;

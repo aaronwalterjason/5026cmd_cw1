@@ -14,10 +14,6 @@
     var bannerStyle = string.IsNullOrEmpty(inp.BannerImageUrl) ? "" : $"background-image:url({inp.BannerImageUrl})";
 }
 
-@if (TempData["StatusMessage"] is string status)
-{
-    <div class="alert alert-success">@status</div>
-}
 
 @* ================= No promotions yet: one welcome card instead of an empty list and panel ================= *@
 @if (!Model.Promotions.Any() && Model.Mode != "new")

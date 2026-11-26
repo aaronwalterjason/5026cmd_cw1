@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="~/css/koma-home.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/customer-header.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/feedback.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/koma-toast.css" asp-append-version="true" />
 </head>
 <body>
     <a class="skip" href="#main">Skip to content</a>
@@ -59,6 +60,8 @@
         <button type="button" class="feedback-close" data-feedback-close>Close</button>
         <iframe src="@Url.Page("/Feedback")" title="Feedback form" loading="lazy"></iframe>
     </dialog>
+    <partial name="_Toast" />
+    <script src="~/js/koma-toast.js" asp-append-version="true" defer></script>
     <script src="~/js/feedback.js" asp-append-version="true" defer></script>
     <script src="~/js/koma-home.js" asp-append-version="true" defer></script>
     <partial name="_DemoClock" />

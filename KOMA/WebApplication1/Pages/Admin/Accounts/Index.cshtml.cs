@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -15,11 +16,14 @@ namespace KOMA.Pages.Admin.Accounts
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly AccountService _accounts;
         private readonly ApplicationDbContext _db;
-        public IndexModel(UserManager<ApplicationUser> userManager, AccountService accounts, ApplicationDbContext db)
+        private readonly KOMA.Services.Email.AccountEmailService _emails;
+        public IndexModel(UserManager<ApplicationUser> userManager, AccountService accounts, ApplicationDbContext db,
+            KOMA.Services.Email.AccountEmailService emails)
         {
             _userManager = userManager;
             _accounts = accounts;
             _db = db;
+            _emails = emails;
         }
 
         public List<AccountRow> Accounts { get; set; } = new();
@@ -154,6 +158,7 @@ namespace KOMA.Pages.Admin.Accounts
             public string? Phone { get; set; }
             public bool PhoneConfirmed { get; set; }
             public bool Locked { get; set; }
+            public DateTimeOffset? LockoutEnd { get; set; }
             public int FailedSignIns { get; set; }
             public DateTime? Since { get; set; }
             public string SinceFrom { get; set; } = "";
@@ -232,6 +237,7 @@ namespace KOMA.Pages.Admin.Accounts
                 Phone = u.PhoneNumber,
                 PhoneConfirmed = u.PhoneNumberConfirmed,
                 Locked = u.LockoutEnd.HasValue && u.LockoutEnd.Value > DateTimeOffset.UtcNow,
+                LockoutEnd = u.LockoutEnd,
                 FailedSignIns = u.AccessFailedCount,
                 Bookings = b,
             };
@@ -321,6 +327,7 @@ namespace KOMA.Pages.Admin.Accounts
             public bool IsAdmin => Role == "Administrator";
             public bool IsMe { get; set; }
             public bool Locked { get; set; }
+            public DateTimeOffset? LockoutEnd { get; set; }
             public int FailedSignIns { get; set; }
             public DateTime? LastActive { get; set; }
             public DateTime? FirstSeen { get; set; }
@@ -328,6 +335,9 @@ namespace KOMA.Pages.Admin.Accounts
             public int SignIns7 { get; set; }
             public int HelpDone { get; set; }
             public int AdminCount { get; set; }
+            public bool Pending { get; set; }              // invited, hasn't completed registration (no password)
+            public DateTime? InviteSentAt { get; set; }    // last invitation email (Admin > Activity > Emails)
+            public bool InviteSent { get; set; }           // ...and whether it actually went out
             public List<StaffAct> Activity { get; set; } = new();
             public List<StaffSignIn> SignIns { get; set; } = new();
             // Schedule tab (staff only, see Index.Schedule.cs)
@@ -369,6 +379,7 @@ namespace KOMA.Pages.Admin.Accounts
                 Role = role,
                 IsMe = u.Id == MyId,
                 Locked = u.LockoutEnd.HasValue && u.LockoutEnd.Value > DateTimeOffset.UtcNow,
+                LockoutEnd = u.LockoutEnd,
                 FailedSignIns = u.AccessFailedCount,
                 LastActive = stats?.Last, FirstSeen = stats?.First,
                 Changes7 = stats?.Changes ?? 0, SignIns7 = stats?.SignIns ?? 0, HelpDone = helpDone,
@@ -376,6 +387,15 @@ namespace KOMA.Pages.Admin.Accounts
                 Activity = activity, SignIns = signIns
             };
             p.Initials = Initials(new AccountRow(u.Id, p.Email, role, p.Name));
+            p.Pending = !await _userManager.HasPasswordAsync(u);
+            if (p.Pending)
+            {
+                var last = await _db.BookingEmails.AsNoTracking()
+                    .Where(e => e.Type == BookingEmailType.StaffInvite && e.ToEmail == u.Email)
+                    .OrderByDescending(e => e.CreatedAt).Select(e => new { e.CreatedAt, e.Status }).FirstOrDefaultAsync();
+                p.InviteSentAt = last?.CreatedAt;
+                p.InviteSent = last?.Status == BookingEmailStatus.Sent;
+            }
             if (!p.IsAdmin) await FillPanelScheduleAsync(p);
             return p;
         }
@@ -387,11 +407,29 @@ namespace KOMA.Pages.Admin.Accounts
             var user = await _userManager.FindByIdAsync(userId);
             if (user is null) return NotFound();
             var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault() ?? "Customer";
-            if (role == "Customer") return Forbid();
+            if (role == "Customer" || !await _userManager.HasPasswordAsync(user)) return Forbid();
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
             var code = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(System.Text.Encoding.UTF8.GetBytes(token));
             var url = Url.Page("/Account/ResetPassword", null, new { area = "Identity", code }, Request.Scheme);
             return new JsonResult(new { url });
+        }
+
+        // Email the staff member / admin a password reset link - the same email and Reset password page customers get
+        // from "Forgot password". The link works once and expires like any reset link. Only for accounts that have
+        // completed registration (a pending invite uses Resend invite instead).
+        public async Task<IActionResult> OnPostResetEmailAsync(string userId)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user is null) return NotFound();
+            var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault() ?? "Customer";
+            if (role == "Customer" || !await _userManager.HasPasswordAsync(user)) return Forbid();
+            var sent = await _emails.SendResetAsync(user, code =>
+                Url.Page("/Account/ResetPassword", null, new { area = "Identity", code }, Request.Scheme)!);
+            if (sent) await LogAccountAsync(user, "Password reset sent", $"Reset email · {user.Email}");
+            TempData[sent ? "StatusMessage" : "StatusError"] = sent
+                ? $"A password reset email was sent to {user.Email}."
+                : $"Couldn't send the reset email to {user.Email} just now (only one per minute, or email isn't set up). Try again shortly or copy the link instead.";
+            return RedirectToPage(new { group = GroupKey(role), id = user.Id });
         }
 
         // Lock / unlock someone's sign-in from the panel. Never yourself, and never the last admin who can still sign in.
@@ -408,7 +446,7 @@ namespace KOMA.Pages.Admin.Accounts
                     .Count(a => !(a.LockoutEnd.HasValue && a.LockoutEnd.Value > DateTimeOffset.UtcNow));
                 if (openAdmins <= 1)
                 {
-                    TempData["StatusMessage"] = "The last admin can't be locked.";
+                    TempData["StatusError"] = "The last admin can't be locked.";
                     return RedirectToPage(new { group = groupKey, id = user.Id });
                 }
             }
@@ -418,12 +456,16 @@ namespace KOMA.Pages.Admin.Accounts
                 await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
                 await _userManager.UpdateSecurityStampAsync(user);   // signs them out on their next request check
                 TempData["StatusMessage"] = $"{user.Email} is locked and can't sign in.";
+                await LogAccountAsync(user, "Account locked", $"{RoleName(role)} · {user.Email} · until unlocked by an admin");
             }
             else
             {
+                var wasAutoLocked = IsAutoLocked(user.LockoutEnd);
                 await _userManager.SetLockoutEndDateAsync(user, null);
                 await _userManager.ResetAccessFailedCountAsync(user);
                 TempData["StatusMessage"] = $"{user.Email} can sign in again.";
+                await LogAccountAsync(user, wasAutoLocked ? "Account unlocked (early)" : "Account unlocked",
+                    $"{RoleName(role)} · {user.Email}" + (wasAutoLocked ? " · was locked after too many wrong passwords" : ""));
             }
             return RedirectToPage(new { group = groupKey, id = user.Id });
         }
@@ -436,14 +478,22 @@ namespace KOMA.Pages.Admin.Accounts
                 var oldRole = (await _userManager.GetRolesAsync(user)).FirstOrDefault() ?? "Customer";
                 if (user.Id == MyId && role != oldRole)
                 {
-                    TempData["StatusMessage"] = "You can't change your own role.";
+                    TempData["StatusError"] = "You can't change your own role.";
                     return RedirectToPage(new { group = CurrentGroup?.Key });
                 }
                 // Customers sign up themselves, so they are never promoted to Staff/Admin from here -
                 // a staff member gets their own work account instead.
-                var result = oldRole == "Customer" && role != "Customer"
-                    ? IdentityResult.Failed(new IdentityError { Description = "Customer accounts can't be changed to Staff or Admin. Create a separate staff account instead." })
-                    : await _accounts.SetRoleAsync(user, role);
+                // The other way is allowed: a staff/admin account can become a Customer (e.g. someone who left but
+                // still dines here). It is one-way from this page; an admin's mistake can be undone with Revert in Admin > Activity
+                // (the role comes back, removed shifts don't).
+                // A pending invite (never registered) can't become a Customer: cancel the invite instead.
+                IdentityResult result;
+                if (oldRole == "Customer" && role != "Customer")
+                    result = IdentityResult.Failed(new IdentityError { Description = "Customer accounts can't be changed to Staff or Admin. Use Invite staff or Invite admin to create a work account instead." });
+                else if (role == "Customer" && oldRole != "Customer" && !await _userManager.HasPasswordAsync(user))
+                    result = IdentityResult.Failed(new IdentityError { Description = "This person hasn't completed their invitation yet. Use Cancel invite instead." });
+                else
+                    result = await _accounts.SetRoleAsync(user, role);   // also keeps at least one admin and signs them out of staff/admin pages
                 if (!result.Succeeded)
                 {
                     foreach (var error in result.Errors) ModelState.AddModelError(string.Empty, error.Description);
@@ -452,6 +502,18 @@ namespace KOMA.Pages.Admin.Accounts
                     return Page();
                 }
                 TempData["StatusMessage"] = $"{user.Email} is now {role}.";
+                if (role == "Customer" && oldRole != "Customer")
+                {
+                    // A customer has no duty roster: drop their shifts and leave from today on (past shifts stay for Reports > Team).
+                    var today = DateOnly.FromDateTime(DateTime.Today);
+                    var future = await _db.ShiftAssignments.Where(a => a.UserId == user.Id && a.Date >= today).ToListAsync();
+                    if (future.Count > 0)
+                    {
+                        _db.ShiftAssignments.RemoveRange(future);
+                        await _db.SaveChangesAsync();
+                        TempData["StatusMessage"] = $"{user.Email} is now Customer. {future.Count} upcoming shift{(future.Count == 1 ? " was" : "s were")} removed from the schedule.";
+                    }
+                }
                 if (oldRole != role) await LogRoleChangeAsync(_db, User, user, oldRole, role, null);
                 // Changed from the details panel: go to their new group with the panel open again.
                 if (Request.HasFormContentType && Request.Form.ContainsKey("panel"))
@@ -459,6 +521,144 @@ namespace KOMA.Pages.Admin.Accounts
             }
 
             return RedirectToPage(new { group = CurrentGroup?.Key });   // stay in the same group
+        }
+
+        // ---------- Invite staff / Invite admin ----------
+        // Customers sign up themselves. A staff or admin work account is started here with just an email:
+        // the account (role + profile) is created without a password and an invitation email is sent. The person
+        // completes their own details and password from the link (Identity/Account/AcceptInvite, valid 24 hours).
+        // The role comes from the group being viewed (Staff or Admins), never from the form.
+        public class InviteInput
+        {
+            [Required(ErrorMessage = "Enter an email address."), EmailAddress(ErrorMessage = "Enter a valid email address."), StringLength(256)]
+            [Display(Name = "Work email")]
+            public string Email { get; set; } = string.Empty;
+        }
+
+        // Not a [BindProperty]: bound only by OnPostInviteAsync, so the other forms on this page never validate it.
+        public InviteInput Invite { get; set; } = new();
+        public bool ShowInvite { get; set; }   // re-open the Invite pop-up after a failed save
+        public bool CanInvite => CurrentGroup is { Role: "Staff" or "Administrator" } && !IsSchedule;
+        public static string InviteLabel(GroupInfo g) => g.Role == "Administrator" ? "Invite admin" : "Invite staff";
+
+        public async Task<IActionResult> OnPostInviteAsync(InviteInput invite)
+        {
+            var g = CurrentGroup;
+            if (g is null || g.Role is not ("Staff" or "Administrator")) return BadRequest();
+            Invite = invite;
+            var email = (invite.Email ?? "").Trim();
+
+            if (ModelState.IsValid && await _userManager.FindByEmailAsync(email) is not null)
+                ModelState.AddModelError("Invite.Email", "An account with this email already exists.");
+
+            if (ModelState.IsValid)
+            {
+                var user = new ApplicationUser { UserName = email, Email = email };
+                var result = await _accounts.CreateAsync(user, null, g.Role);   // user + role + profile in one transaction, no password
+                if (result.Succeeded)
+                {
+                    await LogAccountAsync(user, "Invite sent", $"New {Label(g.Role)} account · {email}");
+                    var sent = await SendInviteAsync(user, g.Role);
+                    if (!sent) TempData["StatusTitle"] = "Account created";   // created, but the email didn't go out
+                    TempData[sent ? "StatusMessage" : "StatusError"] = sent
+                        ? $"Invitation sent to {email}. The link works for 24 hours."
+                        : $"The account for {email} was created, but the invitation email couldn't be sent. Open their card and use Copy invite link, or try Resend invite.";
+                    return RedirectToPage(new { group = g.Key, id = user.Id });   // open the new person's panel
+                }
+                foreach (var error in result.Errors) ModelState.AddModelError("Invite", error.Description);
+            }
+
+            ShowInvite = true;
+            await LoadAccountsAsync();
+            await LoadStatsAsync();
+            return Page();
+        }
+
+        // Resend: renews the security stamp first, so any earlier invitation link stops working.
+        public async Task<IActionResult> OnPostInviteResendAsync(string userId)
+        {
+            var (user, role) = await PendingAsync(userId);
+            if (user is null) return NotFound();
+            await _userManager.UpdateSecurityStampAsync(user);
+            var sent = await SendInviteAsync(user, role!);
+            if (sent) await LogAccountAsync(user, "Invite resent", $"{Label(role!)} · {user.Email}");
+            TempData[sent ? "StatusMessage" : "StatusError"] = sent
+                ? $"A new invitation was sent to {user.Email}. Earlier links no longer work."
+                : $"Couldn't send the invitation to {user.Email} just now (only one per minute, or email isn't set up). Try again shortly or use Copy invite link.";
+            return RedirectToPage(new { group = GroupKey(role!), id = user.Id });
+        }
+
+        // Fallback when email isn't arriving: the same 24-hour link, shown in the panel to copy and pass on.
+        public async Task<IActionResult> OnPostInviteLinkAsync(string userId)
+        {
+            var (user, _) = await PendingAsync(userId);
+            if (user is null) return NotFound();
+            return new JsonResult(new { url = InviteUrl(user.Id, await _emails.InviteCodeAsync(user)) });
+        }
+
+        // Cancel: deletes the account, but only while the invitation is still pending (never registered).
+        public async Task<IActionResult> OnPostInviteCancelAsync(string userId)
+        {
+            var (user, role) = await PendingAsync(userId);
+            if (user is null) return NotFound();
+            var email = user.Email;
+            var result = await _userManager.DeleteAsync(user);   // profile and any shifts are removed by cascade
+            if (!result.Succeeded)
+            {
+                TempData["StatusError"] = "Couldn't cancel the invitation. Try again.";
+                return RedirectToPage(new { group = GroupKey(role!), id = user.Id });
+            }
+            await LogAccountAsync(user, "Invite cancelled", $"{Label(role!)} · {email}");
+            TempData["StatusMessage"] = $"The invitation for {email} was cancelled.";
+            return RedirectToPage(new { group = GroupKey(role!) });
+        }
+
+        // A staff/admin account that hasn't completed registration yet (no password). Never yourself.
+        private async Task<(ApplicationUser? User, string? Role)> PendingAsync(string userId)
+        {
+            var user = string.IsNullOrEmpty(userId) ? null : await _userManager.FindByIdAsync(userId);
+            if (user is null || user.Id == MyId || await _userManager.HasPasswordAsync(user)) return (null, null);
+            var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault(r => r is "Staff" or "Administrator");
+            return role is null ? (null, null) : (user, role);
+        }
+
+        private async Task<bool> SendInviteAsync(ApplicationUser user, string role)
+        {
+            var me = await _userManager.GetUserAsync(User);
+            var by = me?.FullName ?? me?.Email ?? "The KOMA manager";
+            return await _emails.SendInviteAsync(user, role, by, code => InviteUrl(user.Id, code));
+        }
+
+        private string InviteUrl(string userId, string code) =>
+            Url.Page("/Account/AcceptInvite", null, new { area = "Identity", userId, code }, Request.Scheme)!;
+
+        private static string RoleName(string role) => role switch { "Administrator" => "Admin", "Staff" => "Staff", _ => "Customer" };
+
+        // Locked by 5 wrong passwords (ends in 15 minutes) rather than by an admin (no end date: DateTimeOffset.MaxValue).
+        public static bool IsAutoLocked(DateTimeOffset? end) =>
+            end is { } e && e > DateTimeOffset.UtcNow && e < DateTimeOffset.UtcNow.AddYears(1);
+
+        // Panel status line: "Active", "Locked", or "Locked until 9:45 PM · too many wrong passwords".
+        public static string LockText(bool locked, DateTimeOffset? end) =>
+            !locked ? "Active"
+            : IsAutoLocked(end) ? $"Locked until {end!.Value.ToLocalTime():h:mm tt} · too many wrong passwords"
+            : "Locked";
+
+        private static string Label(string role) => role == "Administrator" ? "Admin" : "Staff";
+        private static string? GroupKey(string role) => Groups.FirstOrDefault(x => x.Role == role)?.Key;
+
+        // Admin > Activity entry (Settings tab). No snapshots, so it is a record only - accounts are not reverted from Activity.
+        private async Task LogAccountAsync(ApplicationUser target, string action, string summary)
+        {
+            var who = AuditInterceptor.StaffOrAdmin(User);
+            var me = who?.Id is null ? null : await _db.Users.FindAsync(who.Value.Id);
+            _db.ActivityLogs.Add(new ActivityLog
+            {
+                UserId = who?.Id, UserRole = who?.Role, UserName = me?.FullName ?? me?.Email ?? User.Identity?.Name ?? "Unknown",
+                Area = ActivityLog.Areas.Settings, Action = action,
+                Title = target.FullName ?? target.Email ?? target.Id, Summary = summary
+            });
+            await _db.SaveChangesAsync();
         }
 
         // One query for every account and its role (instead of a separate role lookup per user).
@@ -472,14 +672,17 @@ namespace KOMA.Pages.Admin.Accounts
             var roleByUser = roleOf.GroupBy(x => x.UserId).ToDictionary(g => g.Key, g => g.First().Name);
 
             var users = await _db.Users.AsNoTracking()
-                .Select(u => new { u.Id, u.Email, u.UserName, u.FullName, u.PhoneNumber }).ToListAsync();
+                .Select(u => new { u.Id, u.Email, u.UserName, u.FullName, u.PhoneNumber, NoPassword = u.PasswordHash == null }).ToListAsync();
 
-            Accounts = users.Select(u => new AccountRow(u.Id, u.Email ?? u.UserName ?? "(no email)",
-                roleByUser.TryGetValue(u.Id, out var role) && role is not null ? role : "Customer",
-                u.FullName, u.PhoneNumber)).ToList();
+            Accounts = users.Select(u =>
+            {
+                var role = roleByUser.TryGetValue(u.Id, out var r) && r is not null ? r : "Customer";
+                return new AccountRow(u.Id, u.Email ?? u.UserName ?? "(no email)", role, u.FullName, u.PhoneNumber,
+                    Pending: u.NoPassword && role != "Customer");   // invited staff/admin who hasn't registered yet
+            }).ToList();
         }
 
-        public record AccountRow(string UserId, string Email, string Role, string? FullName = null, string? Phone = null);
+        public record AccountRow(string UserId, string Email, string Role, string? FullName = null, string? Phone = null, bool Pending = false);
 
         // Admin > Activity entry for a role change (also used when an admin reverts one).
         public static async Task<ActivityLog> LogRoleChangeAsync(ApplicationDbContext db, System.Security.Claims.ClaimsPrincipal by,

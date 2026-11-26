@@ -11,6 +11,9 @@ namespace KOMA.Areas.Identity.Pages.Account.Manage;
 public class IndexModel(UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signIn) : PageModel
 {
     public string? Email { get; set; }
+    // Staff and admins must keep a phone number (the restaurant may need to reach them about shifts);
+    // it is also required when they complete registration from their invitation (AcceptInvite). Optional for customers.
+    public bool PhoneRequired => User.IsInRole("Staff") || User.IsInRole("Administrator");
     [TempData] public string? StatusMessage { get; set; }
     [BindProperty] public InputModel Input { get; set; } = new();
     public class InputModel
@@ -19,7 +22,7 @@ public class IndexModel(UserManager<ApplicationUser> users, SignInManager<Applic
         public string FirstName { get; set; } = "";
         [Required, StringLength(49), Display(Name = "Last name")]
         public string LastName { get; set; } = "";
-        [Phone, StringLength(30), Display(Name = "Phone number")]
+        [RegularExpression(PhoneRules.Pattern, ErrorMessage = PhoneRules.Message), StringLength(30), Display(Name = "Phone number")]
         public string? PhoneNumber { get; set; }
     }
     public async Task<IActionResult> OnGetAsync()
@@ -35,6 +38,8 @@ public class IndexModel(UserManager<ApplicationUser> users, SignInManager<Applic
         var user = await users.GetUserAsync(User);
         if (user == null) return Challenge();
         Email = user.Email;
+        if (PhoneRequired && string.IsNullOrWhiteSpace(Input.PhoneNumber))
+            ModelState.AddModelError("Input.PhoneNumber", "Staff and admin accounts need a phone number.");
         if (!ModelState.IsValid) return Page();
         user.FirstName = Input.FirstName.Trim();
         user.LastName = Input.LastName.Trim();

@@ -1,17 +1,53 @@
 @page "{id:int}"
 @model KOMA.Pages.Admin.Tables.DeleteModel
 @{
-    ViewData["Title"] = "Delete Table";
+    ViewData["Title"] = "Remove Table";
+    var u = Model.Usage;
 }
 
-<h1>Delete Table</h1>
+<h1>Remove table @Model.Table.TableNumber</h1>
+<p class="text-muted">@Model.Table.DiningArea?.Name · @Model.Table.Capacity seats</p>
 
-<div class="alert alert-warning">
-    Are you sure you want to delete table <strong>@Model.Table.TableNumber</strong>? This cannot be undone.
-</div>
-
-<form method="post">
-    <input type="hidden" asp-for="Table.Id" />
-    <button type="submit" class="btn btn-danger">Delete</button>
-    <a asp-page="./Index" class="btn btn-link">Cancel</a>
-</form>
+@if (u.Seated)
+{
+    <div class="alert alert-danger">Guests are seated at this table right now, so it can't be removed. Try again after they leave.</div>
+    <a asp-page="./Index" class="btn btn-link px-0">Back to tables</a>
+}
+else if (u.Upcoming > 0)
+{
+    @* Upcoming bookings: they need a table, so removing is blocked until they are moved. *@
+    <div class="alert alert-warning">
+        <strong>This table has @u.Upcoming upcoming booking@(u.Upcoming == 1 ? "" : "s")</strong> (next: @u.NextText, up to @u.MaxGuests guests),
+        so it can't be removed yet. Move the bookings to other tables first. Each customer is emailed their new table.
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="post" asp-page-handler="MoveBookings" asp-route-id="@Model.Table.Id">
+            <button type="submit" class="btn btn-primary">Move upcoming bookings</button>
+        </form>
+        <a asp-page="./Index" class="btn btn-link">Cancel</a>
+    </div>
+}
+else if (u.HasHistory)
+{
+    <div class="alert alert-info">
+        This table has <strong>booking history</strong>, so it will be <strong>archived</strong> instead of deleted:
+        it disappears from the floor plan and can't be booked, but past bookings, bills and reports still show it.
+        Its number can be used for a new table.
+    </div>
+    <form method="post">
+        <input type="hidden" asp-for="Table.Id" />
+        <button type="submit" class="btn btn-danger">Archive table</button>
+        <a asp-page="./Index" class="btn btn-link">Cancel</a>
+    </form>
+}
+else
+{
+    <div class="alert alert-warning">
+        Table <strong>@Model.Table.TableNumber</strong> has never been booked. Delete it? This can't be undone.
+    </div>
+    <form method="post">
+        <input type="hidden" asp-for="Table.Id" />
+        <button type="submit" class="btn btn-danger">Delete</button>
+        <a asp-page="./Index" class="btn btn-link">Cancel</a>
+    </form>
+}

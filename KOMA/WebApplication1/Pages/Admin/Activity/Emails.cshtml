@@ -4,18 +4,14 @@
 @using KOMA.Pages.Admin.Activity
 @{
     ViewData["Title"] = "Emails · Activity";
-    var colors = new Dictionary<BookingEmailType, string> { [BookingEmailType.Confirmed] = "#263b49", [BookingEmailType.Updated] = "#4f6d82", [BookingEmailType.Cancelled] = "#974535", [BookingEmailType.Reminder] = "#8b6a2e", [BookingEmailType.ConfirmEmail] = "#42602d", [BookingEmailType.PasswordReset] = "#7a837e" };
-    string Label(BookingEmailType t) => t switch { BookingEmailType.ConfirmEmail => "Confirm email", BookingEmailType.PasswordReset => "Password reset", _ => t.ToString() };
+    var colors = new Dictionary<BookingEmailType, string> { [BookingEmailType.Confirmed] = "#263b49", [BookingEmailType.Updated] = "#4f6d82", [BookingEmailType.Cancelled] = "#974535", [BookingEmailType.Reminder] = "#8b6a2e", [BookingEmailType.ConfirmEmail] = "#42602d", [BookingEmailType.PasswordReset] = "#7a837e", [BookingEmailType.StaffInvite] = "#d0442b" };
+    string Label(BookingEmailType t) => t switch { BookingEmailType.ConfirmEmail => "Confirm email", BookingEmailType.PasswordReset => "Password reset", BookingEmailType.StaffInvite => "Staff invite", _ => t.ToString() };
     string When(DateTime d) => d.Date == KOMA.Services.ReservationRules.MalaysiaNow.Date ? d.ToString("h:mm tt") : d.ToString("d MMM, h:mm tt");
 }
 @*
     Admin > Activity > Emails: the booking email outbox (Services/Email). Failed rows show the reason and Resend;
     Skipped = nothing to send (no address, booking cancelled first ...); Waiting = queued (grouped edits, reminders).
 *@
-@if (TempData["StatusMessage"] is string status)
-{
-    <div class="alert alert-success">@status</div>
-}
 <div class="em-head">
     <h1 class="mb-0">Activity</h1>
     <form method="get" class="em-range">

@@ -34,7 +34,11 @@ public class IndexModel(ApplicationDbContext _db, MenuImageService images) : Pag
         public decimal DiscountPercent { get; set; } = 20;
         public List<int> Days { get; set; } = new() { 0, 1, 2, 3, 4, 5, 6 };
         public bool AllDay { get; set; } = true;
+        // Minutes since midnight. Range-checked so a tampered value (e.g. 2000 = "33:20") is refused with a message
+        // instead of crashing when it is turned into a TimeOnly on save.
+        [Range(0, 1439, ErrorMessage = "Choose a start time between 00:00 and 23:59.")]
         public int FromMin { get; set; } = 690;     // 11:30
+        [Range(0, 1439, ErrorMessage = "Choose an end time between 00:00 and 23:59.")]
         public int ToMin { get; set; } = 870;       // 2:30 pm
         [DataType(DataType.Date)] public DateTime StartDate { get; set; } = KOMA.Services.DemoClock.Shared.MalaysiaNow.Date;
         [DataType(DataType.Date)] public DateTime EndDate { get; set; } = KOMA.Services.DemoClock.Shared.MalaysiaNow.Date.AddDays(30);

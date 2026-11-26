@@ -15,17 +15,24 @@
     let start = null;
 
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    const cell = () => grid.clientWidth / maxW;   // pixels per metre
+    // Pixels per metre. Uses the smaller of width and height, so maxW x maxH metres always fit inside the grid
+    // even if the grid isn't exactly 60:40 on some screen.
+    const cell = () => Math.min(grid.clientWidth / maxW, grid.clientHeight / maxH);
 
+    // Pointer position in whole metres, measured inside the grid's border, never past the edges.
     function metresAt(e) {
         const r = grid.getBoundingClientRect();
+        const c = cell();
         return {
-            x: clamp(Math.round((e.clientX - r.left) / cell()), 0, maxW),
-            y: clamp(Math.round((e.clientY - r.top) / cell()), 0, maxH)
+            x: clamp(Math.round((e.clientX - r.left - grid.clientLeft) / c), 0, maxW),
+            y: clamp(Math.round((e.clientY - r.top - grid.clientTop) / c), 0, maxH)
         };
     }
 
     function draw(x, y, w, h) {
+        // Keep the rectangle on the grid: x + w never past maxW, y + h never past maxH.
+        w = clamp(w, 0, maxW); h = clamp(h, 0, maxH);
+        x = clamp(x, 0, maxW - w); y = clamp(y, 0, maxH - h);
         const c = cell();
         grid.style.backgroundSize = `${c}px ${c}px`;
         rect.style.left = `${x * c}px`;
@@ -65,6 +72,8 @@
         origin = { x: Math.min(start.x, p.x), y: Math.min(start.y, p.y) };
         start = null;
         // A plain click (or a tiny drag) keeps the minimum size instead of a 0 m floor.
+        // Growing a click near the right/bottom edge to the minimum moves it left/up instead of past the edge
+        // (fromInputs clamps the origin).
         w = Math.max(w, min); h = Math.max(h, min);
         widthInput.value = clamp(w, min, maxW);
         heightInput.value = clamp(h, min, maxH);

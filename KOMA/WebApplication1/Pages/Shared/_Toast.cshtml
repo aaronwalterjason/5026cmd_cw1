@@ -1,0 +1,40 @@
+@*
+    Shared KOMA pop-up after an action (the green tick from Admin > Menu, now used in every module).
+    Rendered once by each layout (_Layout, _PublicLayout, Dining/_TabletLayout); styles in css/koma-toast.css,
+    behaviour in js/koma-toast.js (fades out after a few seconds, × closes it).
+
+    Pages don't show these messages themselves any more - they just set TempData and redirect:
+      Success (green tick, "Done")   : TempData["StatusMessage"], ["SuccessMessage"], ["OrderSuccess"], ["DiningNotice"]
+      Didn't happen / note (amber !) : TempData["StatusError"]
+      Optional headings              : TempData["StatusTitle"] (green, default "Done"),
+                                       TempData["StatusNoteTitle"] (amber, default "Not done")
+    Identity's "Error…" StatusMessage is left to the Account pages' own red alert (_StatusMessage partial).
+    Scripts (fetch actions with no page reload) use KomaToast.show(...) / KomaToast.next(...) - see koma-toast.js.
+*@
+@{
+    string? Take(string key) => TempData[key] is string s && !string.IsNullOrWhiteSpace(s) ? s : null;
+    var status = Take("StatusMessage");
+    if (status is not null && status.StartsWith("Error", StringComparison.OrdinalIgnoreCase)) status = null;
+    var ok = status ?? Take("SuccessMessage") ?? Take("OrderSuccess") ?? Take("DiningNotice");
+    var note = Take("StatusError");
+    var title = Take("StatusTitle");
+    var noteTitle = Take("StatusNoteTitle");
+}
+<div class="kt-stack" id="kt-stack" aria-live="polite">
+    @if (ok is not null)
+    {
+        <div class="kt" role="status">
+            <span class="kt-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span>
+            <span class="kt-text"><strong>@(title ?? "Done")</strong><span>@ok</span></span>
+            <button type="button" class="kt-close" aria-label="Close">&times;</button>
+        </div>
+    }
+    @if (note is not null)
+    {
+        <div class="kt is-note" role="alert">
+            <span class="kt-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 7v6" /><path d="M12 17h.01" /></svg></span>
+            <span class="kt-text"><strong>@(noteTitle ?? (ok is null && title is not null ? title : "Not done"))</strong><span>@note</span></span>
+            <button type="button" class="kt-close" aria-label="Close">&times;</button>
+        </div>
+    }
+</div>
