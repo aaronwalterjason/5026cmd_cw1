@@ -36,6 +36,11 @@ namespace KOMA.Pages.Admin.Reports
             public List<string> Head { get; init; } = new();
             public List<string[]> Rows { get; init; } = new();
             public HashSet<(int Row, int Col)> RedCells { get; init; } = new();
+            // Full list behind a card that only shows a top/bottom few on screen (Order: every dish).
+            // Added to the card's CSV and to the PDF/Excel/CSV export so the numbers add up to the card's total.
+            public string? DetailTitle { get; init; }
+            public List<string> DetailHead { get; init; } = new();
+            public List<string[]> Detail { get; init; } = new();
         }
 
         public Part Book { get; private set; } = null!;
@@ -69,6 +74,13 @@ namespace KOMA.Pages.Admin.Reports
             sb.AppendLine();
             sb.AppendLine(string.Join(",", new[] { "Chart", "Value" }.Select(Q)));
             foreach (var b in p.Bars) sb.AppendLine(Q(b.Label) + "," + Q(b.Text));
+            if (p.Detail.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine(Q(p.DetailTitle ?? "All"));
+                sb.AppendLine(string.Join(",", p.DetailHead.Select(Q)));
+                foreach (var r in p.Detail) sb.AppendLine(string.Join(",", r.Select(Q)));
+            }
             var name = $"koma-{p.Key}-{P.FileTag}.csv";
             return File(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray(), "text/csv", name);
         }
@@ -107,6 +119,7 @@ namespace KOMA.Pages.Admin.Reports
                         : p.Bars.Select(b => new[] { b.Full ?? b.Label, b.Text }).ToList();
                     if (chart.Count > 0) section.Tables.Add(new ReportTable(tt.Chart, tt.ChartHead, chart));
                     if (p.Rows.Count > 0) section.Tables.Add(new ReportTable(tt.Table, p.Head, p.Rows));
+                    if (p.Detail.Count > 0) section.Tables.Add(new ReportTable(p.DetailTitle ?? "All", p.DetailHead, p.Detail));
                 }
                 doc.Sections.Add(section);
             }
@@ -199,8 +212,16 @@ namespace KOMA.Pages.Admin.Reports
 
             // ---------- Order: most / least ordered dishes ----------
             var dishes = KOMA.Services.DishPopularity.Rank(items.Select(i => ((string?)i.Name, i.Quantity)));
-            Order = new Part("order", "Order", $"{dishes.Sum(d => d.Qty):N0} dishes", "Menu", "/Admin/MenuItems/Index", dishes.Count == 0)
+            var dishTotal = dishes.Sum(d => d.Qty);
+            // The card shows the top 6 and the bottom 3; the header says so, and the CSV/export list every dish.
+            Order = new Part("order", "Order",
+                dishes.Count <= 6 ? $"{dishTotal:N0} dishes" : $"{dishTotal:N0} dishes · {dishes.Count:N0} items, top 6 shown",
+                "Menu", "/Admin/MenuItems/Index", dishes.Count == 0)
             {
+                DetailTitle = "All dishes ordered",
+                DetailHead = new() { "Dish", "Ordered", "Share" },
+                Detail = dishes.Select(d => new[] { d.Name, d.Qty.ToString("N0"), dishTotal == 0 ? "0%" : $"{d.Qty * 100.0 / dishTotal:0.#}%" })
+                    .Append(new[] { "Total", dishTotal.ToString("N0"), "100%" }).ToList(),
                 Bars = dishes.Take(6).Select(d => new Bar(d.Name, d.Qty, d.Qty.ToString("N0"))).ToList(),
                 Head = new() { "Least ordered", "Dishes" },
                 Rows = dishes.Count <= 6 ? new() : dishes.TakeLast(3).OrderBy(d => d.Qty).Select(d => new[] { d.Name, d.Qty.ToString("N0") }).ToList()

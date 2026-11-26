@@ -78,7 +78,8 @@
                 <span class="rp-tools">
                     @if (!p.Empty)
                     {
-                        <a class="rp-csv" asp-page-handler="Csv" asp-route-part="@p.Key" asp-all-route-data="M.P.Route" title="Download CSV"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>CSV</a>
+                        @* asp-all-route-data REPLACES any asp-route-* values, so "part" goes into a copy of the period route. *@
+                        <a class="rp-csv" asp-page-handler="Csv" asp-all-route-data="@(new Dictionary<string, string>(M.P.Route) { ["part"] = p.Key })" title="Download CSV"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>CSV</a>
                     }
                     <a class="koma-go" href="@Url2(p)">@p.Link<span class="koma-go-disc" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span></a>
                 </span>
